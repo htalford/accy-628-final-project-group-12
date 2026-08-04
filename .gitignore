@@ -1,0 +1,19 @@
+# Environment variables — never commit secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Next.js / build
+.next/
+out/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+.vercel
