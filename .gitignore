@@ -16,12 +16,12 @@
 # next.js
 /.next/
 /out/
-
-# production
+/dist/
 /build
 
 # misc
 .DS_Store
+Thumbs.db
 *.pem
 
 # debug
@@ -29,11 +29,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files — never commit secrets
+.env
+.env.*
 !.env.example
-
 
 # vercel
 .vercel
