@@ -140,7 +140,12 @@ export type NavIcon =
   | "users"
   | "user-round"
   | "user-cog"
-  | "clipboard-list";
+  | "clipboard-list"
+  | "briefcase-business"
+  | "calendar"
+  | "building-2"
+  | "user-circle";
+
 export type NavItem = {
   href: string;
   label: string;
@@ -176,7 +181,13 @@ export function getNavForRole(role: UserRole): NavItem[] {
     case "recruiter":
       return [
         { href: "/recruiter/dashboard", label: "Dashboard", icon: "layout-dashboard" },
-        { href: "/recruiter/placements", label: "Placements", icon: "briefcase" },
+        { href: "/recruiter/job-orders", label: "Job Orders", icon: "briefcase-business" },
+        { href: "/recruiter/candidates", label: "Candidates in Pipeline", icon: "users" },
+        { href: "/recruiter/interviews", label: "Interviews Scheduled", icon: "calendar" },
+        { href: "/recruiter/placements", label: "Placements This Month", icon: "briefcase" },
+        { href: "/recruiter/clients", label: "Clients", icon: "building-2" },
+        { href: "/recruiter/messages", label: "Messages", icon: "message-square" },
+        { href: "/recruiter/profile", label: "Profile", icon: "user-circle" },
       ];
     case "accounting":
       return [
@@ -233,7 +244,13 @@ export function getPageTitle(pathname: string): string {
     "/candidate/profile": "Profile",
     "/candidate/timesheets": "Timesheets",
     "/recruiter/dashboard": "Dashboard",
-    "/recruiter/placements": "Placements",
+    "/recruiter/candidates": "Candidates in Pipeline",
+    "/recruiter/job-orders": "Job Orders",
+    "/recruiter/interviews": "Interviews Scheduled",
+    "/recruiter/placements": "Placements This Month",
+    "/recruiter/clients": "Clients",
+    "/recruiter/messages": "Messages",
+    "/recruiter/profile": "Profile",
   };
 
   if (map[pathname]) return map[pathname];
@@ -248,6 +265,9 @@ export function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/client/contracts/")) return "Contract";
   if (pathname.startsWith("/client/timesheets/")) return "Timesheet";
   if (pathname.startsWith("/client/invoices/")) return "Invoice";
+  if (pathname.startsWith("/recruiter/candidates/")) return "Candidate details";
+  if (pathname.startsWith("/recruiter/job-orders/")) return "Job order details";
+  if (pathname.startsWith("/recruiter/clients/")) return "Client details";
   return "TalentQuest";
 }
 

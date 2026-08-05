@@ -1,10 +1,15 @@
 export function StatusBadge({
   label,
+  status,
   tone = "neutral",
 }: {
-  label: string;
+  label?: string;
+  /** Alias for label (recruiter portal convenience). */
+  status?: string;
   tone?: "neutral" | "success" | "warning" | "danger" | "info";
 }) {
+  const text = label ?? status ?? "";
+  const resolvedTone = tone !== "neutral" || !status ? tone : statusTone(status);
   const tones: Record<string, string> = {
     neutral: "bg-[var(--cf-surface)] text-[var(--cf-ink)] border-[var(--cf-border)]",
     success: "bg-emerald-50 text-emerald-800 border-emerald-200",
@@ -14,21 +19,51 @@ export function StatusBadge({
   };
   return (
     <span
-      className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${tones[tone]}`}
+      className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${tones[resolvedTone]}`}
     >
-      {label}
+      {text}
     </span>
   );
 }
 
-export function statusTone(label: string): "neutral" | "success" | "warning" | "danger" | "info" {
+export function statusTone(
+  label: string,
+): "neutral" | "success" | "warning" | "danger" | "info" {
   const l = label.toLowerCase();
   if (l.includes("paid") && !l.includes("partial") && !l.includes("unpaid"))
     return "success";
-  if (l.includes("overdue") || l.includes("disputed") || l.includes("rejected"))
+  if (
+    l.includes("overdue") ||
+    l.includes("disputed") ||
+    l.includes("rejected") ||
+    l.includes("cancelled") ||
+    l.includes("ended") ||
+    l.includes("closed")
+  )
     return "danger";
-  if (l.includes("pending") || l.includes("draft") || l.includes("partial") || l.includes("sent"))
+  if (
+    l.includes("pending") ||
+    l.includes("draft") ||
+    l.includes("partial") ||
+    l.includes("sent") ||
+    l.includes("interview") ||
+    l.includes("screening") ||
+    l.includes("medium") ||
+    l.includes("starting") ||
+    l.includes("rescheduled")
+  )
     return "warning";
-  if (l.includes("active") || l.includes("approved")) return "info";
+  if (
+    l.includes("active") ||
+    l.includes("approved") ||
+    l.includes("open") ||
+    l.includes("hired") ||
+    l.includes("filled") ||
+    l.includes("completed") ||
+    l.includes("scheduled") ||
+    l.includes("high") ||
+    l.includes("extended")
+  )
+    return "info";
   return "neutral";
 }
