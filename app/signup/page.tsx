@@ -18,7 +18,7 @@ export default function SignupPage() {
           Create your account
         </h1>
         <p className="mt-4 leading-relaxed text-[var(--ot-muted)]">
-          Sign up as an employer, candidate, recruiter, or accounting user.
+          Tell us whether you hire talent or you&apos;re looking for work.
         </p>
         <div className="mt-8 rounded-xl border border-[var(--ot-border)] bg-white p-6 shadow-sm">
           <SignupForm />

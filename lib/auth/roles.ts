@@ -7,6 +7,19 @@ export const USER_ROLES: UserRole[] = [
   "accounting",
 ];
 
+export const STAFF_ROLES: UserRole[] = ["recruiter", "accounting"];
+export const STAFF_EMAIL_DOMAIN = "talentquest.com";
+
+export function isStaffRole(role: UserRole): boolean {
+  return STAFF_ROLES.includes(role);
+}
+
+export function staffEmailFromUsername(input: string): string {
+  const trimmed = input.trim().toLowerCase();
+  const local = trimmed.includes("@") ? trimmed.split("@")[0]! : trimmed;
+  return `${local}@${STAFF_EMAIL_DOMAIN}`;
+}
+
 export const ROLE_LABELS: Record<UserRole, string> = {
   employer: "Employer",
   candidate: "Candidate",

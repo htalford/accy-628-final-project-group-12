@@ -1,8 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
-import { LoginForm } from "./login-form";
+import { StaffLoginForm } from "./staff-login-form";
 
-export default function LoginPage() {
+export const metadata = {
+  title: "Employee Sign In · TalentQuest",
+  description: "Sign in for Talent Quest staff — recruiters, accounting, and managers.",
+};
+
+export default function StaffLoginPage() {
   return (
     <div className="flex min-h-full flex-1 items-center justify-center bg-[var(--ot-surface)] px-4 py-16">
       <div className="w-full max-w-md">
@@ -18,32 +23,25 @@ export default function LoginPage() {
             />
           </Link>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight text-[var(--ot-navy)]">
-            Client sign in
+            Employee sign in
           </h1>
           <p className="mt-2 text-sm text-[var(--ot-muted)]">
-            This sign-in page is for Talent Quest clients.
+            For Talent Quest staff — recruiters, managers, accountants, and other
+            internal team members. Enter your username only; your email is always{" "}
+            <span className="font-medium text-[var(--ot-navy)]">
+              @talentquest.com
+            </span>
+            .
           </p>
         </div>
         <div className="rounded-xl border border-[var(--ot-border)] bg-white p-6 shadow-sm">
-          <LoginForm />
+          <StaffLoginForm />
         </div>
         <p className="mt-4 text-center text-sm text-[var(--ot-muted)]">
-          New here?{" "}
-          <Link href="/signup" className="font-semibold text-[var(--ot-ocean)]">
-            Get started
+          Looking for client access?{" "}
+          <Link href="/login" className="font-semibold text-[var(--ot-ocean)]">
+            Client sign in
           </Link>
-        </p>
-        <p className="mt-2 text-center text-sm text-[var(--ot-muted)]">
-          Talent Quest staff?{" "}
-          <Link
-            href="/careers/login"
-            className="font-semibold text-[var(--ot-ocean)]"
-          >
-            Employee sign in
-          </Link>
-        </p>
-        <p className="mt-2 text-center text-xs text-[var(--ot-muted)]">
-          Demo password: <code className="font-mono">DemoPass123!</code>
         </p>
       </div>
     </div>

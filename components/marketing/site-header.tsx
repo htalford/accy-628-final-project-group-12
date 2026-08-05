@@ -32,9 +32,9 @@ const careerItems = [
     description: "Culture, benefits, and what to expect",
   },
   {
-    href: "/login",
+    href: "/careers/login",
     label: "Employee Login",
-    description: "For current TalentQuest employees",
+    description: "For TalentQuest staff: recruiters, managers, accounting",
   },
 ];
 

@@ -41,7 +41,7 @@ export default function WorkingHerePage() {
             How to apply
           </Link>
           <Link
-            href="/login"
+            href="/careers/login"
             className="text-sm font-semibold text-[var(--ot-navy)] hover:text-[var(--ot-ocean)]"
           >
             Current employee login

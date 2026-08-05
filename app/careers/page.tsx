@@ -18,9 +18,9 @@ const cards = [
     body: "Learn about our culture, how recruiters work, and what we value.",
   },
   {
-    href: "/login",
+    href: "/careers/login",
     title: "Employee login",
-    body: "Current TalentQuest employees can sign in to the internal portal.",
+    body: "Staff sign-in for recruiters, managers, accountants, and other Talent Quest team members.",
   },
 ];
 
