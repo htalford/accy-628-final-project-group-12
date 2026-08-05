@@ -7,6 +7,9 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Briefcase,
+  BriefcaseBusiness,
+  Building2,
+  Calendar,
   CheckCircle2,
   CircleDollarSign,
   ClipboardCheck,
@@ -25,6 +28,7 @@ import {
   Send,
   TrendingUp,
   User,
+  UserCircle,
   UserCog,
   UserRound,
   Users,
@@ -63,6 +67,10 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   users: Users,
   "user-round": UserRound,
   "user-cog": UserCog,
+  "briefcase-business": BriefcaseBusiness,
+  calendar: Calendar,
+  "building-2": Building2,
+  "user-circle": UserCircle,
 };
 
 const CANDIDATE_DASHBOARD = "/candidate/dashboard";

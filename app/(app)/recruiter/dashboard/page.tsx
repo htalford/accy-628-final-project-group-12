@@ -1,23 +1,53 @@
-import { EmptyState } from "@/components/ui/empty-state";
-import { PageHeader } from "@/components/ui/page-header";
-import { StatCard } from "@/components/ui/stat-card";
+import {
+  getDashboardMetrics,
+  listRecentActivity,
+  listRecentJobOrders,
+  listUpcomingInterviews,
+} from "@/lib/recruiter/data";
+import { getAppUser } from "@/lib/auth/get-app-user";
+import { RecruiterSummaryCards } from "@/components/recruiter/summary-cards";
+import { RecentJobOrdersTable } from "@/components/recruiter/recent-job-orders-table";
+import { UpcomingInterviewsList } from "@/components/recruiter/upcoming-interviews-list";
+import { ActivityTimeline } from "@/components/recruiter/activity-timeline";
 
-export default function RecruiterDashboardPage() {
+export default async function RecruiterDashboardPage() {
+  const user = await getAppUser();
+  const name = user?.name || "Recruiter";
+  const today = new Date().toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  const [metrics, jobOrders, interviews, activity] = await Promise.all([
+    getDashboardMetrics(),
+    listRecentJobOrders(),
+    listUpcomingInterviews(),
+    listRecentActivity(),
+  ]);
+
   return (
-    <div>
-      <PageHeader
-        title="Operations dashboard"
-        description="All placements at a glance, with attention on at-risk assignments."
-      />
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <StatCard label="Active placements" value="—" />
-        <StatCard label="At-risk" value="—" hint="Needs follow-up" />
-        <StatCard label="Pending timesheets" value="—" />
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-[var(--cf-ink)]">
+          Welcome back, {name.split(" ")[0]}!
+        </h1>
+        <p className="mt-1 text-sm text-[var(--cf-muted)]">{today}</p>
       </div>
-      <EmptyState
-        title="Portfolio overview coming soon"
-        description="Recruiters will see placement health, margins at risk, and aging timesheets."
-      />
+
+      <RecruiterSummaryCards metrics={metrics} />
+
+      <div className="grid gap-6 xl:grid-cols-5">
+        <div className="xl:col-span-3">
+          <RecentJobOrdersTable rows={jobOrders} />
+        </div>
+        <div className="xl:col-span-2">
+          <UpcomingInterviewsList interviews={interviews} />
+        </div>
+      </div>
+
+      <ActivityTimeline events={activity} />
     </div>
   );
 }

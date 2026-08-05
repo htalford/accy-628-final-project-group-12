@@ -50,7 +50,7 @@ After login, use the **Demo role switcher** (bottom-right) to jump between roles
 |---|---|
 | Employer (Client Portal) | `/client/dashboard`, `/client/job-requests`, `/client/candidates`, `/client/employees`, `/client/contracts`, `/client/timesheets`, `/client/invoices`, `/client/messages`, `/client/profile` |
 | Candidate | `/candidate/dashboard`, `/candidate/timesheets` |
-| Recruiter | `/recruiter/dashboard`, `/recruiter/placements` |
+| Recruiter | `/recruiter/dashboard`, `/recruiter/candidates`, `/recruiter/job-orders`, `/recruiter/interviews`, `/recruiter/placements`, `/recruiter/clients`, `/recruiter/messages`, `/recruiter/profile` |
 | Accounting | `/accounting/dashboard`, `/accounting/invoices` |
 
 Legacy `/employer/*` paths redirect to `/client/*`.
