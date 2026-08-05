@@ -1,145 +1,108 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { getDashboardPath } from "@/lib/auth/roles";
-import type { UserRole } from "@/lib/types/database";
+import { useState } from "react";
+import { INDUSTRIES } from "@/lib/marketing/content";
 
-const SIGNUP_OPTIONS: { value: UserRole; label: string }[] = [
-  { value: "employer", label: "Looking to hire" },
-  { value: "candidate", label: "Looking for work" },
-];
+const INTEREST_OPTIONS = [
+  { value: "hire", label: "Looking to hire" },
+  { value: "work", label: "Looking for work" },
+] as const;
+
+type Interest = (typeof INTEREST_OPTIONS)[number]["value"];
+
+const RECRUITER_EMAIL = "recruiter@talentquest.com";
 
 export function SignupForm() {
-  const router = useRouter();
+  const [interest, setInterest] = useState<Interest | "">("");
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserRole | "">("");
   const [companyName, setCompanyName] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [sent, setSent] = useState(false);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setInfo(null);
 
-    startTransition(async () => {
-      if (role !== "employer" && role !== "candidate") {
-        setError("Please choose who you are.");
-        return;
-      }
+    if (interest !== "hire" && interest !== "work") {
+      setError("Please choose whether you are looking to hire or looking for work.");
+      return;
+    }
 
-      const selectedRole = role;
-      const supabase = createClient();
+    if (!name.trim() || !email.trim() || !industry) {
+      setError("Please fill in all required fields.");
+      return;
+    }
 
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { name },
-        },
-      });
+    if (interest === "hire" && !companyName.trim()) {
+      setError("Please enter your company or organization name.");
+      return;
+    }
 
-      if (signUpError) {
-        setError(signUpError.message);
-        return;
-      }
+    const interestLabel =
+      interest === "hire" ? "Looking to hire" : "Looking for work";
 
-      // Email confirmation may be required — no session yet.
-      if (!signUpData.session) {
-        setInfo(
-          "Account created. Check your email to confirm, then sign in.",
-        );
-        return;
-      }
+    const lines = [
+      "New TalentQuest account request",
+      "",
+      `Interest: ${interestLabel}`,
+      `Name: ${name.trim()}`,
+      interest === "hire"
+        ? `Company / organization: ${companyName.trim()}`
+        : null,
+      `Industry: ${industry}`,
+      `Email: ${email.trim()}`,
+      "",
+      "Please follow up to create their account.",
+    ].filter(Boolean);
 
-      const { data: profile, error: profileError } = await supabase.rpc(
-        "complete_signup",
-        {
-          p_name: name,
-          p_role: selectedRole,
-          p_company_name:
-            selectedRole === "employer" ? companyName || null : null,
-        },
-      );
+    const subject = `Account request — ${name.trim()} (${interestLabel})`;
+    const href = `mailto:${RECRUITER_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join("\n"))}`;
 
-      if (profileError || !profile) {
-        setError(
-          profileError?.message ??
-            "Account created, but profile setup failed. Try signing in.",
-        );
-        return;
-      }
+    window.location.href = href;
+    setSent(true);
+  }
 
-      const row = (Array.isArray(profile) ? profile[0] : profile) as {
-        role?: UserRole;
-      } | null;
-
-      const destinationRole =
-        row?.role === "employer" || row?.role === "candidate"
-          ? row.role
-          : selectedRole;
-
-      router.replace(getDashboardPath(destinationRole));
-      router.refresh();
-    });
+  if (sent) {
+    return (
+      <div className="space-y-3 text-sm leading-relaxed text-[var(--ot-muted)]">
+        <p className="font-medium text-[var(--ot-navy)]">
+          Your request is ready to send.
+        </p>
+        <p>
+          Your email app should open with a message to{" "}
+          <span className="font-medium text-[var(--ot-navy)]">
+            {RECRUITER_EMAIL}
+          </span>
+          . Send that message and a recruiter will follow up to create your
+          account.
+        </p>
+        <button
+          type="button"
+          onClick={() => setSent(false)}
+          className="font-semibold text-[var(--ot-ocean)] hover:underline"
+        >
+          Edit and try again
+        </button>
+      </div>
+    );
   }
 
   return (
     <form onSubmit={onSubmit} className="flex w-full flex-col gap-4">
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-[var(--cf-ink)]">Full name</span>
-        <input
-          type="text"
-          autoComplete="name"
-          required
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-[var(--cf-ink)] outline-none ring-[var(--cf-accent)] focus:ring-2"
-        />
-      </label>
-
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-[var(--cf-ink)]">Email</span>
-        <input
-          type="email"
-          autoComplete="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-[var(--cf-ink)] outline-none ring-[var(--cf-accent)] focus:ring-2"
-        />
-      </label>
-
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-[var(--cf-ink)]">Password</span>
-        <input
-          type="password"
-          autoComplete="new-password"
-          required
-          minLength={8}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-[var(--cf-ink)] outline-none ring-[var(--cf-accent)] focus:ring-2"
-        />
-      </label>
-
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-[var(--cf-ink)]">I am...</span>
+        <span className="font-medium text-[var(--ot-navy)]">I am...</span>
         <select
           required
-          value={role}
-          onChange={(e) => setRole(e.target.value as UserRole | "")}
-          className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-[var(--cf-ink)] outline-none ring-[var(--cf-accent)] focus:ring-2"
+          value={interest}
+          onChange={(e) => setInterest(e.target.value as Interest | "")}
+          className="rounded-md border border-[var(--ot-border)] bg-white px-3 py-2 text-[var(--ot-navy)] outline-none ring-[var(--ot-ocean)] focus:ring-2"
         >
           <option value="" disabled>
             Select one
           </option>
-          {SIGNUP_OPTIONS.map((option) => (
+          {INTEREST_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
@@ -147,40 +110,82 @@ export function SignupForm() {
         </select>
       </label>
 
-      {role === "employer" ? (
+      <label className="flex flex-col gap-1.5 text-sm">
+        <span className="font-medium text-[var(--ot-navy)]">Full name</span>
+        <input
+          type="text"
+          autoComplete="name"
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="rounded-md border border-[var(--ot-border)] bg-white px-3 py-2 text-[var(--ot-navy)] outline-none ring-[var(--ot-ocean)] focus:ring-2"
+        />
+      </label>
+
+      {interest === "hire" ? (
         <label className="flex flex-col gap-1.5 text-sm">
-          <span className="font-medium text-[var(--cf-ink)]">
-            Company name
+          <span className="font-medium text-[var(--ot-navy)]">
+            Company / organization name
           </span>
           <input
             type="text"
             autoComplete="organization"
+            required
             value={companyName}
             onChange={(e) => setCompanyName(e.target.value)}
-            placeholder="Optional"
-            className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-[var(--cf-ink)] outline-none ring-[var(--cf-accent)] focus:ring-2"
+            className="rounded-md border border-[var(--ot-border)] bg-white px-3 py-2 text-[var(--ot-navy)] outline-none ring-[var(--ot-ocean)] focus:ring-2"
           />
         </label>
       ) : null}
+
+      <label className="flex flex-col gap-1.5 text-sm">
+        <span className="font-medium text-[var(--ot-navy)]">Industry</span>
+        <select
+          required
+          value={industry}
+          onChange={(e) => setIndustry(e.target.value)}
+          className="rounded-md border border-[var(--ot-border)] bg-white px-3 py-2 text-[var(--ot-navy)] outline-none ring-[var(--ot-ocean)] focus:ring-2"
+        >
+          <option value="" disabled>
+            Select an industry
+          </option>
+          {INDUSTRIES.map((item) => (
+            <option key={item.slug} value={item.name}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1.5 text-sm">
+        <span className="font-medium text-[var(--ot-navy)]">Email</span>
+        <input
+          type="email"
+          autoComplete="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="rounded-md border border-[var(--ot-border)] bg-white px-3 py-2 text-[var(--ot-navy)] outline-none ring-[var(--ot-ocean)] focus:ring-2"
+        />
+      </label>
 
       {error ? (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
         </p>
       ) : null}
-      {info ? (
-        <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-          {info}
-        </p>
-      ) : null}
 
       <button
         type="submit"
-        disabled={pending}
-        className="mt-1 rounded-md bg-[var(--cf-navy)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--cf-navy-hover)] disabled:opacity-60"
+        className="mt-1 rounded-md bg-[var(--ot-navy)] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
       >
-        {pending ? "Creating account…" : "Create account"}
+        Email recruiter
       </button>
+
+      <p className="text-xs leading-relaxed text-[var(--ot-muted)]">
+        Submitting opens an email to {RECRUITER_EMAIL} with your details. A
+        recruiter will create your account after they receive it.
+      </p>
     </form>
   );
 }
