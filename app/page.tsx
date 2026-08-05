@@ -7,6 +7,8 @@ import { INDUSTRIES } from "@/lib/marketing/content";
 export default function HomePage() {
   return (
     <MarketingShell>
+      <HeroSlideshow />
+
       <section className="relative overflow-hidden bg-[linear-gradient(180deg,#ffffff_0%,#eef5fb_55%,#ffffff_100%)]">
         <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:py-16">
           <p className="text-sm font-semibold tracking-[0.18em] text-[var(--ot-ocean)] uppercase">
@@ -40,8 +42,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      <HeroSlideshow />
 
       <AudiencePortal />
 
