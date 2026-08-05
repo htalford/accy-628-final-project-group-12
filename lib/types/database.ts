@@ -152,6 +152,8 @@ export type Job = {
   posted_at: string;
   created_at: string;
   updated_at: string;
+  recruiter_notes?: unknown;
+  assigned_employee_id?: string | null;
 };
 
 export type Application = {
@@ -164,6 +166,9 @@ export type Application = {
   resume_url: string | null;
   include_profile: boolean;
   profile_snapshot: Record<string, unknown> | null;
+  interview_at?: string | null;
+  interview_type?: string | null;
+  interview_notes?: string | null;
   created_at: string;
   updated_at: string;
 };

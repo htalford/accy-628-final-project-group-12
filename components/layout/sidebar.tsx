@@ -7,6 +7,9 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Briefcase,
+  BriefcaseBusiness,
+  Building2,
+  Calendar,
   CheckCircle2,
   CircleDollarSign,
   ClipboardCheck,
@@ -24,6 +27,8 @@ import {
   Send,
   TrendingUp,
   User,
+  UserCircle,
+  Users,
   Wallet,
   X,
 } from "lucide-react";
@@ -51,6 +56,11 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   send: Send,
   "circle-check": CheckCircle2,
   "message-square": MessageSquare,
+  users: Users,
+  "briefcase-business": BriefcaseBusiness,
+  calendar: Calendar,
+  "building-2": Building2,
+  "user-circle": UserCircle,
 };
 
 const CANDIDATE_DASHBOARD = "/candidate/dashboard";
