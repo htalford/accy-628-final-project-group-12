@@ -1,17 +1,6 @@
-import { EmptyState } from "@/components/ui/empty-state";
-import { PageHeader } from "@/components/ui/page-header";
+import { redirect } from "next/navigation";
 
-export default function EmployerTimesheetsPage() {
-  return (
-    <div>
-      <PageHeader
-        title="Timesheet approval"
-        description="Review submitted hours for workers placed at your company."
-      />
-      <EmptyState
-        title="Approval queue placeholder"
-        description="Submitted timesheets will appear here for approve / dispute / reject actions."
-      />
-    </div>
-  );
+/** Legacy employer timesheets → Client Portal */
+export default function EmployerTimesheetsRedirect() {
+  redirect("/client/timesheets");
 }

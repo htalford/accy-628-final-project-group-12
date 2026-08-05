@@ -43,7 +43,7 @@ export const DEMO_ACCOUNTS: Record<
 export function getDashboardPath(role: UserRole): string {
   switch (role) {
     case "employer":
-      return "/employer/dashboard";
+      return "/client/dashboard";
     case "candidate":
       return "/candidate/dashboard";
     case "recruiter":
@@ -53,13 +53,23 @@ export function getDashboardPath(role: UserRole): string {
   }
 }
 
+/** URL prefix for a role's portal home. Employer uses /client (Client Portal). */
 export function getRoleHomePrefix(role: UserRole): string {
+  if (role === "employer") return "/client";
   return `/${role}`;
 }
 
 export function isRolePath(pathname: string, role: UserRole): boolean {
+  const prefix = getRoleHomePrefix(role);
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+/** Also treats legacy /employer/* as employer territory for redirects. */
+export function isEmployerPath(pathname: string): boolean {
   return (
-    pathname === `/${role}` || pathname.startsWith(`/${role}/`)
+    isRolePath(pathname, "employer") ||
+    pathname === "/employer" ||
+    pathname.startsWith("/employer/")
   );
 }
 
@@ -80,11 +90,32 @@ export function isPublicPath(pathname: string): boolean {
 export function pathRequiresAuth(pathname: string): boolean {
   if (isPublicPath(pathname)) return false;
   return (
+    pathname.startsWith("/client") ||
     pathname.startsWith("/employer") ||
     pathname.startsWith("/candidate") ||
     pathname.startsWith("/recruiter") ||
     pathname.startsWith("/accounting")
   );
+}
+
+/**
+ * Resolve which portal role a pathname belongs to.
+ * /client/* maps to employer (Client Portal).
+ */
+export function roleFromPathname(pathname: string): UserRole | null {
+  if (
+    pathname === "/client" ||
+    pathname.startsWith("/client/") ||
+    pathname === "/employer" ||
+    pathname.startsWith("/employer/")
+  ) {
+    return "employer";
+  }
+  for (const role of USER_ROLES) {
+    if (role === "employer") continue;
+    if (isRolePath(pathname, role)) return role;
+  }
+  return null;
 }
 
 export type NavIcon =
@@ -105,8 +136,11 @@ export type NavIcon =
   | "search"
   | "send"
   | "circle-check"
-  | "message-square";
-
+  | "message-square"
+  | "users"
+  | "user-round"
+  | "user-cog"
+  | "clipboard-list";
 export type NavItem = {
   href: string;
   label: string;
@@ -117,8 +151,15 @@ export function getNavForRole(role: UserRole): NavItem[] {
   switch (role) {
     case "employer":
       return [
-        { href: "/employer/dashboard", label: "Dashboard", icon: "layout-dashboard" },
-        { href: "/employer/timesheets", label: "Timesheet approval", icon: "clipboard-check" },
+        { href: "/client/dashboard", label: "Dashboard", icon: "layout-dashboard" },
+        { href: "/client/candidates", label: "Candidates", icon: "users" },
+        { href: "/client/contracts", label: "Contracts", icon: "file-signature" },
+        { href: "/client/employees", label: "Employees", icon: "user-round" },
+        { href: "/client/invoices", label: "Invoices", icon: "receipt" },
+        { href: "/client/job-requests", label: "Job Requests", icon: "clipboard-list" },
+        { href: "/client/messages", label: "Messages", icon: "messages-square" },
+        { href: "/client/profile", label: "Profile", icon: "user-cog" },
+        { href: "/client/timesheets", label: "Timesheets", icon: "clipboard-check" },
       ];
     case "candidate":
       return [
@@ -142,7 +183,11 @@ export function getNavForRole(role: UserRole): NavItem[] {
         { href: "/accounting/dashboard", label: "Home", icon: "layout-dashboard" },
         { href: "/accounting/invoices", label: "Invoices", icon: "file-text" },
         { href: "/accounting/payroll", label: "Payroll", icon: "wallet" },
-        { href: "/accounting/accounts-receivable", label: "Accounts Receivable", icon: "receipt" },
+        {
+          href: "/accounting/accounts-receivable",
+          label: "Accounts Receivable",
+          icon: "receipt",
+        },
         { href: "/accounting/contracts", label: "Contracts", icon: "file-signature" },
         { href: "/accounting/expenses", label: "Expenses", icon: "circle-dollar-sign" },
         { href: "/accounting/profitability", label: "Profitability", icon: "trending-up" },
@@ -167,6 +212,15 @@ export function getPageTitle(pathname: string): string {
     "/accounting/audit-trail": "Audit Trail",
     "/accounting/messages": "Messages",
     "/accounting/profile": "Profile",
+    "/client/dashboard": "Dashboard",
+    "/client/candidates": "Candidates",
+    "/client/contracts": "Contracts",
+    "/client/employees": "Employees",
+    "/client/invoices": "Invoices",
+    "/client/job-requests": "Job Requests",
+    "/client/messages": "Messages",
+    "/client/profile": "Profile",
+    "/client/timesheets": "Timesheets",
     "/employer/dashboard": "Dashboard",
     "/employer/timesheets": "Timesheet approval",
     "/candidate/dashboard": "Dashboard",
@@ -187,5 +241,30 @@ export function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/accounting/invoices/")) return "Invoice detail";
   if (pathname.startsWith("/accounting/contracts/")) return "Contract detail";
   if (pathname.startsWith("/candidate/contracts/")) return "Contract detail";
+  if (pathname.startsWith("/client/job-requests/new")) return "New Job Request";
+  if (pathname.startsWith("/client/job-requests/")) return "Job Request";
+  if (pathname.startsWith("/client/candidates/")) return "Candidate Profile";
+  if (pathname.startsWith("/client/employees/")) return "Employee";
+  if (pathname.startsWith("/client/contracts/")) return "Contract";
+  if (pathname.startsWith("/client/timesheets/")) return "Timesheet";
+  if (pathname.startsWith("/client/invoices/")) return "Invoice";
   return "TalentQuest";
+}
+
+/** Map legacy employer paths to client portal paths. */
+export function employerToClientPath(pathname: string): string | null {
+  if (pathname === "/employer" || pathname === "/employer/") {
+    return "/client/dashboard";
+  }
+  if (pathname.startsWith("/employer/")) {
+    const rest = pathname.slice("/employer".length);
+    if (rest === "/timesheets" || rest.startsWith("/timesheets/")) {
+      return `/client${rest}`;
+    }
+    if (rest === "/dashboard") {
+      return "/client/dashboard";
+    }
+    return `/client${rest}`;
+  }
+  return null;
 }

@@ -1,25 +1,31 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  getAuthBypassEmail,
+  isAuthBypassEnabled,
+} from "@/lib/auth/bypass";
+import {
+  employerToClientPath,
   getDashboardPath,
   isPublicPath,
-  isRolePath,
   pathRequiresAuth,
-  USER_ROLES,
+  roleFromPathname,
 } from "@/lib/auth/roles";
 import type { UserRole } from "@/lib/types/database";
 
-function roleFromPath(pathname: string): UserRole | null {
-  for (const role of USER_ROLES) {
-    if (isRolePath(pathname, role)) return role;
-  }
-  return null;
+function copyCookies(from: NextResponse, to: NextResponse) {
+  from.cookies.getAll().forEach((cookie) => {
+    to.cookies.set(cookie.name, cookie.value);
+  });
+  return to;
 }
 
 export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  if (isPublicPath(pathname)) {
+  // Public marketing pages skip auth work (login handled below for bypass).
+  const isLoginRoute = pathname === "/login" || pathname === "/signup";
+  if (isPublicPath(pathname) && !isLoginRoute) {
     return NextResponse.next({ request });
   }
 
@@ -53,9 +59,45 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const { data: claimsData } = await supabase.auth.getClaims();
-  const authId = claimsData?.claims?.sub;
-  const isAuthenticated = typeof authId === "string" && authId.length > 0;
+  let { data: claimsData } = await supabase.auth.getClaims();
+  let authId = claimsData?.claims?.sub;
+  let isAuthenticated = typeof authId === "string" && authId.length > 0;
+  let justSignedInViaBypass = false;
+
+  // Dev/demo: auto sign-in as demo employer so Client Portal works without the form.
+  if (!isAuthenticated && isAuthBypassEnabled()) {
+    const password = process.env.DEMO_PASSWORD;
+    if (password) {
+      const { data: signedIn, error } = await supabase.auth.signInWithPassword({
+        email: getAuthBypassEmail(),
+        password,
+      });
+      if (!error && signedIn.user) {
+        authId = signedIn.user.id;
+        isAuthenticated = true;
+        justSignedInViaBypass = true;
+      }
+    }
+  }
+
+  // After programatic sign-in, redirect so App Router cookies() pick up the session.
+  if (justSignedInViaBypass) {
+    const url = request.nextUrl.clone();
+    if (isLoginRoute) {
+      url.pathname = getDashboardPath("employer");
+      url.search = "";
+    }
+    const redirect = NextResponse.redirect(url);
+    return copyCookies(supabaseResponse, redirect);
+  }
+
+  // Legacy /employer/* → /client/*
+  const clientRedirect = employerToClientPath(pathname);
+  if (clientRedirect && clientRedirect !== pathname) {
+    const url = request.nextUrl.clone();
+    url.pathname = clientRedirect;
+    return NextResponse.redirect(url);
+  }
 
   if (pathRequiresAuth(pathname) && !isAuthenticated) {
     const url = request.nextUrl.clone();
@@ -64,10 +106,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (
-    (pathname === "/login" || pathname === "/signup") &&
-    isAuthenticated
-  ) {
+  if (isLoginRoute && isAuthenticated) {
     const { data: appUser } = await supabase
       .from("users")
       .select("role")
@@ -81,7 +120,12 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  const pathRole = roleFromPath(pathname);
+  // Public login/signup with no session: fall through to the page.
+  if (isLoginRoute && !isAuthenticated) {
+    return supabaseResponse;
+  }
+
+  const pathRole = roleFromPathname(pathname);
   if (pathRole && isAuthenticated) {
     const { data: appUser } = await supabase
       .from("users")
