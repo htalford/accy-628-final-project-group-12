@@ -26,6 +26,87 @@ export type ExpenseCategory =
   | "training"
   | "miscellaneous";
 export type ExpenseStatus = "pending" | "approved" | "rejected" | "reimbursed";
+
+/** Client Portal only — employer staffing requests (not public.jobs). */
+export type JobRequestStatus = "open" | "in_progress" | "filled" | "closed";
+
+/** Client Portal only — candidates submitted for a job request. */
+export type SubmittalStage =
+  | "submitted"
+  | "under_review"
+  | "interview"
+  | "offer"
+  | "accepted"
+  | "rejected";
+
+export type PortalJobRequest = {
+  id: string;
+  client_id: string;
+  title: string;
+  department: string;
+  positions: number;
+  status: JobRequestStatus;
+  employment_type: string;
+  location: string | null;
+  pay_rate_text: string | null;
+  start_date: string | null;
+  skills: string[];
+  description: string | null;
+  notes: string | null;
+  recruiter_name: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SubmittalExperience = {
+  company: string;
+  title: string;
+  years: string;
+};
+
+export type PortalSubmittal = {
+  id: string;
+  job_request_id: string;
+  client_id: string;
+  employee_id: string | null;
+  candidate_name: string;
+  candidate_email: string | null;
+  candidate_phone: string | null;
+  position_title: string;
+  recruiter_name: string | null;
+  years_experience: number | null;
+  stage: SubmittalStage;
+  resume_status: string;
+  skills: string[];
+  certifications: string[];
+  experience: SubmittalExperience[];
+  interview_notes: string | null;
+  resume_summary: string | null;
+  created_at: string;
+  updated_at: string;
+  job_title?: string | null;
+};
+
+export type ClientMessageThread = {
+  id: string;
+  client_id: string;
+  subject: string;
+  recruiter_name: string;
+  created_at: string;
+  updated_at: string;
+  preview?: string;
+  unread?: number;
+  messages?: ClientPortalMessage[];
+};
+
+export type ClientPortalMessage = {
+  id: string;
+  thread_id: string;
+  sender_role: "client" | "recruiter" | "staff";
+  body: string;
+  created_at: string;
+};
+
 export type Client = {
   id: string;
   name: string;
@@ -57,6 +138,8 @@ export type Placement = {
   client_id: string;
   employee_id: string;
   placement_type: PlacementType;
+  /** Job/role title for the assignment (e.g. Warehouse Associate). */
+  title: string | null;
   bill_rate: number | null;
   pay_rate: number | null;
   placement_fee: number | null;
@@ -75,6 +158,8 @@ export type Timesheet = {
   hours_regular: number;
   hours_overtime: number;
   status: TimesheetStatus;
+  /** Employer decision note (approve/reject) — employer-facing only. */
+  employer_note?: string | null;
   created_at: string;
   updated_at: string;
 };

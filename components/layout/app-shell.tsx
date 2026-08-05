@@ -1,15 +1,34 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
+import { ClientPortalShell } from "@/components/client-portal/client-portal-shell";
+import { RoleSwitcher } from "@/components/demo/role-switcher";
 import { ShellProvider } from "@/components/layout/shell-context";
+import { loadClientPortalChrome } from "@/lib/client-portal/chrome";
 import type { AppUser } from "@/lib/types/database";
 
-export function AppShell({
+export async function AppShell({
   user,
   children,
 }: {
   user: AppUser;
   children: React.ReactNode;
 }) {
+  if (user.role === "employer") {
+    const chrome = await loadClientPortalChrome();
+    return (
+      <>
+        <ClientPortalShell
+          user={user}
+          notifications={chrome.notifications}
+          searchIndex={chrome.searchIndex}
+        >
+          {children}
+        </ClientPortalShell>
+        <RoleSwitcher currentRole={user.role} />
+      </>
+    );
+  }
+
   return (
     <ShellProvider>
       <div className="flex min-h-full flex-1">
@@ -21,6 +40,7 @@ export function AppShell({
           </main>
         </div>
       </div>
+      <RoleSwitcher currentRole={user.role} />
     </ShellProvider>
   );
 }
