@@ -67,7 +67,7 @@ export default function HomePage() {
           {INDUSTRIES.slice(0, 6).map((industry) => (
             <Link
               key={industry.slug}
-              href={`/industries#${industry.slug}`}
+              href={`/industries/${industry.slug}`}
               className="rounded-xl border border-[var(--ot-border)] bg-white p-5 transition hover:border-[var(--ot-ocean)] hover:shadow-md"
             >
               <h3 className="font-semibold text-[var(--ot-navy)]">

@@ -33,11 +33,22 @@ export default function IndustriesPage() {
             className="scroll-mt-28 rounded-xl border border-[var(--ot-border)] bg-white p-6"
           >
             <h2 className="text-xl font-semibold text-[var(--ot-navy)]">
-              {industry.name}
+              <Link
+                href={`/industries/${industry.slug}`}
+                className="hover:text-[var(--ot-ocean)]"
+              >
+                {industry.name}
+              </Link>
             </h2>
             <p className="mt-2 max-w-3xl leading-relaxed text-[var(--ot-muted)]">
               {industry.summary}
             </p>
+            <Link
+              href={`/industries/${industry.slug}`}
+              className="mt-4 inline-block text-sm font-semibold text-[var(--ot-ocean)] hover:underline"
+            >
+              Read staffing details →
+            </Link>
           </article>
         ))}
         <Link

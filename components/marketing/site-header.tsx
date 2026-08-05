@@ -8,7 +8,7 @@ import { INDUSTRIES } from "@/lib/marketing/content";
 import { NavDropdown } from "@/components/marketing/nav-dropdown";
 
 const industryItems = INDUSTRIES.map((industry) => ({
-  href: `/industries#${industry.slug}`,
+  href: `/industries/${industry.slug}`,
   label: industry.name,
 }));
 
