@@ -3,6 +3,8 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { requireEmployerUser } from "@/lib/client-portal/require-employer";
 import type {
+  ApplicationStatus,
+  ClientCandidate,
   ClientMessageThread,
   ClientPortalMessage,
   JobRequestStatus,
@@ -157,6 +159,174 @@ export async function getSubmittalForClient(
     return null;
   }
   return mapSubmittal(data as Record<string, unknown>);
+}
+
+function applicationStatusToStage(status: string): SubmittalStage {
+  switch (status) {
+    case "submitted":
+      return "submitted";
+    case "reviewing":
+      return "under_review";
+    case "interview":
+      return "interview";
+    case "offered":
+      return "offer";
+    case "rejected":
+    case "withdrawn":
+      return "rejected";
+    default:
+      return "submitted";
+  }
+}
+
+function submittalToCandidate(s: PortalSubmittal): ClientCandidate {
+  return {
+    id: s.id,
+    source: "submittal",
+    detail_href: `/client/candidates/${s.id}`,
+    candidate_name: s.candidate_name,
+    candidate_email: s.candidate_email,
+    candidate_phone: s.candidate_phone,
+    position_title: s.position_title || s.job_title || "",
+    recruiter_name: s.recruiter_name,
+    years_experience: s.years_experience,
+    stage: s.stage,
+    source_label: "Recruiter submittal",
+    resume_status: s.resume_status,
+    skills: s.skills,
+    certifications: s.certifications,
+    experience: s.experience,
+    interview_notes: s.interview_notes,
+    resume_summary: s.resume_summary,
+    created_at: s.created_at,
+    updated_at: s.updated_at,
+    job_title: s.job_title,
+  };
+}
+
+function mapApplicationToCandidate(
+  row: Record<string, unknown>,
+): ClientCandidate {
+  const job = (row.jobs ?? row.job) as Record<string, unknown> | null | undefined;
+  const emp = (row.employees ?? row.employee) as
+    | Record<string, unknown>
+    | null
+    | undefined;
+  const first = emp?.first_name != null ? String(emp.first_name) : "";
+  const last = emp?.last_name != null ? String(emp.last_name) : "";
+  const name =
+    `${first} ${last}`.trim() ||
+    (emp?.email != null ? String(emp.email) : "Applicant");
+  const status = String(row.status ?? "submitted") as ApplicationStatus;
+  const snap = row.profile_snapshot as Record<string, unknown> | null;
+  const certs =
+    emp?.certifications != null
+      ? String(emp.certifications)
+          .split(",")
+          .map((c) => c.trim())
+          .filter(Boolean)
+      : [];
+  const summaryParts: string[] = [];
+  if (row.cover_letter) summaryParts.push(String(row.cover_letter));
+  if (row.note) summaryParts.push(String(row.note));
+  if (snap) {
+    summaryParts.push(
+      `Profile submitted from candidate portal (${Object.keys(snap).length} fields).`,
+    );
+  }
+
+  return {
+    id: String(row.id),
+    source: "application",
+    detail_href: `/client/candidates/applications/${row.id}`,
+    candidate_name: name,
+    candidate_email: emp?.email != null ? String(emp.email) : null,
+    candidate_phone: emp?.phone != null ? String(emp.phone) : null,
+    position_title: job?.title != null ? String(job.title) : "Open role",
+    recruiter_name: "Jobs board",
+    years_experience: null,
+    stage: applicationStatusToStage(status),
+    application_status: status,
+    source_label: "Candidate portal application",
+    resume_status: row.resume_url ? "Attached" : "None",
+    skills: [],
+    certifications: certs,
+    experience: [],
+    interview_notes:
+      row.interview_notes == null ? null : String(row.interview_notes),
+    resume_summary: summaryParts.join("\n\n") || null,
+    cover_letter: row.cover_letter == null ? null : String(row.cover_letter),
+    resume_url: row.resume_url == null ? null : String(row.resume_url),
+    created_at: String(row.created_at),
+    updated_at: String(row.updated_at),
+    job_title: job?.title != null ? String(job.title) : null,
+  };
+}
+
+/** Applications submitted via the candidate portal for this employer's jobs. */
+export async function listApplicationsForClient(): Promise<ClientCandidate[]> {
+  const user = await requireEmployerUser();
+  void user;
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("applications")
+    .select(
+      "*, jobs(id, title, client_id, employer_name), employees(id, first_name, last_name, email, phone, certifications)",
+    )
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("applications list for client", error.message);
+    return [];
+  }
+
+  return (data ?? []).map((r) =>
+    mapApplicationToCandidate(r as Record<string, unknown>),
+  );
+}
+
+export async function getApplicationForClient(
+  id: string,
+): Promise<ClientCandidate | null> {
+  await requireEmployerUser();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("applications")
+    .select(
+      "*, jobs(id, title, client_id, employer_name), employees(id, first_name, last_name, email, phone, certifications)",
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !data) {
+    if (error) console.error("applications get", error.message);
+    return null;
+  }
+  return mapApplicationToCandidate(data as Record<string, unknown>);
+}
+
+/**
+ * Candidates for the employer: people who applied via the candidate portal
+ * (public.applications only — not recruiter submittals or placed employees).
+ */
+export async function listClientCandidates(): Promise<ClientCandidate[]> {
+  return listApplicationsForClient();
+}
+
+export async function getClientCandidate(
+  id: string,
+  source?: "submittal" | "application",
+): Promise<ClientCandidate | null> {
+  if (source === "application") {
+    return getApplicationForClient(id);
+  }
+  if (source === "submittal") {
+    const s = await getSubmittalForClient(id);
+    return s ? submittalToCandidate(s) : null;
+  }
+  const s = await getSubmittalForClient(id);
+  if (s) return submittalToCandidate(s);
+  return getApplicationForClient(id);
 }
 
 /** Live client↔recruiter threads (does not touch candidate messages). */

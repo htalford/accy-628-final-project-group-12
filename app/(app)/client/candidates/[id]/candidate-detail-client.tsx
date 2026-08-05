@@ -9,8 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/client-portal/breadcrumbs";
 import { ConfirmActionDialog } from "@/components/client-portal/confirm-action-dialog";
 import { useToast } from "@/components/client-portal/toast";
-import { updateSubmittalStageAction } from "@/app/actions/client-portal";
-import type { PortalSubmittal, SubmittalStage } from "@/lib/types/database";
+import {
+  updateApplicationStatusAction,
+  updateSubmittalStageAction,
+} from "@/app/actions/client-portal";
+import type { ClientCandidate, SubmittalStage } from "@/lib/types/database";
 import {
   seedStatusTone,
   submittalStageLabel,
@@ -19,7 +22,7 @@ import {
 export function CandidateDetailClient({
   initial,
 }: {
-  initial: PortalSubmittal;
+  initial: ClientCandidate;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -33,12 +36,15 @@ export function CandidateDetailClient({
     stage: Extract<SubmittalStage, "accepted" | "rejected">,
     note: string,
   ) {
-    const result = await updateSubmittalStageAction(candidate.id, stage, note);
+    const result =
+      candidate.source === "application"
+        ? await updateApplicationStatusAction(candidate.id, stage, note)
+        : await updateSubmittalStageAction(candidate.id, stage, note);
     if (result.ok) {
       toast.push(result.message, stage === "accepted" ? "success" : "info");
       setCandidate((c) => ({
         ...c,
-        stage,
+        stage: stage === "accepted" && c.source === "application" ? "offer" : stage,
         interview_notes: note
           ? `${c.interview_notes ?? ""} · Decision note: ${note}`.replace(
               /^ · /,
@@ -53,6 +59,11 @@ export function CandidateDetailClient({
     }
   }
 
+  const canDecide =
+    candidate.stage !== "accepted" &&
+    candidate.stage !== "rejected" &&
+    !(candidate.source === "application" && candidate.stage === "offer");
+
   return (
     <div className="space-y-6">
       <Breadcrumbs
@@ -64,14 +75,13 @@ export function CandidateDetailClient({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <PageHeader
           title={candidate.candidate_name}
-          description={`${candidate.position_title || candidate.job_title || "Submittal"} · ${candidate.recruiter_name ?? "Recruiter"}`}
+          description={`${candidate.position_title || candidate.job_title || "Candidate"} · ${candidate.source_label}`}
         />
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={seedStatusTone(candidate.stage)}>
             {submittalStageLabel(candidate.stage)}
           </Badge>
-          {candidate.stage !== "accepted" &&
-          candidate.stage !== "rejected" ? (
+          {canDecide ? (
             <>
               <Button
                 size="sm"
@@ -111,14 +121,37 @@ export function CandidateDetailClient({
               ? `${candidate.years_experience} years experience`
               : "Experience not provided"}
           </p>
+          <p className="mt-2 text-xs text-[var(--cf-muted)]">
+            Source: {candidate.source_label}
+          </p>
         </Card>
         <Card>
           <CardTitle className="mb-3">Resume</CardTitle>
           <Badge tone="navy">{candidate.resume_status}</Badge>
-          <p className="mt-3 text-sm text-[var(--cf-ink)]">
+          {candidate.resume_url ? (
+            <p className="mt-2">
+              <a
+                href={candidate.resume_url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm font-medium text-[var(--cf-navy)] underline"
+              >
+                Open resume / attachment
+              </a>
+            </p>
+          ) : null}
+          <p className="mt-3 text-sm whitespace-pre-wrap text-[var(--cf-ink)]">
             {candidate.resume_summary || "No summary on file."}
           </p>
         </Card>
+        {candidate.cover_letter ? (
+          <Card className="md:col-span-2">
+            <CardTitle className="mb-3">Cover letter</CardTitle>
+            <p className="text-sm whitespace-pre-wrap text-[var(--cf-ink)]">
+              {candidate.cover_letter}
+            </p>
+          </Card>
+        ) : null}
         <Card>
           <CardTitle className="mb-3">Skills</CardTitle>
           <div className="flex flex-wrap gap-2">
@@ -163,7 +196,7 @@ export function CandidateDetailClient({
           )}
         </Card>
         <Card className="md:col-span-2">
-          <CardTitle className="mb-3">Interview Notes</CardTitle>
+          <CardTitle className="mb-3">Notes</CardTitle>
           <p className="text-sm text-[var(--cf-ink)]">
             {candidate.interview_notes || "No notes yet."}
           </p>
@@ -176,7 +209,11 @@ export function CandidateDetailClient({
         title={
           dialog === "accepted" ? "Accept candidate?" : "Reject candidate?"
         }
-        description={`Confirm decision for ${candidate.candidate_name}. Writes to submittals only.`}
+        description={
+          candidate.source === "application"
+            ? `Confirm decision for ${candidate.candidate_name}. Updates their jobs board application.`
+            : `Confirm decision for ${candidate.candidate_name}. Writes to submittals only.`
+        }
         confirmLabel={dialog === "accepted" ? "Accept" : "Reject"}
         confirmVariant={dialog === "accepted" ? "success" : "danger"}
         requireReason={dialog === "rejected"}

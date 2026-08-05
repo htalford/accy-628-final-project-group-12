@@ -11,8 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Table, THead, Th, Td } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination } from "@/components/ui/form";
+import { PinContractButton } from "@/components/portal-pins/pin-contract-button";
 import type { PlacementWithEmployee } from "@/lib/client-portal/types";
 import {
+  placementPositionTitle,
   placementStatusLabel,
   placementTypeLabel,
   seedStatusTone,
@@ -40,12 +42,14 @@ export function ContractsClient({
       const name = p.employee
         ? `${p.employee.first_name} ${p.employee.last_name}`
         : "";
-      const title = p.title ?? "";
+      const title = placementPositionTitle(p.title, p.placement_type);
+      const number = shortPlacementNumber(p.id);
       const matchesQ =
         !q ||
         name.toLowerCase().includes(q.toLowerCase()) ||
         title.toLowerCase().includes(q.toLowerCase()) ||
-        shortPlacementNumber(p.id).toLowerCase().includes(q.toLowerCase());
+        number.toLowerCase().includes(q.toLowerCase()) ||
+        p.id.toLowerCase().includes(q.toLowerCase());
       const matchesStatus =
         status === "All" ||
         p.status === status ||
@@ -62,12 +66,12 @@ export function ContractsClient({
     <div className="space-y-6">
       <PageHeader
         title="Contracts"
-        description={`Live placements for ${companyName} (shown as contracts).`}
+        description={`${companyName} · same placements and contract numbers as the Accounting portal.`}
       />
       <div className="flex flex-col gap-3 sm:flex-row">
         <SearchInput
           className="sm:max-w-xs"
-          placeholder="Search place, employee, number…"
+          placeholder="Search contract #, employee, title…"
           value={q}
           onChange={(e) => {
             setQ(e.target.value);
@@ -93,13 +97,13 @@ export function ContractsClient({
         <EmptyState
           title={
             hasFilters
-              ? "No placements match your filters"
-              : "No placements for this client"
+              ? "No contracts match your filters"
+              : "No contracts for this client"
           }
           description={
             hasFilters
               ? "Adjust search or status to widen results."
-              : "Placements assigned to your company will appear here."
+              : "Placements that accounting records for your company will appear here."
           }
           action={
             hasFilters ? (
@@ -122,13 +126,14 @@ export function ContractsClient({
           <Table>
             <THead>
               <tr>
-                <Th>Contract / Placement</Th>
+                <Th>Contract #</Th>
                 <Th>Position Title</Th>
                 <Th>Employee</Th>
                 <Th>Start</Th>
                 <Th>End</Th>
                 <Th>Type</Th>
                 <Th>Status</Th>
+                <Th className="w-12 text-center">Pin</Th>
               </tr>
             </THead>
             <tbody>
@@ -136,17 +141,20 @@ export function ContractsClient({
                 const name = p.employee
                   ? `${p.employee.first_name} ${p.employee.last_name}`
                   : "—";
+                const number = shortPlacementNumber(p.id);
+                const title = placementPositionTitle(p.title, p.placement_type);
                 return (
                   <tr key={p.id} className="hover:bg-[var(--cf-surface)]/60">
                     <Td>
                       <Link
                         href={`/client/contracts/${p.id}`}
-                        className="font-medium text-[var(--cf-navy)] hover:underline"
+                        className="font-mono text-xs font-medium text-[var(--cf-navy)] hover:underline"
+                        title="Same contract number as Accounting portal"
                       >
-                        {shortPlacementNumber(p.id)}
+                        {number}
                       </Link>
                     </Td>
-                    <Td>{p.title ?? "—"}</Td>
+                    <Td className="font-medium text-[var(--cf-ink)]">{title}</Td>
                     <Td>{name}</Td>
                     <Td>{p.start_date.slice(0, 10)}</Td>
                     <Td>{p.end_date ? p.end_date.slice(0, 10) : "—"}</Td>
@@ -155,6 +163,15 @@ export function ContractsClient({
                       <Badge tone={seedStatusTone(p.status)}>
                         {placementStatusLabel(p.status)}
                       </Badge>
+                    </Td>
+                    <Td className="text-center">
+                      <PinContractButton
+                        scope="client"
+                        contractId={p.id}
+                        contractNumber={number}
+                        employeeName={name !== "—" ? name : undefined}
+                        positionTitle={title}
+                      />
                     </Td>
                   </tr>
                 );

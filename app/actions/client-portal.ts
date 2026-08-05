@@ -256,6 +256,69 @@ export async function updateSubmittalStageAction(
 }
 
 /**
+ * Update application status when employer accepts/rejects a jobs-board applicant.
+ * Writes public.applications only (not submittals).
+ */
+export async function updateApplicationStatusAction(
+  applicationId: string,
+  decision: "accepted" | "rejected",
+  note?: string,
+): Promise<ActionResult> {
+  const auth = await requireEmployerClientId();
+  if (!auth.ok) return auth;
+
+  const supabase = await createClient();
+  const { data: row, error: findError } = await supabase
+    .from("applications")
+    .select("id, status, note, interview_notes, jobs(client_id, employer_name)")
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (findError || !row) {
+    return {
+      ok: false,
+      message: findError?.message ?? "Application not found.",
+    };
+  }
+
+  const nextStatus = decision === "accepted" ? "offered" : "rejected";
+  const decisionNote = note?.trim()
+    ? `Employer ${decision}: ${note.trim()}`
+    : `Employer ${decision}.`;
+  const existingNotes = row.interview_notes
+    ? String(row.interview_notes)
+    : "";
+  const interview_notes = existingNotes
+    ? `${existingNotes} · ${decisionNote}`
+    : decisionNote;
+
+  const { error } = await supabase
+    .from("applications")
+    .update({
+      status: nextStatus,
+      interview_notes,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", applicationId);
+
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/client/candidates");
+  revalidatePath(`/client/candidates/applications/${applicationId}`);
+  revalidatePath("/client/dashboard");
+  revalidatePath("/candidate/applications");
+  revalidatePath("/candidate/dashboard");
+
+  return {
+    ok: true,
+    message:
+      decision === "accepted"
+        ? "Application marked as offer extended."
+        : "Application rejected.",
+  };
+}
+
+/**
  * Insert into client_messages only (not public.messages).
  */
 export async function sendClientMessageAction(

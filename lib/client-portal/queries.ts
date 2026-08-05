@@ -13,7 +13,7 @@ import type {
 import { createClient } from "@/lib/supabase/server";
 import {
   listJobRequestsForClient,
-  listSubmittalsForClient,
+  listApplicationsForClient,
 } from "@/lib/client-portal/portal-data";
 import { requireEmployerUser } from "@/lib/client-portal/require-employer";
 import type {
@@ -22,6 +22,7 @@ import type {
   PlacementWithEmployee,
   TimesheetWithDetails,
 } from "@/lib/client-portal/types";
+import { placementPositionTitle } from "@/lib/client-portal/labels";
 
 export type {
   ActionItem,
@@ -45,7 +46,12 @@ function asPlacement(row: Record<string, unknown>): PlacementWithEmployee {
     client_id: String(row.client_id),
     employee_id: String(row.employee_id),
     placement_type: row.placement_type as Placement["placement_type"],
-    title: (row.title as string | null) ?? null,
+    title:
+      typeof row.title === "string" && row.title.trim()
+        ? row.title.trim()
+        : row.placement_type === "permanent"
+          ? "Permanent Placement"
+          : "Temporary Assignment",
     bill_rate: row.bill_rate == null ? null : num(row.bill_rate),
     pay_rate: row.pay_rate == null ? null : num(row.pay_rate),
     placement_fee: row.placement_fee == null ? null : num(row.placement_fee),
@@ -182,10 +188,10 @@ export const loadClientPortalData = cache(async (): Promise<ClientPortalData> =>
     (p) => p.status === "active" || p.status === "at_risk",
   );
 
-  // Client-portal-only tables (isolated from public.jobs / applications / messages)
-  const [portalJobRequests, portalSubmittals] = await Promise.all([
+  // Jobs board applications for this employer's open postings
+  const [portalJobRequests, portalApplications] = await Promise.all([
     listJobRequestsForClient(),
-    listSubmittalsForClient(),
+    listApplicationsForClient(),
   ]);
 
   const metrics = {
@@ -193,7 +199,7 @@ export const loadClientPortalData = cache(async (): Promise<ClientPortalData> =>
       .filter((j) => j.status === "open" || j.status === "in_progress")
       .reduce((n, j) => n + j.positions, 0),
     currentEmployees: openPlacements.length,
-    pendingCandidateReviews: portalSubmittals.filter(
+    pendingCandidateReviews: portalApplications.filter(
       (c) => c.stage === "submitted" || c.stage === "under_review",
     ).length,
     activeContracts: openPlacements.length,
@@ -443,11 +449,7 @@ export function employeesFromPlacements(
       name: `${p.employee!.first_name} ${p.employee!.last_name}`,
       email: p.employee!.email,
       phone: p.employee!.phone,
-      title:
-        p.title ??
-        (p.placement_type === "permanent"
-          ? "Permanent Placement"
-          : "Temporary Assignment"),
+      title: placementPositionTitle(p.title, p.placement_type),
       status: p.status,
       startDate: p.start_date,
       billRate: p.bill_rate,

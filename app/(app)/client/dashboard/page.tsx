@@ -5,6 +5,8 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, THead, Th, Td } from "@/components/ui/table";
+import { PinActionTaskButton } from "@/components/portal-pins/pin-action-task-button";
+import { PinContractButton } from "@/components/portal-pins/pin-contract-button";
 import {
   employeesFromPlacements,
   loadClientPortalData,
@@ -51,7 +53,7 @@ export default async function ClientDashboardPage() {
             <CardTitle>Needs attention</CardTitle>
             <span className="text-xs font-medium text-amber-900">
               {data.actionQueue.length} item
-              {data.actionQueue.length === 1 ? "" : "s"}
+              {data.actionQueue.length === 1 ? "" : "s"} · pin to sidebar
             </span>
           </div>
           <ul className="divide-y divide-amber-100">
@@ -70,6 +72,22 @@ export default async function ClientDashboardPage() {
                   <Badge tone={seedStatusTone(item.status)}>
                     {actionStatusLabel(item.kind, item.status)}
                   </Badge>
+                  <PinActionTaskButton
+                    scope="client"
+                    id={item.id}
+                    title={item.title}
+                    detail={item.detail}
+                    href={item.href}
+                    kind={
+                      item.kind === "placement"
+                        ? "contract"
+                        : item.kind === "timesheet"
+                          ? "timesheet"
+                          : item.kind === "invoice"
+                            ? "invoice"
+                            : "task"
+                    }
+                  />
                   <Link href={item.href}>
                     <Button size="sm" variant="secondary">
                       Open
@@ -285,6 +303,13 @@ export default async function ClientDashboardPage() {
                   <Badge tone={seedStatusTone(p.status)}>
                     {placementStatusLabel(p.status)}
                   </Badge>
+                  <PinContractButton
+                    scope="client"
+                    contractId={p.id}
+                    contractNumber={shortPlacementNumber(p.id)}
+                    employeeName={name}
+                    positionTitle={p.title ?? undefined}
+                  />
                   <Button
                     size="sm"
                     variant="ghost"
