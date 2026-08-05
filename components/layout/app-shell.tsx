@@ -1,6 +1,5 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
-import { RoleSwitcher } from "@/components/demo/role-switcher";
 import type { AppUser } from "@/lib/types/database";
 
 export function AppShell({
@@ -17,7 +16,6 @@ export function AppShell({
         <TopBar user={user} />
         <main className="flex-1 bg-[var(--cf-surface)] p-6">{children}</main>
       </div>
-      <RoleSwitcher currentRole={user.role} />
     </div>
   );
 }
