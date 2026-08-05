@@ -1,42 +1,57 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
+  BarChart3,
   Briefcase,
   CheckCircle2,
+  CircleDollarSign,
   ClipboardCheck,
   Clock,
   FileSignature,
   FileText,
+  History,
   LayoutDashboard,
   MessageSquare,
+  MessagesSquare,
   Pin,
   PinOff,
+  Receipt,
   Search,
   Send,
+  TrendingUp,
   User,
   Wallet,
+  X,
 } from "lucide-react";
 import { getNavForRole, ROLE_LABELS } from "@/lib/auth/roles";
 import type { UserRole } from "@/lib/types/database";
-import type { NavItem } from "@/lib/auth/roles";
+import type { NavIcon, NavItem } from "@/lib/auth/roles";
+import { useShell } from "@/components/layout/shell-context";
 
-const ICONS = {
+const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   "layout-dashboard": LayoutDashboard,
   "clipboard-check": ClipboardCheck,
   briefcase: Briefcase,
   "file-text": FileText,
   clock: Clock,
-  search: Search,
-  "file-signature": FileSignature,
-  send: Send,
   wallet: Wallet,
+  receipt: Receipt,
+  "file-signature": FileSignature,
+  "circle-dollar-sign": CircleDollarSign,
+  "trending-up": TrendingUp,
+  "bar-chart-3": BarChart3,
+  "messages-square": MessagesSquare,
+  user: User,
+  history: History,
+  search: Search,
+  send: Send,
   "circle-check": CheckCircle2,
   "message-square": MessageSquare,
-  user: User,
-} as const;
+};
 
 const CANDIDATE_DASHBOARD = "/candidate/dashboard";
 const CANDIDATE_PIN_KEY = "cf-candidate-nav-pins";
@@ -60,7 +75,6 @@ function orderCandidateNav(items: NavItem[], pinnedHrefs: string[]) {
   const pinnedSet = new Set(pinnedHrefs);
 
   const pinned: NavItem[] = [];
-  // Keep Dashboard first among pins when it is pinned.
   if (pinnedSet.has(CANDIDATE_DASHBOARD) && byHref.has(CANDIDATE_DASHBOARD)) {
     pinned.push(byHref.get(CANDIDATE_DASHBOARD)!);
   }
@@ -79,17 +93,25 @@ function orderCandidateNav(items: NavItem[], pinnedHrefs: string[]) {
 
 function NavLink({
   item,
+  collapsed,
+  onNavigate,
   pinned,
   showPinControls,
   onTogglePin,
 }: {
   item: NavItem;
+  collapsed: boolean;
+  onNavigate?: () => void;
   pinned?: boolean;
   showPinControls?: boolean;
   onTogglePin?: () => void;
 }) {
   const pathname = usePathname();
-  const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+  const active =
+    pathname === item.href ||
+    (item.href !== "/accounting/dashboard" &&
+      pathname.startsWith(`${item.href}/`)) ||
+    (item.href.endsWith("/dashboard") && pathname === item.href);
   const Icon = ICONS[item.icon];
 
   return (
@@ -100,14 +122,16 @@ function NavLink({
     >
       <Link
         href={item.href}
+        title={item.label}
+        onClick={onNavigate}
         className={`flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-sm font-medium transition ${
-          active ? "text-white" : "text-white/70 group-hover:text-white"
-        }`}
+          collapsed ? "justify-center px-2" : ""
+        } ${active ? "text-white" : "text-white/70 group-hover:text-white"}`}
       >
         <Icon className="h-4 w-4 shrink-0" aria-hidden />
-        <span className="truncate">{item.label}</span>
+        {!collapsed ? <span className="truncate">{item.label}</span> : null}
       </Link>
-      {showPinControls && onTogglePin ? (
+      {showPinControls && onTogglePin && !collapsed ? (
         <button
           type="button"
           onClick={onTogglePin}
@@ -133,6 +157,7 @@ function NavLink({
 export function Sidebar({ role }: { role: UserRole }) {
   const items = getNavForRole(role);
   const isCandidate = role === "candidate";
+  const { collapsed, mobileOpen, setMobileOpen } = useShell();
   const [pinnedHrefs, setPinnedHrefs] = useState<string[]>([
     CANDIDATE_DASHBOARD,
   ]);
@@ -161,35 +186,69 @@ export function Sidebar({ role }: { role: UserRole }) {
       if (prev.includes(href)) {
         return prev.filter((h) => h !== href);
       }
-      // New pins append; Dashboard is reordered to front on render.
       return [...prev, href];
     });
   }
 
-  return (
-    <aside className="flex w-60 shrink-0 flex-col bg-[var(--cf-navy)] text-white">
-      <div className="border-b border-white/10 px-5 py-5">
-        <p className="text-xs font-semibold tracking-[0.16em] text-[var(--cf-accent)] uppercase">
-          ContractFlow
-        </p>
-        <p className="mt-1 text-sm text-white/60">{ROLE_LABELS[role]} portal</p>
+  const showCollapsed = collapsed && !mobileOpen;
+
+  const nav = (
+    <>
+      <div
+        className={`border-b border-white/10 ${showCollapsed ? "px-2 py-3" : "px-4 py-4"}`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className={showCollapsed ? "w-full" : "min-w-0 flex-1"}>
+            <Link
+              href={`/${role}/dashboard`}
+              className={`block rounded-md bg-white ${showCollapsed ? "p-1.5" : "p-2"}`}
+              title="TalentQuest"
+            >
+              <Image
+                src="/talentquest-logo.png"
+                alt="TalentQuest"
+                width={168}
+                height={118}
+                className={`w-auto ${showCollapsed ? "mx-auto h-8" : "h-11"}`}
+                priority
+              />
+            </Link>
+            {!showCollapsed ? (
+              <p className="mt-2 text-sm text-white/60">
+                {ROLE_LABELS[role]} portal
+              </p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            className="rounded-md p-1 text-white/60 hover:bg-white/10 hover:text-white lg:hidden"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Close menu"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
         {isCandidate ? (
           <>
             {pinned.length > 0 ? (
               <div className="mb-1">
-                <p className="px-3 pb-1 text-[10px] font-semibold tracking-[0.14em] text-white/35 uppercase">
-                  Pinned
-                </p>
+                {!showCollapsed ? (
+                  <p className="px-3 pb-1 text-[10px] font-semibold tracking-[0.14em] text-white/35 uppercase">
+                    Pinned
+                  </p>
+                ) : null}
                 <div className="flex flex-col gap-0.5">
                   {pinned.map((item) => (
                     <NavLink
                       key={item.href}
                       item={item}
+                      collapsed={showCollapsed}
                       pinned
                       showPinControls
                       onTogglePin={() => togglePin(item.href)}
+                      onNavigate={() => setMobileOpen(false)}
                     />
                   ))}
                 </div>
@@ -197,7 +256,7 @@ export function Sidebar({ role }: { role: UserRole }) {
             ) : null}
             {unpinned.length > 0 ? (
               <div className={pinned.length > 0 ? "mt-2" : undefined}>
-                {pinned.length > 0 ? (
+                {!showCollapsed && pinned.length > 0 ? (
                   <p className="px-3 pb-1 text-[10px] font-semibold tracking-[0.14em] text-white/35 uppercase">
                     More
                   </p>
@@ -207,8 +266,10 @@ export function Sidebar({ role }: { role: UserRole }) {
                     <NavLink
                       key={item.href}
                       item={item}
+                      collapsed={showCollapsed}
                       showPinControls
                       onTogglePin={() => togglePin(item.href)}
+                      onNavigate={() => setMobileOpen(false)}
                     />
                   ))}
                 </div>
@@ -216,14 +277,50 @@ export function Sidebar({ role }: { role: UserRole }) {
             ) : null}
           </>
         ) : (
-          items.map((item) => <NavLink key={item.href} item={item} />)
+          items.map((item) => (
+            <NavLink
+              key={item.href}
+              item={item}
+              collapsed={showCollapsed}
+              onNavigate={() => setMobileOpen(false)}
+            />
+          ))
         )}
       </nav>
-      <div className="border-t border-white/10 px-4 py-3 text-xs text-white/40">
-        {isCandidate
-          ? "Hover a tab to pin or unpin"
-          : "ACCY 628 · Group 12"}
-      </div>
-    </aside>
+      {!showCollapsed ? (
+        <div className="border-t border-white/10 px-4 py-3 text-xs text-white/40">
+          {isCandidate ? "Hover a tab to pin or unpin" : "ACCY 628 · Group 12"}
+        </div>
+      ) : null}
+    </>
+  );
+
+  return (
+    <>
+      {mobileOpen ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          aria-label="Close sidebar overlay"
+          onClick={() => setMobileOpen(false)}
+        />
+      ) : null}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-[var(--cf-navy)] text-white transition-transform lg:hidden ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {nav}
+      </aside>
+
+      <aside
+        className={`hidden shrink-0 flex-col bg-[var(--cf-navy)] text-white transition-[width] lg:flex ${
+          collapsed ? "w-[4.25rem]" : "w-60"
+        }`}
+      >
+        {nav}
+      </aside>
+    </>
   );
 }

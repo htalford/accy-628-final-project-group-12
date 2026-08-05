@@ -33,7 +33,10 @@ export function SiteFooter() {
               Get started
             </Link>
             <Link href="/login" className="hover:text-white">
-              Client & employee login
+              Client sign in
+            </Link>
+            <Link href="/careers/login" className="hover:text-white">
+              Employee sign in
             </Link>
           </div>
         </div>

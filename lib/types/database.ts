@@ -15,7 +15,17 @@ export type ApplicationStatus =
   | "offered"
   | "rejected"
   | "withdrawn";
-
+export type ExpenseCategory =
+  | "recruiter_labor"
+  | "advertising"
+  | "background_checks"
+  | "drug_screening"
+  | "payroll"
+  | "employee_wages"
+  | "referral_bonuses"
+  | "training"
+  | "miscellaneous";
+export type ExpenseStatus = "pending" | "approved" | "rejected" | "reimbursed";
 export type Client = {
   id: string;
   name: string;
@@ -99,6 +109,19 @@ export type Payment = {
   amount: number;
   payment_date: string;
   status: PaymentStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Expense = {
+  id: string;
+  expense_date: string;
+  category: ExpenseCategory;
+  client_id: string | null;
+  placement_id: string | null;
+  amount: number;
+  status: ExpenseStatus;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 };

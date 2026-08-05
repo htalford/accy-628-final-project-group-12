@@ -18,11 +18,10 @@ export default function LoginPage() {
             />
           </Link>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight text-[var(--ot-navy)]">
-            Sign in
+            Client sign in
           </h1>
           <p className="mt-2 text-sm text-[var(--ot-muted)]">
-            Existing clients, employees, managers, and accounting users can log
-            in here.
+            This sign-in page is for Talent Quest clients.
           </p>
         </div>
         <div className="rounded-xl border border-[var(--ot-border)] bg-white p-6 shadow-sm">
@@ -33,6 +32,18 @@ export default function LoginPage() {
           <Link href="/signup" className="font-semibold text-[var(--ot-ocean)]">
             Get started
           </Link>
+        </p>
+        <p className="mt-2 text-center text-sm text-[var(--ot-muted)]">
+          Talent Quest staff?{" "}
+          <Link
+            href="/careers/login"
+            className="font-semibold text-[var(--ot-ocean)]"
+          >
+            Employee sign in
+          </Link>
+        </p>
+        <p className="mt-2 text-center text-xs text-[var(--ot-muted)]">
+          Demo password: <code className="font-mono">DemoPass123!</code>
         </p>
       </div>
     </div>

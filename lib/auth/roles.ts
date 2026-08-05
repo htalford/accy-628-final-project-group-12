@@ -7,6 +7,19 @@ export const USER_ROLES: UserRole[] = [
   "accounting",
 ];
 
+export const STAFF_ROLES: UserRole[] = ["recruiter", "accounting"];
+export const STAFF_EMAIL_DOMAIN = "talentquest.com";
+
+export function isStaffRole(role: UserRole): boolean {
+  return STAFF_ROLES.includes(role);
+}
+
+export function staffEmailFromUsername(input: string): string {
+  const trimmed = input.trim().toLowerCase();
+  const local = trimmed.includes("@") ? trimmed.split("@")[0]! : trimmed;
+  return `${local}@${STAFF_EMAIL_DOMAIN}`;
+}
+
 export const ROLE_LABELS: Record<UserRole, string> = {
   employer: "Employer",
   candidate: "Candidate",
@@ -57,6 +70,8 @@ export function isPublicPath(pathname: string): boolean {
     pathname === "/signup" ||
     pathname.startsWith("/about") ||
     pathname.startsWith("/industries") ||
+    pathname.startsWith("/locations") ||
+    pathname.startsWith("/jobs") ||
     pathname.startsWith("/careers") ||
     pathname.startsWith("/auth/")
   );
@@ -72,22 +87,30 @@ export function pathRequiresAuth(pathname: string): boolean {
   );
 }
 
+export type NavIcon =
+  | "layout-dashboard"
+  | "clipboard-check"
+  | "briefcase"
+  | "file-text"
+  | "clock"
+  | "wallet"
+  | "receipt"
+  | "file-signature"
+  | "circle-dollar-sign"
+  | "trending-up"
+  | "bar-chart-3"
+  | "messages-square"
+  | "user"
+  | "history"
+  | "search"
+  | "send"
+  | "circle-check"
+  | "message-square";
+
 export type NavItem = {
   href: string;
   label: string;
-  icon:
-    | "layout-dashboard"
-    | "clipboard-check"
-    | "briefcase"
-    | "file-text"
-    | "clock"
-    | "search"
-    | "file-signature"
-    | "send"
-    | "wallet"
-    | "circle-check"
-    | "message-square"
-    | "user";
+  icon: NavIcon;
 };
 
 export function getNavForRole(role: UserRole): NavItem[] {
@@ -116,8 +139,52 @@ export function getNavForRole(role: UserRole): NavItem[] {
       ];
     case "accounting":
       return [
-        { href: "/accounting/dashboard", label: "Dashboard", icon: "layout-dashboard" },
+        { href: "/accounting/dashboard", label: "Home", icon: "layout-dashboard" },
         { href: "/accounting/invoices", label: "Invoices", icon: "file-text" },
+        { href: "/accounting/payroll", label: "Payroll", icon: "wallet" },
+        { href: "/accounting/accounts-receivable", label: "Accounts Receivable", icon: "receipt" },
+        { href: "/accounting/contracts", label: "Contracts", icon: "file-signature" },
+        { href: "/accounting/expenses", label: "Expenses", icon: "circle-dollar-sign" },
+        { href: "/accounting/profitability", label: "Profitability", icon: "trending-up" },
+        { href: "/accounting/reports", label: "Financial Reports", icon: "bar-chart-3" },
+        { href: "/accounting/audit-trail", label: "Audit Trail", icon: "history" },
+        { href: "/accounting/messages", label: "Messages", icon: "messages-square" },
+        { href: "/accounting/profile", label: "Profile", icon: "user" },
       ];
   }
+}
+
+export function getPageTitle(pathname: string): string {
+  const map: Record<string, string> = {
+    "/accounting/dashboard": "Home",
+    "/accounting/invoices": "Invoices",
+    "/accounting/payroll": "Payroll",
+    "/accounting/accounts-receivable": "Accounts Receivable",
+    "/accounting/contracts": "Contracts",
+    "/accounting/expenses": "Expenses",
+    "/accounting/profitability": "Profitability",
+    "/accounting/reports": "Financial Reports",
+    "/accounting/audit-trail": "Audit Trail",
+    "/accounting/messages": "Messages",
+    "/accounting/profile": "Profile",
+    "/employer/dashboard": "Dashboard",
+    "/employer/timesheets": "Timesheet approval",
+    "/candidate/dashboard": "Dashboard",
+    "/candidate/applications": "Applications",
+    "/candidate/jobs": "Available jobs",
+    "/candidate/completions": "Completions",
+    "/candidate/contracts": "Contracts",
+    "/candidate/messages": "Messages",
+    "/candidate/pay": "Pay",
+    "/candidate/profile": "Profile",
+    "/candidate/timesheets": "Timesheets",
+    "/recruiter/dashboard": "Dashboard",
+    "/recruiter/placements": "Placements",
+  };
+
+  if (map[pathname]) return map[pathname];
+  if (pathname === "/accounting/invoices/new") return "Create Invoice";
+  if (pathname.startsWith("/accounting/invoices/")) return "Invoice detail";
+  if (pathname.startsWith("/accounting/contracts/")) return "Contract detail";
+  return "TalentQuest";
 }
