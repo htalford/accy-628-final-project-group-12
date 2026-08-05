@@ -16,6 +16,7 @@ async function requireRecruiter() {
 
 function revalidateRecruiter() {
   revalidatePath("/recruiter", "layout");
+  revalidatePath("/accounting/messages");
 }
 
 export async function approveApplication(applicationId: string) {
@@ -433,4 +434,36 @@ export async function sendEmployerMessage(input: {
 
   revalidateRecruiter();
   return { ok: true as const, message: "Message sent to employer." };
+}
+
+export async function sendAccountingStaffMessage(input: {
+  threadId: string;
+  body: string;
+}) {
+  const { error: authError, user } = await requireRecruiter();
+  if (authError || !user) {
+    return { ok: false as const, error: authError ?? "Unauthorized" };
+  }
+
+  const body = input.body.trim();
+  if (!input.threadId || !body) {
+    return { ok: false as const, error: "Thread and message body are required." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("staff_messages").insert({
+    thread_id: input.threadId,
+    sender_user_id: user.id,
+    sender_role: "recruiter",
+    body,
+  });
+  if (error) return { ok: false as const, error: error.message };
+
+  await supabase
+    .from("staff_message_threads")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", input.threadId);
+
+  revalidateRecruiter();
+  return { ok: true as const, message: "Message sent to accounting." };
 }

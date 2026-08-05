@@ -9,8 +9,6 @@ import {
   ChevronDown,
   LogOut,
   Menu,
-  PanelLeftClose,
-  PanelLeftOpen,
   Search,
   User,
 } from "lucide-react";
@@ -30,7 +28,7 @@ type SearchHit = {
 
 export function TopBar({ user }: { user: AppUser }) {
   const pathname = usePathname();
-  const { collapsed, toggleCollapsed, toggleMobileOpen } = useShell();
+  const { toggleMobileOpen } = useShell();
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -78,18 +76,6 @@ export function TopBar({ user }: { user: AppUser }) {
         aria-label="Open menu"
       >
         <Menu className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        className="hidden rounded-md border border-[var(--cf-border)] p-2 text-[var(--cf-ink)] hover:bg-[var(--cf-surface)] lg:inline-flex"
-        onClick={toggleCollapsed}
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      >
-        {collapsed ? (
-          <PanelLeftOpen className="h-4 w-4" />
-        ) : (
-          <PanelLeftClose className="h-4 w-4" />
-        )}
       </button>
 
       <Link
