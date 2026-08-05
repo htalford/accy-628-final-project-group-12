@@ -8,46 +8,47 @@ import {
   useMemo,
   useState,
 } from "react";
+import { usePathname } from "next/navigation";
 
 type ShellContextValue = {
-  collapsed: boolean;
+  pinned: boolean;
   mobileOpen: boolean;
-  setCollapsed: (value: boolean) => void;
-  toggleCollapsed: () => void;
+  setPinned: (value: boolean) => void;
+  togglePinned: () => void;
   setMobileOpen: (value: boolean) => void;
   toggleMobileOpen: () => void;
 };
 
 const ShellContext = createContext<ShellContextValue | null>(null);
-const STORAGE_KEY = "cf-sidebar-collapsed";
+const PINNED_KEY = "cf-sidebar-pinned";
 
 export function ShellProvider({ children }: { children: React.ReactNode }) {
-  const [collapsed, setCollapsedState] = useState(false);
+  const [pinned, setPinnedState] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved === "1") setCollapsedState(true);
+      const savedPinned = localStorage.getItem(PINNED_KEY);
+      if (savedPinned === "1") setPinnedState(true);
     } catch {
       /* ignore */
     }
   }, []);
 
-  const setCollapsed = useCallback((value: boolean) => {
-    setCollapsedState(value);
+  const setPinned = useCallback((value: boolean) => {
+    setPinnedState(value);
     try {
-      localStorage.setItem(STORAGE_KEY, value ? "1" : "0");
+      localStorage.setItem(PINNED_KEY, value ? "1" : "0");
     } catch {
       /* ignore */
     }
   }, []);
 
-  const toggleCollapsed = useCallback(() => {
-    setCollapsedState((prev) => {
+  const togglePinned = useCallback(() => {
+    setPinnedState((prev) => {
       const next = !prev;
       try {
-        localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
+        localStorage.setItem(PINNED_KEY, next ? "1" : "0");
       } catch {
         /* ignore */
       }
@@ -61,14 +62,14 @@ export function ShellProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(
     () => ({
-      collapsed,
+      pinned,
       mobileOpen,
-      setCollapsed,
-      toggleCollapsed,
+      setPinned,
+      togglePinned,
       setMobileOpen,
       toggleMobileOpen,
     }),
-    [collapsed, mobileOpen, setCollapsed, toggleCollapsed, toggleMobileOpen],
+    [pinned, mobileOpen, setPinned, togglePinned, toggleMobileOpen],
   );
 
   return (
@@ -80,4 +81,22 @@ export function useShell() {
   const ctx = useContext(ShellContext);
   if (!ctx) throw new Error("useShell must be used within ShellProvider");
   return ctx;
+}
+
+/** Sidebar is forced open on Home, or when the user has pinned it. */
+export function useSidebarLayout(homePath: string) {
+  const pathname = usePathname();
+  const shell = useShell();
+  const isHome = pathname === homePath;
+  const forcedOpen = isHome || shell.pinned;
+  const showCollapsed = !forcedOpen;
+
+  return {
+    ...shell,
+    isHome,
+    forcedOpen,
+    showCollapsed,
+    /** Pin/unpin on non-home pages; unpin also allowed on Home if globally pinned. */
+    canTogglePin: !isHome || shell.pinned,
+  };
 }

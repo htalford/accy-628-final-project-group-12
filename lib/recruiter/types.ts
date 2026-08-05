@@ -199,7 +199,7 @@ export type JobOrderFilters = {
 
 export type RecruiterMessageThread = {
   id: string;
-  participantType: "candidate" | "employer";
+  participantType: "candidate" | "employer" | "accounting";
   participantName: string;
   participantId: string;
   subject: string;
