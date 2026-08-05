@@ -22,8 +22,19 @@ export function PayrollToolbar({
     startTransition(() => router.push(`${pathname}?${params.toString()}`));
   }
 
+  const from = searchParams.get("from");
+
   return (
     <div className={`flex flex-wrap gap-3 ${pending ? "opacity-70" : ""}`}>
+      {from ? (
+        <button
+          type="button"
+          className="rounded-md border border-[var(--cf-border)] bg-[var(--cf-surface)] px-3 py-2 text-sm text-[var(--cf-ink)] hover:bg-white"
+          onClick={() => update("from", "all")}
+        >
+          From {from} ×
+        </button>
+      ) : null}
       <select
         className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-sm"
         defaultValue={searchParams.get("period") ?? "all"}

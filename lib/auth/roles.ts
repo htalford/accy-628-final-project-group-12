@@ -194,6 +194,7 @@ export function getNavForRole(role: UserRole): NavItem[] {
         { href: "/accounting/dashboard", label: "Home", icon: "layout-dashboard" },
         { href: "/accounting/invoices", label: "Invoices", icon: "file-text" },
         { href: "/accounting/payroll", label: "Payroll", icon: "wallet" },
+        { href: "/accounting/timesheets", label: "Timesheets", icon: "clock" },
         {
           href: "/accounting/accounts-receivable",
           label: "Accounts Receivable",
@@ -215,6 +216,7 @@ export function getPageTitle(pathname: string): string {
     "/accounting/dashboard": "Home",
     "/accounting/invoices": "Invoices",
     "/accounting/payroll": "Payroll",
+    "/accounting/timesheets": "Timesheets",
     "/accounting/accounts-receivable": "Accounts Receivable",
     "/accounting/contracts": "Contracts",
     "/accounting/expenses": "Expenses",
@@ -256,6 +258,22 @@ export function getPageTitle(pathname: string): string {
   if (map[pathname]) return map[pathname];
   if (pathname === "/accounting/invoices/new") return "Create Invoice";
   if (pathname.startsWith("/accounting/invoices/")) return "Invoice detail";
+  if (pathname === "/accounting/expenses/new") return "Add Expense";
+  if (pathname === "/accounting/reports/revenue") return "Revenue Report";
+  if (pathname === "/accounting/reports/payroll") return "Payroll Report";
+  if (pathname === "/accounting/reports/aging") return "Invoice Aging Report";
+  if (pathname === "/accounting/reports/profitability")
+    return "Profitability Report";
+  if (pathname === "/accounting/reports/contract-revenue")
+    return "Contract Revenue Report";
+  if (pathname === "/accounting/reports/expense") return "Expense Report";
+  if (pathname === "/accounting/reports/cash-flows")
+    return "Statement of Cash Flows";
+  if (pathname === "/accounting/reports/income-statement")
+    return "Income Statement";
+  if (pathname === "/accounting/reports/balance-sheet") return "Balance Sheet";
+  if (pathname.startsWith("/accounting/reports/")) return "Report preview";
+  if (pathname.startsWith("/accounting/timesheets/")) return "Timesheet detail";
   if (pathname.startsWith("/accounting/contracts/")) return "Contract detail";
   if (pathname.startsWith("/candidate/contracts/")) return "Contract detail";
   if (pathname.startsWith("/client/job-requests/new")) return "New Job Request";

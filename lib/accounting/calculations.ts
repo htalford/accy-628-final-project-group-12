@@ -152,3 +152,24 @@ export function isCurrentCalendarMonth(dateStr: string, now = new Date()): boole
   const m = String(now.getMonth() + 1).padStart(2, "0");
   return dateStr.startsWith(`${y}-${m}`);
 }
+
+/** Inclusive local calendar window: [today − days, today]. */
+export function isWithinLastDays(
+  dateStr: string,
+  days: number,
+  now = new Date(),
+): boolean {
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const start = new Date(end);
+  start.setDate(start.getDate() - days);
+  const d = dateStr.slice(0, 10);
+  const toIso = (dt: Date) =>
+    `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+  return d >= toIso(start) && d <= toIso(end);
+}
+
+export function daysAgoIso(days: number, now = new Date()): string {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  d.setDate(d.getDate() - days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}

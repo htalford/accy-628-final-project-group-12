@@ -216,38 +216,36 @@ export function Sidebar({ role }: { role: UserRole }) {
   const nav = (
     <>
       <div
-        className={`border-b border-white/10 ${showCollapsed ? "px-2 py-3" : "px-4 py-4"}`}
+        className={`relative border-b border-white/10 ${showCollapsed ? "px-2 py-3" : "px-4 py-4"}`}
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className={showCollapsed ? "w-full" : "min-w-0 flex-1"}>
-            <Link
-              href={getDashboardPath(role)}
-              className={`block rounded-md bg-white ${showCollapsed ? "p-1.5" : "p-2"}`}
-              title="TalentQuest"
-            >
-              <Image
-                src="/talentquest-logo.png"
-                alt="TalentQuest"
-                width={168}
-                height={118}
-                className={`w-auto ${showCollapsed ? "mx-auto h-8" : "h-11"}`}
-                priority
-              />
-            </Link>
-            {!showCollapsed ? (
-              <p className="mt-2 text-sm text-white/60">
-                {ROLE_LABELS[role]} portal
-              </p>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            className="rounded-md p-1 text-white/60 hover:bg-white/10 hover:text-white lg:hidden"
-            onClick={() => setMobileOpen(false)}
-            aria-label="Close menu"
+        <button
+          type="button"
+          className="absolute top-3 right-3 rounded-md p-1 text-white/60 hover:bg-white/10 hover:text-white lg:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-label="Close menu"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <div className="flex w-full flex-col items-center text-center">
+          <Link
+            href={getDashboardPath(role)}
+            className={`inline-flex rounded-md bg-white ${showCollapsed ? "p-1.5" : "p-2"}`}
+            title="TalentQuest"
           >
-            <X className="h-4 w-4" />
-          </button>
+            <Image
+              src="/talentquest-logo.png"
+              alt="TalentQuest"
+              width={168}
+              height={118}
+              className={`mx-auto w-auto ${showCollapsed ? "h-8" : "h-11"}`}
+              priority
+            />
+          </Link>
+          {!showCollapsed ? (
+            <p className="mt-2 text-sm text-white/60">
+              {ROLE_LABELS[role]} Portal
+            </p>
+          ) : null}
         </div>
       </div>
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">

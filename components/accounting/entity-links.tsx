@@ -72,3 +72,27 @@ export function PayrollEmployeeLink({ name }: { name: string }) {
     </EntityLink>
   );
 }
+
+export function TimesheetLink({
+  id,
+  label,
+}: {
+  id: string;
+  label?: string;
+}) {
+  return (
+    <EntityLink href={`/accounting/timesheets/${id}`} mono>
+      {label ?? shortId(id)}
+    </EntityLink>
+  );
+}
+
+export function TimesheetEmployeeLink({ name }: { name: string }) {
+  return (
+    <EntityLink
+      href={`/accounting/timesheets?employee=${encodeURIComponent(name)}`}
+    >
+      {name}
+    </EntityLink>
+  );
+}

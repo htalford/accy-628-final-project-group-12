@@ -109,9 +109,7 @@ export function buildTimesheetAuditEvent(input: {
     type: "timesheet",
     title: `Timesheet ${input.status} · ${input.employeeName}`,
     detail: `${input.clientName} · week ending ${input.weekEnding}`,
-    href: input.placementId
-      ? `/accounting/contracts/${input.placementId}`
-      : `/accounting/payroll?employee=${encodeURIComponent(input.employeeName)}`,
+    href: `/accounting/timesheets/${input.id}`,
     amount: input.grossPay,
     placementId: input.placementId,
   };
