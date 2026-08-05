@@ -3,19 +3,20 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import {
-  getDashboardPath,
-  ROLE_LABELS,
-  USER_ROLES,
-} from "@/lib/auth/roles";
+import { getDashboardPath } from "@/lib/auth/roles";
 import type { UserRole } from "@/lib/types/database";
+
+const SIGNUP_OPTIONS: { value: UserRole; label: string }[] = [
+  { value: "employer", label: "a Employer/Recruiter" },
+  { value: "candidate", label: "Looking for work" },
+];
 
 export function SignupForm() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserRole>("candidate");
+  const [role, setRole] = useState<UserRole | "">("");
   const [companyName, setCompanyName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -27,6 +28,11 @@ export function SignupForm() {
     setInfo(null);
 
     startTransition(async () => {
+      if (role !== "employer" && role !== "candidate") {
+        setError("Please choose who you are.");
+        return;
+      }
+
       const supabase = createClient();
 
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
@@ -116,16 +122,19 @@ export function SignupForm() {
       </label>
 
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-[var(--cf-ink)]">I am a…</span>
+        <span className="font-medium text-[var(--cf-ink)]">I am...</span>
         <select
           required
           value={role}
-          onChange={(e) => setRole(e.target.value as UserRole)}
+          onChange={(e) => setRole(e.target.value as UserRole | "")}
           className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-[var(--cf-ink)] outline-none ring-[var(--cf-accent)] focus:ring-2"
         >
-          {USER_ROLES.map((r) => (
-            <option key={r} value={r}>
-              {ROLE_LABELS[r]}
+          <option value="" disabled>
+            Select one
+          </option>
+          {SIGNUP_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>
