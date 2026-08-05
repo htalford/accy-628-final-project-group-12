@@ -57,6 +57,8 @@ export function isPublicPath(pathname: string): boolean {
     pathname === "/signup" ||
     pathname.startsWith("/about") ||
     pathname.startsWith("/industries") ||
+    pathname.startsWith("/locations") ||
+    pathname.startsWith("/jobs") ||
     pathname.startsWith("/careers") ||
     pathname.startsWith("/auth/")
   );

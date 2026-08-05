@@ -45,13 +45,18 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-[var(--ot-border)] bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-start justify-between gap-4 px-4 py-3 sm:px-6">
         <div className="flex min-w-0 flex-1 items-start gap-2 md:gap-4">
-          <Link href="/" className="shrink-0 pt-0.5" aria-label="TalentQuest home">
+          <Link
+            href="/"
+            className="relative z-10 block shrink-0 cursor-pointer pt-0.5"
+            aria-label="Go to TalentQuest home page"
+            title="TalentQuest home"
+          >
             <Image
               src="/talentquest-logo.png"
               alt="TalentQuest — Discover. Connect. Succeed."
               width={168}
               height={118}
-              className="h-14 w-auto sm:h-16"
+              className="pointer-events-none h-14 w-auto sm:h-16"
               priority
             />
           </Link>

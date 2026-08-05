@@ -61,6 +61,134 @@ export const INDUSTRIES = [
   },
 ] as const;
 
+export const REGIONS = [
+  {
+    slug: "northeast",
+    name: "Northeast",
+    states: [
+      "Connecticut",
+      "Delaware",
+      "Maine",
+      "Maryland",
+      "Massachusetts",
+      "New Hampshire",
+      "New Jersey",
+      "New York",
+      "Pennsylvania",
+      "Rhode Island",
+      "Vermont",
+    ],
+  },
+  {
+    slug: "southeast",
+    name: "Southeast",
+    states: [
+      "Alabama",
+      "Arkansas",
+      "Florida",
+      "Georgia",
+      "Kentucky",
+      "Louisiana",
+      "Mississippi",
+      "North Carolina",
+      "South Carolina",
+      "Tennessee",
+      "Virginia",
+      "West Virginia",
+      "Washington, D.C.",
+    ],
+  },
+  {
+    slug: "midwest",
+    name: "Midwest",
+    states: [
+      "Illinois",
+      "Indiana",
+      "Iowa",
+      "Kansas",
+      "Michigan",
+      "Minnesota",
+      "Missouri",
+      "Nebraska",
+      "North Dakota",
+      "Ohio",
+      "South Dakota",
+      "Wisconsin",
+    ],
+  },
+  {
+    slug: "southwest",
+    name: "Southwest",
+    states: [
+      "Arizona",
+      "New Mexico",
+      "Oklahoma",
+      "Texas",
+    ],
+  },
+  {
+    slug: "west",
+    name: "West",
+    states: [
+      "Alaska",
+      "California",
+      "Colorado",
+      "Hawaii",
+      "Idaho",
+      "Montana",
+      "Nevada",
+      "Oregon",
+      "Utah",
+      "Washington",
+      "Wyoming",
+    ],
+  },
+] as const;
+
+export const REMOTE_LOCATION = {
+  slug: "remote",
+  name: "Remote / nationwide",
+  summary:
+    "Fully remote and hybrid roles available across the U.S. — no single-region requirement.",
+} as const;
+
+/** Top industries by demand in each region (demo data for the map view). */
+export const REGION_INDUSTRY_DEMAND: Record<
+  (typeof REGIONS)[number]["slug"],
+  { industrySlug: (typeof INDUSTRIES)[number]["slug"]; strength: 1 | 2 | 3 }[]
+> = {
+  northeast: [
+    { industrySlug: "finance-accounting", strength: 3 },
+    { industrySlug: "healthcare", strength: 3 },
+    { industrySlug: "information-technology", strength: 2 },
+    { industrySlug: "legal-compliance", strength: 2 },
+  ],
+  southeast: [
+    { industrySlug: "healthcare", strength: 3 },
+    { industrySlug: "logistics", strength: 3 },
+    { industrySlug: "administrative", strength: 2 },
+    { industrySlug: "sales-marketing", strength: 2 },
+  ],
+  midwest: [
+    { industrySlug: "engineering-manufacturing", strength: 3 },
+    { industrySlug: "skilled-trades", strength: 3 },
+    { industrySlug: "logistics", strength: 2 },
+    { industrySlug: "finance-accounting", strength: 2 },
+  ],
+  southwest: [
+    { industrySlug: "healthcare", strength: 3 },
+    { industrySlug: "skilled-trades", strength: 3 },
+    { industrySlug: "information-technology", strength: 2 },
+    { industrySlug: "logistics", strength: 2 },
+  ],
+  west: [
+    { industrySlug: "information-technology", strength: 3 },
+    { industrySlug: "healthcare", strength: 2 },
+    { industrySlug: "sales-marketing", strength: 2 },
+    { industrySlug: "human-resources", strength: 2 },
+  ],
+};
+
 export const ABOUT_TABS = [
   {
     id: "mission",

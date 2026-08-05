@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { MarketingShell } from "@/components/marketing/marketing-shell";
 import { INDUSTRIES } from "@/lib/marketing/content";
 
@@ -39,6 +40,12 @@ export default function IndustriesPage() {
             </p>
           </article>
         ))}
+        <Link
+          href="/"
+          className="mt-2 inline-block text-sm font-semibold text-[var(--ot-ocean)] hover:underline"
+        >
+          ← Back to home
+        </Link>
       </section>
     </MarketingShell>
   );

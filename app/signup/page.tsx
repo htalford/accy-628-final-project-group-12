@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MarketingShell } from "@/components/marketing/marketing-shell";
+import { SignupForm } from "./signup-form";
 
 export const metadata = {
   title: "Get Started · TalentQuest",
@@ -14,19 +15,20 @@ export default function SignupPage() {
           Get Started
         </p>
         <h1 className="mt-3 text-3xl font-semibold text-[var(--ot-navy)]">
-          Client sign-up is on the way
+          Create your account
         </h1>
         <p className="mt-4 leading-relaxed text-[var(--ot-muted)]">
-          This page is reserved for the new-client sign-in / registration form
-          another teammate is building. When that form ships, the Get Started
-          button will land here.
+          Sign up as an employer, candidate, recruiter, or accounting user.
         </p>
-        <div className="mt-8 rounded-xl border border-[var(--ot-border)] bg-[var(--ot-mist)] p-5 text-sm text-[var(--ot-navy)]">
+        <div className="mt-8 rounded-xl border border-[var(--ot-border)] bg-white p-6 shadow-sm">
+          <SignupForm />
+        </div>
+        <p className="mt-6 text-center text-sm text-[var(--ot-muted)]">
           Already have an account?{" "}
           <Link href="/login" className="font-semibold text-[var(--ot-ocean)]">
             Log in
           </Link>
-        </div>
+        </p>
       </section>
     </MarketingShell>
   );

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { AudiencePortal } from "@/components/marketing/audience-portal";
 import { MarketingShell } from "@/components/marketing/marketing-shell";
 import { INDUSTRIES } from "@/lib/marketing/content";
 
@@ -53,6 +54,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <AudiencePortal />
 
       <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
         <div className="flex items-end justify-between gap-4">

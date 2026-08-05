@@ -64,7 +64,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (pathname === "/login" && isAuthenticated) {
+  if (
+    (pathname === "/login" || pathname === "/signup") &&
+    isAuthenticated
+  ) {
     const { data: appUser } = await supabase
       .from("users")
       .select("role")

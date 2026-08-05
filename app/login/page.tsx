@@ -34,6 +34,9 @@ export default function LoginPage() {
             Get started
           </Link>
         </p>
+        <p className="mt-2 text-center text-xs text-[var(--ot-muted)]">
+          Demo password: <code className="font-mono">DemoPass123!</code>
+        </p>
       </div>
     </div>
   );
