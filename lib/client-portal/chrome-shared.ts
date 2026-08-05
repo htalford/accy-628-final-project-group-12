@@ -8,7 +8,13 @@ export type ClientNotification = {
 
 export type ClientSearchHit = {
   id: string;
-  category: "Employees" | "Candidates" | "Jobs" | "Timesheets" | "Invoices" | "Contracts";
+  category:
+    | "Employees"
+    | "Candidates"
+    | "Jobs"
+    | "Timesheets"
+    | "Invoices"
+    | "Contracts";
   label: string;
   sublabel: string;
   href: string;

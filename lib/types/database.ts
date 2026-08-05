@@ -108,6 +108,37 @@ export type PortalSubmittal = {
   job_title?: string | null;
 };
 
+/**
+ * Unified Client Portal candidate row — recruiter submittals and
+ * candidate-portal applications for company jobs.
+ */
+export type ClientCandidate = {
+  id: string;
+  source: "submittal" | "application";
+  detail_href: string;
+  candidate_name: string;
+  candidate_email: string | null;
+  candidate_phone: string | null;
+  position_title: string;
+  recruiter_name: string | null;
+  years_experience: number | null;
+  stage: SubmittalStage;
+  /** Original application_status when source is application. */
+  application_status?: ApplicationStatus | null;
+  source_label: string;
+  resume_status: string;
+  skills: string[];
+  certifications: string[];
+  experience: SubmittalExperience[];
+  interview_notes: string | null;
+  resume_summary: string | null;
+  cover_letter?: string | null;
+  resume_url?: string | null;
+  created_at: string;
+  updated_at: string;
+  job_title?: string | null;
+};
+
 export type ClientMessageThread = {
   id: string;
   client_id: string;

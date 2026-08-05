@@ -12,8 +12,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination } from "@/components/ui/form";
 import { ConfirmActionDialog } from "@/components/client-portal/confirm-action-dialog";
 import { useToast } from "@/components/client-portal/toast";
-import { updateSubmittalStageAction } from "@/app/actions/client-portal";
-import type { PortalSubmittal, SubmittalStage } from "@/lib/types/database";
+import {
+  updateApplicationStatusAction,
+} from "@/app/actions/client-portal";
+import type { ClientCandidate, SubmittalStage } from "@/lib/types/database";
 import {
   seedStatusTone,
   submittalStageLabel,
@@ -23,14 +25,13 @@ import { paginate } from "@/lib/client-portal/pagination";
 export function CandidatesClient({
   initial,
 }: {
-  initial: PortalSubmittal[];
+  initial: ClientCandidate[];
 }) {
   const router = useRouter();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
   const [q, setQ] = useState("");
   const [position, setPosition] = useState("All");
-  const [recruiter, setRecruiter] = useState("All");
   const [status, setStatus] = useState("All");
   const [page, setPage] = useState(1);
   const [dialog, setDialog] = useState<{
@@ -39,53 +40,51 @@ export function CandidatesClient({
     next: Extract<SubmittalStage, "accepted" | "rejected">;
   } | null>(null);
 
-  const positions = useMemo(
-    () => [
-      "All",
-      ...Array.from(new Set(initial.map((c) => c.position_title || c.job_title || "—"))),
-    ],
-    [initial],
-  );
-  const recruiters = useMemo(
-    () => [
-      "All",
-      ...Array.from(
-        new Set(initial.map((c) => c.recruiter_name).filter(Boolean) as string[]),
-      ),
-    ],
+  // Candidates tab is applications-only; never surface submittals/employees here.
+  const candidatesOnly = useMemo(
+    () => initial.filter((c) => c.source === "application"),
     [initial],
   );
 
-  const filtered = initial.filter((c) => {
+  const positions = useMemo(
+    () => [
+      "All",
+      ...Array.from(
+        new Set(
+          candidatesOnly.map((c) => c.position_title || c.job_title || "—"),
+        ),
+      ),
+    ],
+    [candidatesOnly],
+  );
+
+  const filtered = candidatesOnly.filter((c) => {
     const pos = c.position_title || c.job_title || "";
     const matchesQ =
-      !q ||
-      c.candidate_name.toLowerCase().includes(q.toLowerCase()) ||
-      pos.toLowerCase().includes(q.toLowerCase());
+      !q || c.candidate_name.toLowerCase().includes(q.toLowerCase());
     return (
       matchesQ &&
       (position === "All" || pos === position) &&
-      (recruiter === "All" || c.recruiter_name === recruiter) &&
       (status === "All" || c.stage === status)
     );
   });
 
   const paged = paginate(filtered, page);
   const hasFilters =
-    q.trim() !== "" ||
-    position !== "All" ||
-    recruiter !== "All" ||
-    status !== "All";
+    q.trim() !== "" || position !== "All" || status !== "All";
 
   async function confirmDecision(reason: string) {
     if (!dialog) return;
-    const result = await updateSubmittalStageAction(
+    const result = await updateApplicationStatusAction(
       dialog.id,
       dialog.next,
       reason,
     );
     if (result.ok) {
-      toast.push(result.message, dialog.next === "accepted" ? "success" : "info");
+      toast.push(
+        result.message,
+        dialog.next === "accepted" ? "success" : "info",
+      );
       setDialog(null);
       startTransition(() => router.refresh());
     } else {
@@ -97,13 +96,13 @@ export function CandidatesClient({
     <div className="space-y-6">
       <PageHeader
         title="Candidates"
-        description="Submittals from your recruiters for open job requests. Accept/reject updates the submittals table only."
+        description="People who applied to your open jobs on the candidate portal."
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <SearchInput
           className="sm:max-w-xs"
-          placeholder="Search candidates…"
+          placeholder="Search by candidate name…"
           value={q}
           onChange={(e) => {
             setQ(e.target.value);
@@ -120,19 +119,6 @@ export function CandidatesClient({
           {positions.map((p) => (
             <option key={p} value={p}>
               {p === "All" ? "All positions" : p}
-            </option>
-          ))}
-        </Select>
-        <Select
-          value={recruiter}
-          onChange={(e) => {
-            setRecruiter(e.target.value);
-            setPage(1);
-          }}
-        >
-          {recruiters.map((r) => (
-            <option key={r} value={r}>
-              {r === "All" ? "All recruiters" : r}
             </option>
           ))}
         </Select>
@@ -158,12 +144,12 @@ export function CandidatesClient({
           title={
             hasFilters
               ? "No candidates match your filters"
-              : "No submittals yet"
+              : "No candidates yet"
           }
           description={
             hasFilters
-              ? "Clear filters to see all submittals."
-              : "When recruiters submit people against your job requests, they appear here."
+              ? "Clear filters to see all candidates."
+              : "When candidates apply to your posted jobs, they appear here."
           }
           action={
             hasFilters ? (
@@ -173,7 +159,6 @@ export function CandidatesClient({
                 onClick={() => {
                   setQ("");
                   setPosition("All");
-                  setRecruiter("All");
                   setStatus("All");
                   setPage(1);
                 }}
@@ -191,14 +176,14 @@ export function CandidatesClient({
         <>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {paged.items.map((c) => (
-              <Card key={c.id} className="flex flex-col">
+              <Card key={`${c.source}-${c.id}`} className="flex flex-col">
                 <div className="mb-2 flex items-start justify-between gap-2">
                   <div>
                     <p className="font-semibold text-[var(--cf-ink)]">
                       {c.candidate_name}
                     </p>
                     <p className="text-sm text-[var(--cf-muted)]">
-                      {c.position_title || c.job_title || "Submittal"}
+                      {c.position_title || c.job_title || "Role"}
                     </p>
                   </div>
                   <Badge tone={seedStatusTone(c.stage)}>
@@ -206,20 +191,19 @@ export function CandidatesClient({
                   </Badge>
                 </div>
                 <p className="mb-3 text-xs text-[var(--cf-muted)]">
-                  {c.recruiter_name ?? "Recruiter"} ·{" "}
-                  {c.years_experience != null
-                    ? `${c.years_experience} yrs exp`
-                    : "Experience n/a"}
+                  {c.candidate_email ?? "No email on file"}
                 </p>
                 <div className="mt-auto flex flex-wrap gap-2">
                   <Button
                     size="sm"
                     variant="secondary"
-                    href={`/client/candidates/${c.id}`}
+                    href={c.detail_href}
                   >
                     View Profile
                   </Button>
-                  {c.stage !== "accepted" && c.stage !== "rejected" ? (
+                  {c.stage !== "accepted" &&
+                  c.stage !== "rejected" &&
+                  c.stage !== "offer" ? (
                     <>
                       <Button
                         size="sm"
@@ -275,7 +259,7 @@ export function CandidatesClient({
         }
         description={
           dialog
-            ? `${dialog.name} — updates submittals.stage only (not placements or applications).`
+            ? `${dialog.name} — updates their jobs board application status.`
             : ""
         }
         confirmLabel={dialog?.next === "accepted" ? "Accept" : "Reject"}
