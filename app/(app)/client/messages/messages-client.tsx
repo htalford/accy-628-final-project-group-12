@@ -2,13 +2,16 @@
 
 import { FormEvent, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Label, FieldInput } from "@/components/ui/form";
+import { ConfirmActionDialog } from "@/components/client-portal/confirm-action-dialog";
 import { useToast } from "@/components/client-portal/toast";
 import {
   createClientMessageThreadAction,
+  deleteClientMessageThreadAction,
   sendClientMessageAction,
 } from "@/app/actions/client-portal";
 import type { ClientMessageThread } from "@/lib/types/database";
@@ -41,12 +44,14 @@ export function MessagesClient({
   const [showNew, setShowNew] = useState(false);
   const [newSubject, setNewSubject] = useState("");
   const [newBody, setNewBody] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     setThreads(initial);
     if (initial.length && !initial.some((t) => t.id === activeId)) {
       setActiveId(initial[0].id);
     }
+    if (!initial.length) setActiveId("");
   }, [initial, activeId]);
 
   const active = threads.find((t) => t.id === activeId) ?? threads[0];
@@ -124,6 +129,27 @@ export function MessagesClient({
     setNewBody("");
     setShowNew(false);
     startTransition(() => router.refresh());
+  }
+
+  async function confirmDelete() {
+    if (!active) return;
+    const deletedId = active.id;
+    startTransition(async () => {
+      const result = await deleteClientMessageThreadAction(deletedId);
+      if (!result.ok) {
+        toast.push(result.message, "error");
+        return;
+      }
+      toast.push(result.message, "success");
+      setDeleteOpen(false);
+      setDraft("");
+      setThreads((prev) => {
+        const next = prev.filter((t) => t.id !== deletedId);
+        setActiveId(next[0]?.id ?? "");
+        return next;
+      });
+      router.refresh();
+    });
   }
 
   return (
@@ -209,15 +235,28 @@ export function MessagesClient({
           <section className="flex min-h-[20rem] flex-col">
             {active ? (
               <>
-                <div className="border-b border-[var(--cf-border)] px-4 py-3">
-                  <p className="text-sm font-semibold text-[var(--cf-ink)]">
-                    {active.recruiter_name}
-                  </p>
-                  {active.subject ? (
-                    <p className="text-xs text-[var(--cf-muted)]">
-                      {active.subject}
+                <div className="flex items-start justify-between gap-3 border-b border-[var(--cf-border)] px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[var(--cf-ink)]">
+                      {active.recruiter_name}
                     </p>
-                  ) : null}
+                    {active.subject ? (
+                      <p className="text-xs text-[var(--cf-muted)]">
+                        {active.subject}
+                      </p>
+                    ) : null}
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="danger"
+                    disabled={pending}
+                    onClick={() => setDeleteOpen(true)}
+                    title="Delete conversation"
+                  >
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                    Delete
+                  </Button>
                 </div>
                 <div className="flex-1 space-y-3 overflow-y-auto p-4">
                   {(active.messages ?? []).map((m) => (
@@ -270,6 +309,23 @@ export function MessagesClient({
           </section>
         </div>
       ) : null}
+
+      <ConfirmActionDialog
+        open={deleteOpen && active != null}
+        onClose={() => setDeleteOpen(false)}
+        title="Delete conversation?"
+        description={
+          active
+            ? `Remove “${active.subject || "this conversation"}” with ${active.recruiter_name}? This permanently deletes the thread and all messages.`
+            : ""
+        }
+        confirmLabel="Delete conversation"
+        confirmVariant="danger"
+        requireReason={false}
+        showReason={false}
+        busy={pending}
+        onConfirm={() => void confirmDelete()}
+      />
     </div>
   );
 }

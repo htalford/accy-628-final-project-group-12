@@ -46,7 +46,9 @@ function readStoredPos(): Pos | null {
 
 export function RoleSwitcher({ currentRole }: { currentRole: UserRole }) {
   const [pending, startTransition] = useTransition();
-  const [pos, setPos] = useState<Pos>(defaultPos);
+  // SSR-stable left/top; client layout applied after mount to avoid hydration mismatch.
+  const [pos, setPos] = useState<Pos>({ x: MARGIN, y: MARGIN });
+  const [ready, setReady] = useState(false);
   const [dragging, setDragging] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
   const posRef = useRef(pos);
@@ -54,6 +56,7 @@ export function RoleSwitcher({ currentRole }: { currentRole: UserRole }) {
 
   useEffect(() => {
     setPos(readStoredPos() ?? defaultPos());
+    setReady(true);
   }, []);
 
   useEffect(() => {
@@ -115,7 +118,11 @@ export function RoleSwitcher({ currentRole }: { currentRole: UserRole }) {
   return (
     <div
       className="fixed z-50 w-64 rounded-xl border border-[var(--cf-border)] bg-white p-3 shadow-lg"
-      style={{ left: pos.x, top: pos.y }}
+      style={{
+        left: pos.x,
+        top: pos.y,
+        visibility: ready ? "visible" : "hidden",
+      }}
     >
       <div
         className={`mb-2 flex cursor-grab items-center gap-2 text-xs font-semibold tracking-wide text-[var(--cf-muted)] uppercase select-none active:cursor-grabbing ${

@@ -16,6 +16,8 @@ import {
   LayoutDashboard,
   Menu,
   MessagesSquare,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pin,
   PinOff,
   Receipt,
@@ -43,11 +45,11 @@ const ICONS = {
 } as const;
 
 const CLIENT_DASHBOARD = "/client/dashboard";
-const CLIENT_CANDIDATES = "/client/candidates";
-const CLIENT_PIN_KEY = "cf-client-nav-pins";
+const CLIENT_PIN_KEY = "cf-client-nav-pins-v2";
+const CLIENT_ICONS_ONLY_KEY = "cf-client-sidebar-icons-only";
 
-/** Default: Dashboard then Candidates, then remaining nav order. */
-const DEFAULT_CLIENT_PINS = [CLIENT_DASHBOARD, CLIENT_CANDIDATES];
+/** Only Dashboard is pinned by default. */
+const DEFAULT_CLIENT_PINS = [CLIENT_DASHBOARD];
 
 function readClientPins(): string[] {
   if (typeof window === "undefined") return [...DEFAULT_CLIENT_PINS];
@@ -57,7 +59,9 @@ function readClientPins(): string[] {
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [...DEFAULT_CLIENT_PINS];
     const hrefs = parsed.filter((v): v is string => typeof v === "string");
-    return hrefs.length > 0 ? hrefs : [...DEFAULT_CLIENT_PINS];
+    // Dashboard is always first / always present.
+    const withoutDash = hrefs.filter((h) => h !== CLIENT_DASHBOARD);
+    return [CLIENT_DASHBOARD, ...withoutDash];
   } catch {
     return [...DEFAULT_CLIENT_PINS];
   }
@@ -68,14 +72,11 @@ function orderClientNav(items: NavItem[], pinnedHrefs: string[]) {
   const pinnedSet = new Set(pinnedHrefs);
 
   const pinned: NavItem[] = [];
-  // Keep Dashboard first when pinned, then Candidates, then other pins.
-  for (const preferred of [CLIENT_DASHBOARD, CLIENT_CANDIDATES]) {
-    if (pinnedSet.has(preferred) && byHref.has(preferred)) {
-      pinned.push(byHref.get(preferred)!);
-    }
+  if (byHref.has(CLIENT_DASHBOARD)) {
+    pinned.push(byHref.get(CLIENT_DASHBOARD)!);
   }
   for (const href of pinnedHrefs) {
-    if (href === CLIENT_DASHBOARD || href === CLIENT_CANDIDATES) continue;
+    if (href === CLIENT_DASHBOARD) continue;
     const item = byHref.get(href);
     if (item) pinned.push(item);
   }
@@ -86,18 +87,21 @@ function orderClientNav(items: NavItem[], pinnedHrefs: string[]) {
 
 function NavLink({
   item,
-  collapsed,
+  iconsOnly,
   onNavigate,
   pinned,
   showPinControls,
   onTogglePin,
+  lockPin,
 }: {
   item: NavItem;
-  collapsed: boolean;
+  iconsOnly: boolean;
   onNavigate?: () => void;
   pinned?: boolean;
   showPinControls?: boolean;
   onTogglePin?: () => void;
+  /** Dashboard cannot be unpinned. */
+  lockPin?: boolean;
 }) {
   const pathname = usePathname();
   const active =
@@ -116,13 +120,14 @@ function NavLink({
         title={item.label}
         onClick={onNavigate}
         className={`flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-sm font-medium transition ${
-          collapsed ? "justify-center px-2" : ""
+          iconsOnly ? "justify-center px-2" : ""
         } ${active ? "text-white" : "text-white/70 group-hover:text-white"}`}
       >
         <Icon className="h-4 w-4 shrink-0" aria-hidden />
-        {!collapsed ? <span className="truncate">{item.label}</span> : null}
+        {!iconsOnly ? <span className="truncate">{item.label}</span> : null}
+        {iconsOnly ? <span className="sr-only">{item.label}</span> : null}
       </Link>
-      {showPinControls && onTogglePin && !collapsed ? (
+      {showPinControls && onTogglePin && !iconsOnly && !lockPin ? (
         <button
           type="button"
           onClick={onTogglePin}
@@ -140,6 +145,15 @@ function NavLink({
             <PinOff className="h-3.5 w-3.5" aria-hidden />
           )}
         </button>
+      ) : null}
+      {showPinControls && pinned && lockPin && !iconsOnly ? (
+        <span
+          title="Dashboard stays pinned"
+          className="mr-1 rounded p-1.5 text-[var(--cf-accent)]"
+          aria-hidden
+        >
+          <Pin className="h-3.5 w-3.5 fill-current" />
+        </span>
       ) : null}
     </div>
   );
@@ -162,6 +176,9 @@ export function ClientSidebar({
   ]);
   const [ready, setReady] = useState(false);
 
+  // On mobile drawer we always show labels even if desktop is icons-only.
+  const iconsOnly = collapsed && !mobileOpen;
+
   useEffect(() => {
     setPinnedHrefs(readClientPins());
     setReady(true);
@@ -178,45 +195,35 @@ export function ClientSidebar({
   );
 
   function togglePin(href: string) {
+    if (href === CLIENT_DASHBOARD) return;
     setPinnedHrefs((prev) => {
       if (prev.includes(href)) {
-        // Keep at least Dashboard in the pinned list when unpinning others.
         const next = prev.filter((h) => h !== href);
-        return next.length > 0 ? next : [CLIENT_DASHBOARD];
+        return next.includes(CLIENT_DASHBOARD)
+          ? next
+          : [CLIENT_DASHBOARD, ...next];
       }
-      if (href === CLIENT_CANDIDATES) {
-        // Insert Candidates right after Dashboard when present.
-        const without = prev.filter((h) => h !== href);
-        const dashIdx = without.indexOf(CLIENT_DASHBOARD);
-        if (dashIdx >= 0) {
-          return [
-            ...without.slice(0, dashIdx + 1),
-            CLIENT_CANDIDATES,
-            ...without.slice(dashIdx + 1),
-          ];
-        }
-        return [CLIENT_CANDIDATES, ...without];
-      }
-      return [...prev, href];
+      const without = prev.filter((h) => h !== href && h !== CLIENT_DASHBOARD);
+      return [CLIENT_DASHBOARD, ...without, href];
     });
   }
 
   const rail = (
     <aside
       className={`flex h-full flex-col bg-[var(--cf-navy)] text-white transition-[width] print:hidden ${
-        collapsed ? "w-[72px]" : "w-64"
+        iconsOnly ? "w-[5.75rem]" : "w-64"
       }`}
     >
       <div
         className={`border-b border-white/10 ${
-          collapsed ? "px-2 py-3" : "px-4 py-4"
+          iconsOnly ? "px-2 py-3" : "px-4 py-4"
         }`}
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className={collapsed ? "w-full" : "min-w-0 flex-1"}>
+        {iconsOnly ? (
+          <div className="flex flex-col items-stretch gap-2">
             <Link
               href="/client/dashboard"
-              className={`block rounded-md bg-white ${collapsed ? "p-1.5" : "p-2"}`}
+              className="block w-full rounded-md bg-white p-2"
               title="TalentQuest"
               onClick={onMobileClose}
             >
@@ -225,40 +232,74 @@ export function ClientSidebar({
                 alt="TalentQuest"
                 width={168}
                 height={118}
-                className={`w-auto ${collapsed ? "mx-auto h-8" : "h-11"}`}
+                className="mx-auto h-11 w-auto max-w-full object-contain"
                 priority
               />
             </Link>
-            {!collapsed ? (
-              <p className="mt-2 text-sm text-white/60">Client Portal</p>
-            ) : null}
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="mx-auto hidden rounded-md p-1.5 text-white/70 hover:bg-white/10 hover:text-white lg:inline-flex"
+              title="Show tab titles"
+              aria-label="Show tab titles"
+              aria-pressed={true}
+            >
+              <PanelLeftOpen className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onMobileClose}
+              className="mx-auto inline-flex rounded-md p-1.5 text-white/70 hover:bg-white/10 lg:hidden"
+              aria-label="Close menu"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            className="hidden rounded-md p-1.5 text-white/70 hover:bg-white/10 hover:text-white lg:inline-flex"
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {collapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronLeft className="h-4 w-4" />
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={onMobileClose}
-            className="inline-flex rounded-md p-1.5 text-white/70 hover:bg-white/10 lg:hidden"
-            aria-label="Close menu"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        ) : (
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <Link
+                href="/client/dashboard"
+                className="block rounded-md bg-white p-2"
+                title="TalentQuest"
+                onClick={onMobileClose}
+              >
+                <Image
+                  src="/talentquest-logo.png"
+                  alt="TalentQuest"
+                  width={168}
+                  height={118}
+                  className="h-11 w-auto max-w-full object-contain"
+                  priority
+                />
+              </Link>
+              <p className="mt-2 text-sm text-white/60">Client Portal</p>
+            </div>
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="hidden rounded-md p-1.5 text-white/70 hover:bg-white/10 hover:text-white lg:inline-flex"
+              title="Hide tab titles (icons only)"
+              aria-label="Hide tab titles, show icons only"
+              aria-pressed={false}
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onMobileClose}
+              className="inline-flex rounded-md p-1.5 text-white/70 hover:bg-white/10 lg:hidden"
+              aria-label="Close menu"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
         {pinned.length > 0 ? (
           <div className="mb-1">
-            {!collapsed ? (
+            {!iconsOnly ? (
               <p className="px-3 pb-1 text-[10px] font-semibold tracking-[0.14em] text-white/35 uppercase">
                 Pinned
               </p>
@@ -268,9 +309,10 @@ export function ClientSidebar({
                 <NavLink
                   key={item.href}
                   item={item}
-                  collapsed={collapsed}
+                  iconsOnly={iconsOnly}
                   pinned
                   showPinControls
+                  lockPin={item.href === CLIENT_DASHBOARD}
                   onTogglePin={() => togglePin(item.href)}
                   onNavigate={onMobileClose}
                 />
@@ -280,7 +322,7 @@ export function ClientSidebar({
         ) : null}
         {unpinned.length > 0 ? (
           <div className={pinned.length > 0 ? "mt-2" : undefined}>
-            {!collapsed && pinned.length > 0 ? (
+            {!iconsOnly && pinned.length > 0 ? (
               <p className="px-3 pb-1 text-[10px] font-semibold tracking-[0.14em] text-white/35 uppercase">
                 More
               </p>
@@ -290,7 +332,7 @@ export function ClientSidebar({
                 <NavLink
                   key={item.href}
                   item={item}
-                  collapsed={collapsed}
+                  iconsOnly={iconsOnly}
                   showPinControls
                   onTogglePin={() => togglePin(item.href)}
                   onNavigate={onMobileClose}
@@ -301,11 +343,41 @@ export function ClientSidebar({
         ) : null}
       </nav>
       <div
-        className={`border-t border-white/10 py-3 text-[10px] text-white/40 ${
-          collapsed ? "px-1 text-center" : "px-4"
+        className={`border-t border-white/10 py-3 ${
+          iconsOnly ? "px-1" : "px-3"
         }`}
       >
-        {collapsed ? "G12" : "Hover a tab to pin or unpin"}
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className={`hidden w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[10px] text-white/50 transition hover:bg-white/10 hover:text-white/80 lg:flex ${
+            iconsOnly ? "justify-center px-1" : ""
+          }`}
+          title={
+            iconsOnly
+              ? "Show tab titles"
+              : "Hide tab titles (icons only)"
+          }
+          aria-label={
+            iconsOnly
+              ? "Show tab titles"
+              : "Hide tab titles, show icons only"
+          }
+        >
+          {iconsOnly ? (
+            <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          ) : (
+            <>
+              <ChevronLeft className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span>Hide titles · icons only</span>
+            </>
+          )}
+        </button>
+        {!iconsOnly ? (
+          <p className="mt-2 px-1 text-[10px] text-white/35">
+            Dashboard stays pinned · hover to pin others
+          </p>
+        ) : null}
       </div>
     </aside>
   );
@@ -341,4 +413,26 @@ export function MobileMenuButton({ onClick }: { onClick: () => void }) {
       <Menu className="h-4 w-4" aria-hidden />
     </button>
   );
+}
+
+/** Load / save icons-only preference for the client shell. */
+export function readClientIconsOnly(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(CLIENT_ICONS_ONLY_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function writeClientIconsOnly(iconsOnly: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      CLIENT_ICONS_ONLY_KEY,
+      iconsOnly ? "1" : "0",
+    );
+  } catch {
+    /* ignore */
+  }
 }
