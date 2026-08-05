@@ -207,11 +207,7 @@ export default async function ContractDetailPage({
               {contract.timesheets.map((t) => (
                 <li key={t.id} className="flex justify-between gap-3 py-2">
                   <Link
-                    href={`/accounting/payroll?period=${t.weekEnding}${
-                      employeeName
-                        ? `&employee=${encodeURIComponent(employeeName)}`
-                        : ""
-                    }`}
+                    href={`/accounting/timesheets/${t.id}`}
                     className="font-medium text-[var(--cf-ink)] hover:underline"
                   >
                     Week ending {t.weekEnding} · {t.status}

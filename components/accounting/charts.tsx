@@ -82,7 +82,8 @@ export function InvoiceStatusChart({
             innerRadius={50}
             outerRadius={80}
             paddingAngle={2}
-            label={({ name, value }) => `${name} (${value})`}
+            label={false}
+            labelLine={false}
           >
             {filtered.map((entry, i) => (
               <Cell

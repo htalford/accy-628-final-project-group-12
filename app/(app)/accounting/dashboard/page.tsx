@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
-import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/accounting/panel";
 import {
   InvoiceStatusChart,
@@ -9,9 +8,11 @@ import {
 } from "@/components/accounting/charts";
 import { getDashboardData } from "@/lib/accounting/queries";
 import { money } from "@/lib/accounting/format";
+import { daysAgoIso } from "@/lib/accounting/calculations";
 
 export default async function AccountingHomePage() {
   const data = await getDashboardData();
+  const from = daysAgoIso(30);
 
   return (
     <div className="space-y-6">
@@ -37,10 +38,10 @@ export default async function AccountingHomePage() {
           href="/accounting/accounts-receivable"
         />
         <StatCard
-          label="Payroll (This Month)"
-          value={money(data.cards.payrollThisMonth)}
-          hint="Approved timesheets in current month"
-          href="/accounting/payroll"
+          label="Payroll (Last 30 Days)"
+          value={money(data.cards.payrollLast30Days)}
+          hint="Approved timesheets in the last 30 days"
+          href={`/accounting/payroll?status=approved&from=${from}`}
         />
         <StatCard
           label="Gross Profit"
@@ -112,64 +113,42 @@ export default async function AccountingHomePage() {
         </Panel>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <Panel
-          title="Recent Financial Activity"
-          action={
-            <Link
-              href="/accounting/audit-trail"
-              className="text-sm font-medium text-[var(--cf-accent)] hover:underline"
-            >
-              Full audit trail →
-            </Link>
-          }
-        >
-          <ul className="divide-y divide-[var(--cf-border)]">
-            {data.activity.length === 0 ? (
-              <li className="py-6 text-sm text-[var(--cf-muted)]">No recent activity.</li>
-            ) : (
-              data.activity.map((item) => (
-                <li key={item.id}>
-                  <Link
-                    href={item.href}
-                    className="flex items-center justify-between gap-3 py-3 transition hover:bg-[var(--cf-surface)]"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-[var(--cf-ink)]">
-                        {item.label}
-                      </p>
-                      <p className="text-xs text-[var(--cf-muted)]">{item.at}</p>
-                    </div>
-                    <p className="text-sm font-semibold text-[var(--cf-ink)]">
-                      {item.detail}
+      <Panel
+        title="Recent Financial Activity"
+        action={
+          <Link
+            href="/accounting/audit-trail"
+            className="text-sm font-medium text-[var(--cf-accent)] hover:underline"
+          >
+            Full audit trail →
+          </Link>
+        }
+      >
+        <ul className="divide-y divide-[var(--cf-border)]">
+          {data.activity.length === 0 ? (
+            <li className="py-6 text-sm text-[var(--cf-muted)]">No recent activity.</li>
+          ) : (
+            data.activity.map((item) => (
+              <li key={item.id}>
+                <Link
+                  href={item.href}
+                  className="flex items-center justify-between gap-3 py-3 transition hover:bg-[var(--cf-surface)]"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-[var(--cf-ink)]">
+                      {item.label}
                     </p>
-                  </Link>
-                </li>
-              ))
-            )}
-          </ul>
-        </Panel>
-        <Panel title="Quick Actions" description="Jump to common accounting workflows">
-          <div className="flex flex-col gap-2">
-            <Button href="/accounting/invoices">Invoices</Button>
-            <Button href="/accounting/payroll" variant="secondary">
-              Payroll
-            </Button>
-            <Button href="/accounting/accounts-receivable" variant="secondary">
-              Accounts Receivable
-            </Button>
-            <Button href="/accounting/expenses" variant="secondary">
-              Expenses
-            </Button>
-            <Button href="/accounting/audit-trail" variant="secondary">
-              Audit Trail
-            </Button>
-            <Button href="/accounting/reports" variant="secondary">
-              Financial Reports
-            </Button>
-          </div>
-        </Panel>
-      </div>
+                    <p className="text-xs text-[var(--cf-muted)]">{item.at}</p>
+                  </div>
+                  <p className="text-sm font-semibold text-[var(--cf-ink)]">
+                    {item.detail}
+                  </p>
+                </Link>
+              </li>
+            ))
+          )}
+        </ul>
+      </Panel>
     </div>
   );
 }
