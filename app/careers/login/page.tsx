@@ -4,7 +4,8 @@ import { StaffLoginForm } from "./staff-login-form";
 
 export const metadata = {
   title: "Employee Sign In · TalentQuest",
-  description: "Sign in for Talent Quest staff — recruiters, accounting, and managers.",
+  description:
+    "Sign in for Talent Quest staff — recruiters, accounting, and managers.",
 };
 
 export default function StaffLoginPage() {

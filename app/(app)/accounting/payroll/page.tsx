@@ -1,5 +1,4 @@
 import { PageHeader } from "@/components/ui/page-header";
-import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge, statusTone } from "@/components/ui/status-badge";
 import {
@@ -43,15 +42,7 @@ export default async function PayrollPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader title="Payroll" />
-        <div className="flex gap-2">
-          <Button variant="secondary" disabled>
-            View Payroll
-          </Button>
-          <Button disabled>Process Payroll</Button>
-        </div>
-      </div>
+      <PageHeader title="Payroll" />
 
       <PayrollToolbar employees={employees} periods={periods} />
 
