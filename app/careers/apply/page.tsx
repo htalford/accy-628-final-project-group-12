@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { MarketingShell } from "@/components/marketing/marketing-shell";
 
 export const metadata = {
@@ -52,16 +51,15 @@ export default function ApplyPage() {
             </li>
           ))}
         </ol>
-        <p className="mt-8 text-sm text-[var(--ot-muted)]">
-          Questions? Start a conversation after you{" "}
-          <Link href="/signup" className="font-semibold text-[var(--ot-ocean)]">
-            get started
-          </Link>{" "}
-          or return to{" "}
-          <Link href="/careers" className="font-semibold text-[var(--ot-ocean)]">
-            Careers at TQ
-          </Link>
-          .
+        <p className="mt-8 text-sm leading-relaxed text-[var(--ot-muted)]">
+          Interested in working at TalentQuest? Email{" "}
+          <a
+            href="mailto:careers@talentquest.com"
+            className="font-semibold text-[var(--ot-ocean)] hover:underline"
+          >
+            careers@talentquest.com
+          </a>{" "}
+          to get your application started.
         </p>
       </section>
     </MarketingShell>
