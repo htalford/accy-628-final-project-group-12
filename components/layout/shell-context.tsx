@@ -20,6 +20,7 @@ type ShellContextValue = {
 
 const ShellContext = createContext<ShellContextValue | null>(null);
 const STORAGE_KEY = "cf-sidebar-collapsed";
+const LEGACY_SIDEBAR_PIN_KEY = "cf-recruiter-sidebar-pinned";
 
 export function ShellProvider({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsedState] = useState(false);
@@ -27,6 +28,8 @@ export function ShellProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
+      // Remove obsolete whole-sidebar pin preference.
+      localStorage.removeItem(LEGACY_SIDEBAR_PIN_KEY);
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved === "1") setCollapsedState(true);
     } catch {

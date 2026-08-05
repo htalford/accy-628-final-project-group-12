@@ -140,30 +140,12 @@ export function CandidateFiltersPanel({
             header: "Actions",
             interactive: true,
             render: (row) => (
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href={`/recruiter/candidates/${row.id}`}
-                  className="rounded-md bg-[var(--cf-navy)] px-2.5 py-1 text-xs font-medium text-white hover:bg-[var(--cf-navy-hover)]"
-                >
-                  View
-                </Link>
-                <button
-                  type="button"
-                  disabled
-                  title="Coming soon"
-                  className="rounded-md border border-[var(--cf-border)] px-2.5 py-1 text-xs text-[var(--cf-muted)] opacity-60"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  disabled
-                  title="Coming soon"
-                  className="rounded-md border border-[var(--cf-border)] px-2.5 py-1 text-xs text-[var(--cf-muted)] opacity-60"
-                >
-                  Move Stage
-                </button>
-              </div>
+              <Link
+                href={`/recruiter/candidates/${row.id}`}
+                className="rounded-md bg-[var(--cf-navy)] px-2.5 py-1 text-xs font-medium text-white hover:bg-[var(--cf-navy-hover)]"
+              >
+                View
+              </Link>
             ),
           },
         ]}
