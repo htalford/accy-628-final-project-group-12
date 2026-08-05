@@ -10,7 +10,7 @@ const INTEREST_OPTIONS = [
 
 type Interest = (typeof INTEREST_OPTIONS)[number]["value"];
 
-const RECRUITER_EMAIL = "recruiter@talentquest.com";
+const RECRUITER_EMAIL = "recruiter@talentquest.demo";
 
 export function SignupForm() {
   const [interest, setInterest] = useState<Interest | "">("");
