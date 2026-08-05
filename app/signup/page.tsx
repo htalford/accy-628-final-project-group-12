@@ -4,7 +4,8 @@ import { SignupForm } from "./signup-form";
 
 export const metadata = {
   title: "Get Started · TalentQuest",
-  description: "Create a TalentQuest account to request staffing support.",
+  description:
+    "Request a TalentQuest account by emailing a recruiter with your details.",
 };
 
 export default function SignupPage() {
@@ -18,7 +19,8 @@ export default function SignupPage() {
           Create your account
         </h1>
         <p className="mt-4 leading-relaxed text-[var(--ot-muted)]">
-          Tell us whether you hire talent or you&apos;re looking for work.
+          Tell us a bit about yourself and we&apos;ll email a recruiter to set
+          up your account.
         </p>
         <div className="mt-8 rounded-xl border border-[var(--ot-border)] bg-white p-6 shadow-sm">
           <SignupForm />
