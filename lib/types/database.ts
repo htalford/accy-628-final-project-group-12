@@ -7,6 +7,14 @@ export type EntityStatus = "active" | "inactive";
 export type TimesheetStatus = "submitted" | "approved" | "disputed" | "rejected";
 export type InvoiceStatus = "draft" | "sent" | "paid" | "partial" | "disputed";
 export type PaymentStatus = "pending" | "completed" | "failed";
+export type JobStatus = "open" | "filled" | "closed";
+export type ApplicationStatus =
+  | "submitted"
+  | "reviewing"
+  | "interview"
+  | "offered"
+  | "rejected"
+  | "withdrawn";
 
 export type Client = {
   id: string;
@@ -101,4 +109,41 @@ export type AppUser = {
   linked_employee_id: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type Job = {
+  id: string;
+  client_id: string | null;
+  employer_name: string;
+  title: string;
+  description: string;
+  location: string | null;
+  employment_type: EmploymentType;
+  pay_rate_min: number | null;
+  pay_rate_max: number | null;
+  status: JobStatus;
+  posted_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Application = {
+  id: string;
+  job_id: string;
+  employee_id: string;
+  status: ApplicationStatus;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Message = {
+  id: string;
+  employee_id: string;
+  sender_name: string;
+  sender_role: string;
+  subject: string;
+  body: string;
+  is_read: boolean;
+  created_at: string;
 };

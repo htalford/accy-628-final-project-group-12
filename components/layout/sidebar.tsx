@@ -4,10 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Briefcase,
+  CheckCircle2,
   ClipboardCheck,
   Clock,
+  FileSignature,
   FileText,
   LayoutDashboard,
+  MessageSquare,
+  Search,
+  Send,
+  User,
+  Wallet,
 } from "lucide-react";
 import { getNavForRole, ROLE_LABELS } from "@/lib/auth/roles";
 import type { UserRole } from "@/lib/types/database";
@@ -19,6 +26,13 @@ const ICONS = {
   briefcase: Briefcase,
   "file-text": FileText,
   clock: Clock,
+  search: Search,
+  "file-signature": FileSignature,
+  send: Send,
+  wallet: Wallet,
+  "circle-check": CheckCircle2,
+  "message-square": MessageSquare,
+  user: User,
 } as const;
 
 function NavLink({ item }: { item: NavItem }) {
@@ -52,7 +66,7 @@ export function Sidebar({ role }: { role: UserRole }) {
         </p>
         <p className="mt-1 text-sm text-white/60">{ROLE_LABELS[role]} portal</p>
       </div>
-      <nav className="flex flex-1 flex-col gap-1 p-3">
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
         {items.map((item) => (
           <NavLink key={item.href} item={item} />
         ))}
