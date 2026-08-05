@@ -26,7 +26,6 @@ import {
   isCompletedPayment,
   isCurrentCalendarMonth,
   isOpenReceivable,
-  isRecognizedExpense,
   isRecognizedInvoice,
   lineItemsBalance,
   netAmountDue,
@@ -35,9 +34,10 @@ import {
   yearMonth,
 } from "@/lib/accounting/calculations";
 import type {
-  ExpenseCategory,
   ExpenseStatus,
+  ExpenseType,
   InvoiceStatus,
+  OperatingExpenseCategory,
   PlacementStatus,
   PlacementType,
 } from "@/lib/types/database";
@@ -323,7 +323,7 @@ export async function getContractById(id: string) {
         .order("week_ending_date", { ascending: false }),
       supabase
         .from("expenses")
-        .select("id, expense_date, category, amount, status")
+        .select("id, expense_date, expense_type, description, amount, status")
         .eq("placement_id", id)
         .order("expense_date", { ascending: false }),
       supabase
@@ -411,7 +411,8 @@ export async function getContractById(id: string) {
     expenses: (expenses ?? []).map((e) => ({
       id: e.id as string,
       expenseDate: e.expense_date as string,
-      category: e.category as ExpenseCategory,
+      expenseType: e.expense_type as ExpenseType,
+      description: e.description as string,
       amount: Number(e.amount),
       status: e.status as ExpenseStatus,
     })),
@@ -427,12 +428,13 @@ export async function getContractById(id: string) {
   };
 }
 
+/** Placement-linked direct costs (public.expenses). */
 export async function getExpenses() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("expenses")
     .select(
-      "id, expense_date, category, client_id, placement_id, amount, status, notes, clients(name), placements(id)",
+      "id, expense_date, expense_type, description, placement_id, amount, status, placements(id, clients(id, name))",
     )
     .order("expense_date", { ascending: false });
 
@@ -442,19 +444,60 @@ export async function getExpenses() {
   }
 
   return (data ?? []).map((row) => {
-    const client = asOne(row.clients as Named | Named[] | null);
+    const placement = asOne(
+      row.placements as
+        | {
+            id: string;
+            clients:
+              | { id: string; name: string }
+              | { id: string; name: string }[]
+              | null;
+          }
+        | {
+            id: string;
+            clients:
+              | { id: string; name: string }
+              | { id: string; name: string }[]
+              | null;
+          }[]
+        | null,
+    );
+    const client = asOne(placement?.clients ?? null);
     return {
       id: row.id as string,
       expenseDate: row.expense_date as string,
-      category: row.category as ExpenseCategory,
-      clientId: row.client_id as string | null,
+      expenseType: row.expense_type as ExpenseType,
+      description: row.description as string,
+      clientId: client?.id ?? null,
       clientName: client?.name ?? "—",
-      placementId: row.placement_id as string | null,
+      placementId: (row.placement_id as string | null) ?? null,
       amount: Number(row.amount),
       status: row.status as ExpenseStatus,
-      notes: row.notes as string | null,
     };
   });
+}
+
+/** Company overhead (public.operating_expenses). */
+export async function getOperatingExpenses() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("operating_expenses")
+    .select("id, category, description, amount, expense_date, month")
+    .order("expense_date", { ascending: false });
+
+  if (error) {
+    console.error("operating_expenses query", error.message);
+    return [];
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    category: row.category as OperatingExpenseCategory,
+    description: row.description as string,
+    amount: Number(row.amount),
+    expenseDate: row.expense_date as string,
+    month: row.month as string,
+  }));
 }
 
 export async function getAccountsReceivable() {
@@ -507,13 +550,13 @@ export async function getAccountsReceivable() {
 
 export async function getDashboardData() {
   const supabase = await createClient();
-  const [invoices, payments, placements, timesheets, expenses] =
+  const [invoices, payments, placements, timesheets, operatingExpenseRows] =
     await Promise.all([
       getInvoices(),
       supabase.from("payments").select("invoice_id, amount, status, payment_date, created_at"),
       getContracts(),
       getPayrollRows(),
-      getExpenses(),
+      getOperatingExpenses(),
     ]);
 
   const recognizedInvoices = invoices.filter((i) =>
@@ -549,10 +592,9 @@ export async function getDashboardData() {
       .map((i) => netAmountDue(i.amount, paidByInvoice.get(i.id) ?? 0)),
   );
 
-  const recognizedExpenses = expenses.filter((e) =>
-    isRecognizedExpense(e.status),
+  const operatingExpenses = sumMoney(
+    operatingExpenseRows.map((e) => e.amount),
   );
-  const operatingExpenses = sumMoney(recognizedExpenses.map((e) => e.amount));
   const collected = sumMoney(
     (payments.data ?? [])
       .filter((p) => isCompletedPayment(p.status as string))
@@ -640,10 +682,10 @@ export async function getDashboardData() {
 }
 
 export async function getProfitabilityData() {
-  const [contracts, invoices, expenses, payroll] = await Promise.all([
+  const [contracts, invoices, operatingExpenseRows, payroll] = await Promise.all([
     getContracts(),
     getInvoices(),
-    getExpenses(),
+    getOperatingExpenses(),
     getPayrollRows(),
   ]);
 
@@ -652,9 +694,6 @@ export async function getProfitabilityData() {
   );
   const approvedPayroll = payroll.filter((r) =>
     isApprovedTimesheet(r.status),
-  );
-  const recognizedExpenses = expenses.filter((e) =>
-    isRecognizedExpense(e.status),
   );
 
   const revenueByClient = new Map<string, number>();
@@ -704,7 +743,7 @@ export async function getProfitabilityData() {
 
   const billedRevenue = sumMoney(recognizedInvoices.map((i) => i.amount));
   const directLabor = sumMoney(approvedPayroll.map((r) => r.grossPay));
-  const operatingExpenses = sumMoney(recognizedExpenses.map((e) => e.amount));
+  const operatingExpenses = sumMoney(operatingExpenseRows.map((e) => e.amount));
   const grossProfit = computeGrossProfit(billedRevenue, directLabor);
   const operatingIncome = computeOperatingIncome(
     billedRevenue,
@@ -729,7 +768,7 @@ export async function getProfitabilityData() {
     cur.labor = roundMoney(cur.labor + row.grossPay);
     byMonth.set(key, cur);
   }
-  for (const exp of recognizedExpenses) {
+  for (const exp of operatingExpenseRows) {
     const key = yearMonth(exp.expenseDate);
     const cur = byMonth.get(key) ?? { revenue: 0, labor: 0, opex: 0 };
     cur.opex = roundMoney(cur.opex + exp.amount);
@@ -778,7 +817,7 @@ export async function getAuditTrail(options?: {
   clientId?: string;
   limit?: number;
 }) {
-  const [invoices, paymentsRes, payroll, expenses, contracts] =
+  const [invoices, paymentsRes, payroll, expenses, operatingExpenses, contracts] =
     await Promise.all([
       getInvoices(),
       (await createClient())
@@ -786,6 +825,7 @@ export async function getAuditTrail(options?: {
         .select("id, invoice_id, amount, status, payment_date, created_at"),
       getPayrollRows(),
       getExpenses(),
+      getOperatingExpenses(),
       getContracts(),
     ]);
 
@@ -840,13 +880,27 @@ export async function getAuditTrail(options?: {
     ...expenses.map((e) =>
       buildExpenseAuditEvent({
         id: e.id,
-        category: e.category,
-        clientName: e.clientName,
+        kind: "placement",
+        label: e.expenseType,
+        detail: `${e.clientName} · ${e.description}`,
         amount: e.amount,
         status: e.status,
         expenseDate: e.expenseDate,
         placementId: e.placementId,
         clientId: e.clientId,
+      }),
+    ),
+    ...operatingExpenses.map((e) =>
+      buildExpenseAuditEvent({
+        id: e.id,
+        kind: "operating",
+        label: e.category,
+        detail: e.description,
+        amount: e.amount,
+        status: "approved",
+        expenseDate: e.expenseDate,
+        placementId: null,
+        clientId: null,
       }),
     ),
     ...contracts.map((c) =>

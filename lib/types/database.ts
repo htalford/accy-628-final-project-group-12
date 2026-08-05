@@ -15,7 +15,26 @@ export type ApplicationStatus =
   | "offered"
   | "rejected"
   | "withdrawn";
-export type ExpenseCategory =
+
+/** Placement-linked direct cost types (public.expenses.expense_type). */
+export type ExpenseType =
+  | "payroll_tax"
+  | "workers_comp"
+  | "benefits"
+  | "recruiting_cost"
+  | "travel"
+  | "equipment"
+  | "other";
+
+export type ExpenseStatus = "pending" | "approved" | "rejected" | "reimbursed";
+
+/** Company overhead categories (public.operating_expenses.category). */
+export type OperatingExpenseCategory =
+  | "recruiter_salaries"
+  | "accounting_salaries"
+  | "office_rent"
+  | "software_tools"
+  | "marketing"
   | "recruiter_labor"
   | "advertising"
   | "background_checks"
@@ -24,8 +43,10 @@ export type ExpenseCategory =
   | "employee_wages"
   | "referral_bonuses"
   | "training"
-  | "miscellaneous";
-export type ExpenseStatus = "pending" | "approved" | "rejected" | "reimbursed";
+  | "other";
+
+/** @deprecated Prefer OperatingExpenseCategory — kept as an alias for overhead labels. */
+export type ExpenseCategory = OperatingExpenseCategory;
 
 /** Client Portal only — employer staffing requests (not public.jobs). */
 export type JobRequestStatus = "open" | "in_progress" | "filled" | "closed";
@@ -198,15 +219,27 @@ export type Payment = {
   updated_at: string;
 };
 
+/** Placement-linked direct cost (public.expenses). */
 export type Expense = {
   id: string;
-  expense_date: string;
-  category: ExpenseCategory;
-  client_id: string | null;
-  placement_id: string | null;
+  placement_id: string;
+  expense_type: ExpenseType;
+  description: string;
   amount: number;
+  expense_date: string;
   status: ExpenseStatus;
-  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Company overhead (public.operating_expenses). */
+export type OperatingExpense = {
+  id: string;
+  category: OperatingExpenseCategory;
+  description: string;
+  amount: number;
+  expense_date: string;
+  month: string;
   created_at: string;
   updated_at: string;
 };

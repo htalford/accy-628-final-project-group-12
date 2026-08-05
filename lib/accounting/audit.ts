@@ -1,8 +1,9 @@
 import { money, shortId } from "@/lib/accounting/format";
 import {
-  expenseCategoryLabel,
   expenseStatusLabel,
+  expenseTypeLabel,
   invoiceDisplayStatus,
+  operatingExpenseCategoryLabel,
   placementStatusLabel,
 } from "@/lib/accounting/format";
 import type {
@@ -118,21 +119,28 @@ export function buildTimesheetAuditEvent(input: {
 
 export function buildExpenseAuditEvent(input: {
   id: string;
-  category: string;
-  clientName: string;
+  kind: "placement" | "operating";
+  label: string;
+  detail: string;
   amount: number;
-  status: ExpenseStatus;
+  status: ExpenseStatus | string;
   expenseDate: string;
   placementId: string | null;
   clientId: string | null;
 }): AuditEvent {
+  const typeLabel =
+    input.kind === "placement"
+      ? expenseTypeLabel(input.label)
+      : operatingExpenseCategoryLabel(input.label);
+  const prefix =
+    input.kind === "placement" ? "Placement expense" : "Operating expense";
   return {
-    id: `exp-${input.id}`,
+    id: `${input.kind === "placement" ? "exp" : "opex"}-${input.id}`,
     at: dateKey(input.expenseDate),
     sortKey: input.expenseDate,
     type: "expense",
-    title: `Expense · ${expenseCategoryLabel(input.category)}`,
-    detail: `${input.clientName} · ${expenseStatusLabel(input.status)}`,
+    title: `${prefix} · ${typeLabel}`,
+    detail: `${input.detail} · ${expenseStatusLabel(input.status)}`,
     href: input.placementId
       ? `/accounting/contracts/${input.placementId}`
       : "/accounting/expenses",

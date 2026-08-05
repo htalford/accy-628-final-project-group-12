@@ -14,8 +14,8 @@ import {
   getContractById,
 } from "@/lib/accounting/queries";
 import {
-  expenseCategoryLabel,
   expenseStatusLabel,
+  expenseTypeLabel,
   moneyExact,
   placementStatusLabel,
   placementTypeLabel,
@@ -238,7 +238,8 @@ export default async function ContractDetailPage({
                     href="/accounting/expenses"
                     className="font-medium text-[var(--cf-ink)] hover:underline"
                   >
-                    {e.expenseDate} · {expenseCategoryLabel(e.category)}
+                    {e.expenseDate} · {expenseTypeLabel(e.expenseType)}
+                    {e.description ? ` · ${e.description}` : ""}
                   </Link>
                   <span>
                     {moneyExact(e.amount)} · {expenseStatusLabel(e.status)}
