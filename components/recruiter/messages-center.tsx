@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { sendRecruiterMessage } from "@/app/actions/recruiter";
+import { sendEmployerMessage, sendRecruiterMessage } from "@/app/actions/recruiter";
 import type { RecruiterMessageThread } from "@/lib/recruiter/types";
 
 export function MessagesCenter({
@@ -156,10 +156,42 @@ export function MessagesCenter({
                     </p>
                   </>
                 ) : (
-                  <p className="text-sm text-[var(--cf-muted)]">
-                    Employer messaging is structured for future DB integration.
-                    Candidate threads send through Supabase `messages`.
-                  </p>
+                  <>
+                    <div className="flex gap-2">
+                      <textarea
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        rows={2}
+                        placeholder="Reply to employer…"
+                        className="min-h-[2.5rem] flex-1 rounded-lg border border-[var(--cf-border)] px-3 py-2 text-sm"
+                      />
+                      <button
+                        type="button"
+                        disabled={pending || !draft.trim()}
+                        className="self-end rounded-lg bg-[var(--cf-navy)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                        onClick={() => {
+                          const body = draft.trim();
+                          setDraft("");
+                          startTransition(async () => {
+                            const result = await sendEmployerMessage({
+                              threadId: active.id,
+                              body,
+                            });
+                            setNotice(
+                              result.ok
+                                ? result.message ?? "Sent"
+                                : result.error ?? "Failed",
+                            );
+                          });
+                        }}
+                      >
+                        Send
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-[var(--cf-muted)]">
+                      Synced with Client Portal employer conversations.
+                    </p>
+                  </>
                 )}
               </div>
             </>

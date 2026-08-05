@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { RecruiterInterview } from "@/lib/recruiter/types";
 import { rescheduleInterview } from "@/app/actions/recruiter";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -33,8 +34,17 @@ export function InterviewCalendar({
 }: {
   interviews: RecruiterInterview[];
 }) {
+  const router = useRouter();
   const [view, setView] = useState<ViewMode>("month");
-  const [cursor, setCursor] = useState(() => startOfDay(new Date()));
+  const [cursor, setCursor] = useState(() => {
+    const now = Date.now();
+    const upcoming = [...interviews]
+      .filter((i) => !Number.isNaN(new Date(i.datetime).getTime()))
+      .sort((a, b) => a.datetime.localeCompare(b.datetime))
+      .find((i) => new Date(i.datetime).getTime() >= now - 3600_000);
+    const anchor = upcoming ?? interviews[0];
+    return startOfDay(anchor ? new Date(anchor.datetime) : new Date());
+  });
   const [selected, setSelected] = useState<RecruiterInterview | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -284,6 +294,7 @@ export function InterviewCalendar({
                         ? result.message ?? "Rescheduled"
                         : result.error ?? "Failed",
                     );
+                    if (result.ok) router.refresh();
                   });
                 }}
               >

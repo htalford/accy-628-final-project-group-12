@@ -106,6 +106,8 @@ export type PortalSubmittal = {
   certifications: string[];
   experience: SubmittalExperience[];
   interview_notes: string | null;
+  interview_at?: string | null;
+  interview_type?: string | null;
   resume_summary: string | null;
   created_at: string;
   updated_at: string;

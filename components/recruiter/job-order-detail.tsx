@@ -65,6 +65,11 @@ export function JobOrderDetail({
               job.employerName || job.client
             )}{" "}
             · {job.location}
+            {job.source === "employer_request" ? (
+              <span className="ml-2 rounded-full bg-[var(--cf-accent)]/15 px-2 py-0.5 text-xs font-medium text-[var(--cf-navy)]">
+                Employer request
+              </span>
+            ) : null}
           </p>
           <dl className="mt-3 grid gap-1 text-sm text-[var(--cf-muted)] sm:grid-cols-3">
             <div>

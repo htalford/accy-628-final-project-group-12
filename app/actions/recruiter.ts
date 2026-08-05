@@ -23,14 +23,27 @@ export async function approveApplication(applicationId: string) {
   if (authError) return { ok: false as const, error: authError };
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: app, error: appErr } = await supabase
     .from("applications")
     .update({ status: "reviewing" satisfies ApplicationStatus })
+    .eq("id", applicationId)
+    .select("id")
+    .maybeSingle();
+
+  if (!appErr && app) {
+    revalidateRecruiter();
+    return { ok: true as const, message: "Application approved." };
+  }
+
+  // Employer portal submittal (same id space as recruiter candidate rows)
+  const { error } = await supabase
+    .from("submittals")
+    .update({ stage: "under_review" })
     .eq("id", applicationId);
 
-  if (error) return { ok: false as const, error: error.message };
+  if (error) return { ok: false as const, error: error.message || appErr?.message || "Not found" };
   revalidateRecruiter();
-  return { ok: true as const, message: "Application approved." };
+  return { ok: true as const, message: "Employer submittal marked under review." };
 }
 
 export async function rejectApplication(applicationId: string) {
@@ -38,14 +51,26 @@ export async function rejectApplication(applicationId: string) {
   if (authError) return { ok: false as const, error: authError };
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: app } = await supabase
     .from("applications")
     .update({ status: "rejected" satisfies ApplicationStatus })
+    .eq("id", applicationId)
+    .select("id")
+    .maybeSingle();
+
+  if (app) {
+    revalidateRecruiter();
+    return { ok: true as const, message: "Candidate rejected." };
+  }
+
+  const { error } = await supabase
+    .from("submittals")
+    .update({ stage: "rejected" })
     .eq("id", applicationId);
 
   if (error) return { ok: false as const, error: error.message };
   revalidateRecruiter();
-  return { ok: true as const, message: "Candidate rejected." };
+  return { ok: true as const, message: "Employer submittal rejected." };
 }
 
 export async function updateApplicationStatus(
@@ -56,14 +81,35 @@ export async function updateApplicationStatus(
   if (authError) return { ok: false as const, error: authError };
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: app } = await supabase
     .from("applications")
     .update({ status })
+    .eq("id", applicationId)
+    .select("id")
+    .maybeSingle();
+
+  if (app) {
+    revalidateRecruiter();
+    return { ok: true as const, message: `Status updated to ${status}.` };
+  }
+
+  const stageMap: Record<ApplicationStatus, string> = {
+    submitted: "submitted",
+    reviewing: "under_review",
+    interview: "interview",
+    offered: "offer",
+    rejected: "rejected",
+    withdrawn: "rejected",
+  };
+
+  const { error } = await supabase
+    .from("submittals")
+    .update({ stage: stageMap[status] ?? "submitted" })
     .eq("id", applicationId);
 
   if (error) return { ok: false as const, error: error.message };
   revalidateRecruiter();
-  return { ok: true as const, message: `Status updated to ${status}.` };
+  return { ok: true as const, message: `Employer submittal updated to ${status}.` };
 }
 
 export async function scheduleInterview(input: {
@@ -82,34 +128,52 @@ export async function scheduleInterview(input: {
     .eq("id", input.applicationId)
     .maybeSingle();
 
-  if (fetchError || !app) {
-    return { ok: false as const, error: fetchError?.message ?? "Application not found" };
+  if (app) {
+    const { error } = await supabase
+      .from("applications")
+      .update({
+        status: "interview" satisfies ApplicationStatus,
+        interview_at: input.datetime,
+        interview_type: input.interviewType,
+        interview_notes: input.notes ?? null,
+      })
+      .eq("id", input.applicationId);
+
+    if (error) return { ok: false as const, error: error.message };
+
+    const job = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
+    await supabase.from("messages").insert({
+      employee_id: app.employee_id,
+      sender_name: user.name,
+      sender_role: "recruiter",
+      subject: `Interview scheduled${job?.title ? ` · ${job.title}` : ""}`,
+      body: `Your interview is scheduled for ${new Date(input.datetime).toLocaleString()} (${input.interviewType}).${input.notes ? `\n\nNotes: ${input.notes}` : ""}`,
+      is_read: false,
+    });
+
+    revalidateRecruiter();
+    return { ok: true as const, message: "Interview scheduled." };
   }
 
+  const note = `Interview ${new Date(input.datetime).toLocaleString()} (${input.interviewType})${input.notes ? ` — ${input.notes}` : ""}`;
   const { error } = await supabase
-    .from("applications")
+    .from("submittals")
     .update({
-      status: "interview" satisfies ApplicationStatus,
+      stage: "interview",
       interview_at: input.datetime,
       interview_type: input.interviewType,
-      interview_notes: input.notes ?? null,
+      interview_notes: note,
     })
     .eq("id", input.applicationId);
 
-  if (error) return { ok: false as const, error: error.message };
-
-  const job = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
-  await supabase.from("messages").insert({
-    employee_id: app.employee_id,
-    sender_name: user.name,
-    sender_role: "recruiter",
-    subject: `Interview scheduled${job?.title ? ` · ${job.title}` : ""}`,
-    body: `Your interview is scheduled for ${new Date(input.datetime).toLocaleString()} (${input.interviewType}).${input.notes ? `\n\nNotes: ${input.notes}` : ""}`,
-    is_read: false,
-  });
-
+  if (error) {
+    return {
+      ok: false as const,
+      error: error.message || fetchError?.message || "Not found",
+    };
+  }
   revalidateRecruiter();
-  return { ok: true as const, message: "Interview scheduled." };
+  return { ok: true as const, message: "Interview scheduled on employer submittal." };
 }
 
 export async function rescheduleInterview(input: {
@@ -129,9 +193,32 @@ export async function rescheduleInterview(input: {
   if (input.interviewType) patch.interview_type = input.interviewType;
   if (input.notes !== undefined) patch.interview_notes = input.notes;
 
-  const { error } = await supabase
+  const { data: app } = await supabase
     .from("applications")
     .update(patch)
+    .eq("id", input.applicationId)
+    .select("id")
+    .maybeSingle();
+
+  if (app) {
+    revalidateRecruiter();
+    return { ok: true as const, message: "Interview rescheduled." };
+  }
+
+  const subPatch: Record<string, unknown> = {
+    stage: "interview",
+    interview_at: input.datetime,
+  };
+  if (input.interviewType) subPatch.interview_type = input.interviewType;
+  if (input.notes !== undefined) {
+    subPatch.interview_notes = `Interview ${new Date(input.datetime).toLocaleString()}${input.interviewType ? ` (${input.interviewType})` : ""}${input.notes ? ` — ${input.notes}` : ""}`;
+  } else {
+    subPatch.interview_notes = `Interview ${new Date(input.datetime).toLocaleString()}${input.interviewType ? ` (${input.interviewType})` : ""}`;
+  }
+
+  const { error } = await supabase
+    .from("submittals")
+    .update(subPatch)
     .eq("id", input.applicationId);
 
   if (error) return { ok: false as const, error: error.message };
@@ -168,29 +255,102 @@ export async function updateJobStatus(jobId: string, status: JobOrderStatus) {
 
   const dbStatus: JobStatus = uiJobStatusToDb(status);
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: job } = await supabase
     .from("jobs")
     .update({ status: dbStatus })
+    .eq("id", jobId)
+    .select("id")
+    .maybeSingle();
+
+  if (job) {
+    revalidateRecruiter();
+    return { ok: true as const, message: `Job status set to ${status}.` };
+  }
+
+  const requestStatus =
+    status === "Interviewing"
+      ? "in_progress"
+      : status === "Filled"
+        ? "filled"
+        : status === "Closed"
+          ? "closed"
+          : "open";
+
+  const { error } = await supabase
+    .from("job_requests")
+    .update({ status: requestStatus })
     .eq("id", jobId);
 
   if (error) return { ok: false as const, error: error.message };
   revalidateRecruiter();
-  return { ok: true as const, message: `Job status set to ${status}.` };
+  return { ok: true as const, message: `Employer job request set to ${status}.` };
 }
 
 export async function assignCandidateToJob(jobId: string, employeeId: string) {
-  const { error: authError } = await requireRecruiter();
-  if (authError) return { ok: false as const, error: authError };
+  const { error: authError, user } = await requireRecruiter();
+  if (authError || !user) return { ok: false as const, error: authError ?? "Unauthorized" };
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: job } = await supabase
     .from("jobs")
     .update({ assigned_employee_id: employeeId })
-    .eq("id", jobId);
+    .eq("id", jobId)
+    .select("id")
+    .maybeSingle();
+
+  if (job) {
+    revalidateRecruiter();
+    return { ok: true as const, message: "Candidate assigned to job order." };
+  }
+
+  // Employer job request: ensure a submittal exists for this employee/candidate id
+  const { data: request } = await supabase
+    .from("job_requests")
+    .select("id, client_id, title")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (!request) return { ok: false as const, error: "Job not found" };
+
+  const { data: existing } = await supabase
+    .from("submittals")
+    .select("id")
+    .eq("job_request_id", jobId)
+    .or(`employee_id.eq.${employeeId},id.eq.${employeeId}`)
+    .maybeSingle();
+
+  if (existing) {
+    revalidateRecruiter();
+    return { ok: true as const, message: "Candidate already submitted on this request." };
+  }
+
+  const { data: emp } = await supabase
+    .from("employees")
+    .select("id, first_name, last_name, email, phone")
+    .eq("id", employeeId)
+    .maybeSingle();
+
+  const { error } = await supabase.from("submittals").insert({
+    job_request_id: jobId,
+    client_id: request.client_id,
+    employee_id: emp?.id ?? null,
+    candidate_name: emp
+      ? `${emp.first_name} ${emp.last_name}`.trim()
+      : "Assigned candidate",
+    candidate_email: emp?.email ?? null,
+    candidate_phone: emp?.phone ?? null,
+    position_title: request.title,
+    recruiter_name: user.name,
+    stage: "submitted",
+    resume_status: "On File",
+    skills: [],
+    certifications: [],
+    experience_json: [],
+  });
 
   if (error) return { ok: false as const, error: error.message };
   revalidateRecruiter();
-  return { ok: true as const, message: "Candidate assigned to job order." };
+  return { ok: true as const, message: "Candidate submitted to employer job request." };
 }
 
 export async function addJobNote(jobId: string, body: string) {
@@ -204,27 +364,73 @@ export async function addJobNote(jobId: string, body: string) {
     .eq("id", jobId)
     .maybeSingle();
 
-  if (fetchError || !job) {
+  if (job) {
+    const existing = Array.isArray(job.recruiter_notes) ? job.recruiter_notes : [];
+    const next = [
+      {
+        id: crypto.randomUUID(),
+        body,
+        author: user.name,
+        created_at: new Date().toISOString(),
+      },
+      ...existing,
+    ];
+
+    const { error } = await supabase
+      .from("jobs")
+      .update({ recruiter_notes: next })
+      .eq("id", jobId);
+
+    if (error) return { ok: false as const, error: error.message };
+    revalidateRecruiter();
+    return { ok: true as const, message: "Note added." };
+  }
+
+  const { data: request } = await supabase
+    .from("job_requests")
+    .select("notes")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (!request) {
     return { ok: false as const, error: fetchError?.message ?? "Job not found" };
   }
 
-  const existing = Array.isArray(job.recruiter_notes) ? job.recruiter_notes : [];
-  const next = [
-    {
-      id: crypto.randomUUID(),
-      body,
-      author: user.name,
-      created_at: new Date().toISOString(),
-    },
-    ...existing,
-  ];
-
+  const stamp = new Date().toISOString();
+  const prior = request.notes ? `${request.notes}\n\n` : "";
   const { error } = await supabase
-    .from("jobs")
-    .update({ recruiter_notes: next })
+    .from("job_requests")
+    .update({
+      notes: `${prior}[${stamp}] ${user.name}: ${body}`,
+    })
     .eq("id", jobId);
 
   if (error) return { ok: false as const, error: error.message };
   revalidateRecruiter();
-  return { ok: true as const, message: "Note added." };
+  return { ok: true as const, message: "Note added to employer job request." };
+}
+
+export async function sendEmployerMessage(input: {
+  threadId: string;
+  body: string;
+}) {
+  const { error: authError, user } = await requireRecruiter();
+  if (authError || !user) return { ok: false as const, error: authError ?? "Unauthorized" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("client_messages").insert({
+    thread_id: input.threadId,
+    sender_role: "recruiter",
+    body: input.body,
+  });
+
+  if (error) return { ok: false as const, error: error.message };
+
+  await supabase
+    .from("client_message_threads")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", input.threadId);
+
+  revalidateRecruiter();
+  return { ok: true as const, message: "Message sent to employer." };
 }
