@@ -13,6 +13,8 @@ export function DataTable<T extends { id: string }>({
   columns,
   rows,
   rowHref,
+  rowHtmlId,
+  rowClassName,
   emptyTitle = "No records",
   emptyDescription = "Nothing to show yet.",
   emptyMessage,
@@ -20,6 +22,9 @@ export function DataTable<T extends { id: string }>({
   columns: Column<T>[];
   rows: T[];
   rowHref?: (row: T) => string;
+  /** Optional DOM id for deep-link / scroll targets. */
+  rowHtmlId?: (row: T) => string | undefined;
+  rowClassName?: (row: T) => string | undefined;
   emptyTitle?: string;
   emptyDescription?: string;
   /** Alias for emptyTitle (recruiter portal convenience). */
@@ -53,6 +58,10 @@ export function DataTable<T extends { id: string }>({
         <tbody>
           {rows.map((row) => {
             const href = rowHref?.(row);
+            const htmlId = rowHtmlId?.(row);
+            const extraClass = rowClassName?.(row) ?? "";
+            const baseClass =
+              "border-b border-[var(--cf-border)] last:border-0";
             const cells = columns.map((col) => (
               <td key={col.key} className={`px-4 py-3 text-[var(--cf-ink)] ${col.className ?? ""}`}>
                 {col.render(row)}
@@ -62,7 +71,8 @@ export function DataTable<T extends { id: string }>({
               return (
                 <tr
                   key={row.id}
-                  className="border-b border-[var(--cf-border)] last:border-0 hover:bg-[var(--cf-surface)]/70"
+                  id={htmlId}
+                  className={`${baseClass} hover:bg-[var(--cf-surface)]/70 ${extraClass}`}
                 >
                   {columns.map((col) => (
                     <td key={col.key} className={`px-4 py-3 ${col.className ?? ""}`}>
@@ -81,7 +91,8 @@ export function DataTable<T extends { id: string }>({
             return (
               <tr
                 key={row.id}
-                className="border-b border-[var(--cf-border)] last:border-0"
+                id={htmlId}
+                className={`${baseClass} ${extraClass}`}
               >
                 {cells}
               </tr>
