@@ -5,23 +5,18 @@ import { StatusBadge, statusTone } from "@/components/ui/status-badge";
 import {
   ContractLink,
   EntityLink,
-  PayrollEmployeeLink,
+  TimesheetEmployeeLink,
   TimesheetLink,
 } from "@/components/accounting/entity-links";
+import { PayrollToolbar } from "@/components/accounting/payroll-toolbar";
 import { getTimesheets } from "@/lib/accounting/queries";
 import { moneyExact } from "@/lib/accounting/format";
-import { PayrollToolbar } from "@/components/accounting/payroll-toolbar";
-import { timesheetsHref } from "@/lib/accounting/timesheet-links";
+import { payrollHref } from "@/lib/accounting/timesheet-links";
 
-export default async function PayrollPage({
+export default async function AccountingTimesheetsPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    period?: string;
-    employee?: string;
-    status?: string;
-    from?: string;
-  }>;
+  searchParams: Promise<{ period?: string; employee?: string; status?: string }>;
 }) {
   const params = await searchParams;
   const rows = await getTimesheets();
@@ -31,13 +26,10 @@ export default async function PayrollPage({
   const employeeParam = params.employee
     ? decodeURIComponent(params.employee)
     : undefined;
-  const fromParam =
-    params.from && /^\d{4}-\d{2}-\d{2}$/.test(params.from) ? params.from : undefined;
 
   const filtered = rows.filter((r) => {
     if (params.period && params.period !== "all" && r.weekEnding !== params.period)
       return false;
-    if (fromParam && r.weekEnding < fromParam) return false;
     if (
       employeeParam &&
       employeeParam !== "all" &&
@@ -60,10 +52,10 @@ export default async function PayrollPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Payroll"
+        title="Timesheets"
         actions={
-          <Button href={timesheetsHref(sharedFilters)} variant="secondary">
-            View timesheets
+          <Button href={payrollHref(sharedFilters)} variant="secondary">
+            View payroll
           </Button>
         }
       />
@@ -72,19 +64,19 @@ export default async function PayrollPage({
 
       <DataTable
         rows={filtered}
-        emptyTitle="No payroll rows"
-        emptyDescription="Candidate timesheets feed this payroll view automatically."
+        emptyTitle="No timesheets"
+        emptyDescription="When candidates submit hours, they appear here and feed payroll."
         columns={[
           {
-            key: "timesheet",
+            key: "id",
             header: "Timesheet",
             render: (row) => <TimesheetLink id={row.id} />,
           },
           {
             key: "employee",
-            header: "Employee Name",
+            header: "Candidate",
             render: (row) => (
-              <PayrollEmployeeLink name={row.employeeName} />
+              <TimesheetEmployeeLink name={row.employeeName} />
             ),
           },
           {
@@ -112,7 +104,7 @@ export default async function PayrollPage({
             header: "Week Ending",
             render: (row) => (
               <EntityLink
-                href={timesheetsHref({
+                href={payrollHref({
                   period: row.weekEnding,
                   employee: row.employeeName,
                 })}
@@ -122,36 +114,37 @@ export default async function PayrollPage({
             ),
           },
           {
-            key: "hours",
-            header: "Hours Worked",
-            render: (row) => (
-              <EntityLink href={`/accounting/timesheets/${row.id}`}>
-                {`${row.hoursWorked} (R ${row.hoursRegular} / OT ${row.hoursOvertime})`}
-              </EntityLink>
-            ),
+            key: "regular",
+            header: "Regular",
+            render: (row) => row.hoursRegular,
           },
           {
-            key: "rate",
-            header: "Pay Rate",
-            render: (row) => moneyExact(row.payRate),
+            key: "ot",
+            header: "Overtime",
+            render: (row) => row.hoursOvertime,
+          },
+          {
+            key: "total",
+            header: "Total Hours",
+            render: (row) => row.hoursWorked,
           },
           {
             key: "gross",
             header: "Gross Pay",
-            render: (row) => moneyExact(row.grossPay),
-          },
-          {
-            key: "earned",
-            header: "Bill Amount",
             render: (row) => (
-              <EntityLink href="/accounting/invoices">
-                {moneyExact(row.billAmount)}
+              <EntityLink
+                href={payrollHref({
+                  period: row.weekEnding,
+                  employee: row.employeeName,
+                })}
+              >
+                {moneyExact(row.grossPay)}
               </EntityLink>
             ),
           },
           {
             key: "status",
-            header: "Payroll Status",
+            header: "Status",
             render: (row) => (
               <StatusBadge label={row.status} tone={statusTone(row.status)} />
             ),

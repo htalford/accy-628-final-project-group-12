@@ -201,11 +201,7 @@ export default async function InvoiceDetailPage({
                     <td className="py-2 pr-4">
                       {line.timesheetId ? (
                         <EntityLink
-                          href={
-                            invoice.placementId
-                              ? `/accounting/contracts/${invoice.placementId}`
-                              : `/accounting/payroll`
-                          }
+                          href={`/accounting/timesheets/${line.timesheetId}`}
                           mono
                         >
                           TS {shortId(line.timesheetId)}
