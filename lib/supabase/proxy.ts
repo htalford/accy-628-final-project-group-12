@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import {
   getDashboardPath,
+  isPublicPath,
   isRolePath,
   pathRequiresAuth,
   USER_ROLES,
@@ -16,6 +17,12 @@ function roleFromPath(pathname: string): UserRole | null {
 }
 
 export async function updateSession(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  if (isPublicPath(pathname)) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -48,7 +55,6 @@ export async function updateSession(request: NextRequest) {
 
   const { data: claimsData } = await supabase.auth.getClaims();
   const authId = claimsData?.claims?.sub;
-  const pathname = request.nextUrl.pathname;
   const isAuthenticated = typeof authId === "string" && authId.length > 0;
 
   if (pathRequiresAuth(pathname) && !isAuthenticated) {
@@ -58,7 +64,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (pathname === "/login" && isAuthenticated) {
+  if (
+    (pathname === "/login" || pathname === "/signup") &&
+    isAuthenticated
+  ) {
     const { data: appUser } = await supabase
       .from("users")
       .select("role")

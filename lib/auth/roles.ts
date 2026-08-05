@@ -50,9 +50,22 @@ export function isRolePath(pathname: string, role: UserRole): boolean {
   );
 }
 
+export function isPublicPath(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname.startsWith("/about") ||
+    pathname.startsWith("/industries") ||
+    pathname.startsWith("/locations") ||
+    pathname.startsWith("/jobs") ||
+    pathname.startsWith("/careers") ||
+    pathname.startsWith("/auth/")
+  );
+}
+
 export function pathRequiresAuth(pathname: string): boolean {
-  if (pathname === "/login") return false;
-  if (pathname.startsWith("/auth/")) return false;
+  if (isPublicPath(pathname)) return false;
   return (
     pathname.startsWith("/employer") ||
     pathname.startsWith("/candidate") ||

@@ -1,15 +1,25 @@
 @import "tailwindcss";
 
 :root {
-  --cf-navy: #0b3a53;
-  --cf-navy-hover: #082c3f;
-  --cf-accent: #1f8a70;
-  --cf-ink: #152029;
-  --cf-muted: #5b6b76;
-  --cf-border: #d7e0e6;
-  --cf-surface: #f3f6f8;
-  --background: var(--cf-surface);
-  --foreground: var(--cf-ink);
+  --ot-navy: #0b2545;
+  --ot-navy-hover: #081c34;
+  --ot-ocean: #1a6fe8;
+  --ot-ocean-hover: #155bc4;
+  --ot-ink: #0b2545;
+  --ot-muted: #5a6b7d;
+  --ot-border: #d5e2ee;
+  --ot-surface: #f4f8fb;
+  --ot-mist: #e8f1f8;
+  --background: var(--ot-surface);
+  --foreground: var(--ot-ink);
+
+  --cf-navy: var(--ot-navy);
+  --cf-navy-hover: var(--ot-navy-hover);
+  --cf-accent: var(--ot-ocean);
+  --cf-ink: var(--ot-ink);
+  --cf-muted: var(--ot-muted);
+  --cf-border: var(--ot-border);
+  --cf-surface: var(--ot-surface);
 }
 
 @theme inline {
@@ -20,10 +30,7 @@
 }
 
 body {
-  background:
-    radial-gradient(1200px 500px at 10% -10%, rgba(31, 138, 112, 0.08), transparent 55%),
-    radial-gradient(900px 400px at 100% 0%, rgba(11, 58, 83, 0.08), transparent 50%),
-    var(--cf-surface);
-  color: var(--cf-ink);
+  background: var(--ot-surface);
+  color: var(--ot-ink);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
