@@ -8,6 +8,25 @@ export type TimesheetStatus = "submitted" | "approved" | "disputed" | "rejected"
 export type InvoiceStatus = "draft" | "sent" | "paid" | "partial" | "disputed";
 export type PaymentStatus = "pending" | "completed" | "failed";
 
+export type ExpenseType =
+  | "payroll_tax"
+  | "workers_comp"
+  | "benefits"
+  | "recruiting_cost"
+  | "travel"
+  | "equipment"
+  | "other";
+
+export type ExpenseStatus = "pending" | "approved" | "rejected" | "reimbursed";
+
+export type OperatingExpenseCategory =
+  | "recruiter_salaries"
+  | "accounting_salaries"
+  | "office_rent"
+  | "software_tools"
+  | "marketing"
+  | "other";
+
 export type Client = {
   id: string;
   name: string;
@@ -87,6 +106,29 @@ export type Payment = {
   amount: number;
   payment_date: string;
   status: PaymentStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Expense = {
+  id: string;
+  placement_id: string;
+  expense_type: ExpenseType;
+  description: string;
+  amount: number;
+  expense_date: string;
+  status: ExpenseStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OperatingExpense = {
+  id: string;
+  category: OperatingExpenseCategory;
+  description: string;
+  amount: number;
+  expense_date: string;
+  month: string;
   created_at: string;
   updated_at: string;
 };
