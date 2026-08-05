@@ -4,10 +4,10 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
+  clientPortalRoleFromEmail,
   getDashboardPath,
   isClientPortalEmail,
   isClientPortalRole,
-  resolveClientPortalRole,
 } from "@/lib/auth/roles";
 import type { UserRole } from "@/lib/types/database";
 
@@ -24,8 +24,9 @@ export function LoginForm() {
 
     startTransition(async () => {
       const trimmedEmail = email.trim().toLowerCase();
+      const emailRole = clientPortalRoleFromEmail(trimmedEmail);
 
-      if (!isClientPortalEmail(trimmedEmail)) {
+      if (!emailRole || !isClientPortalEmail(trimmedEmail)) {
         setError(
           "Client sign in is only for employer or candidate emails (for example employer@… or candidate@…).",
         );
@@ -64,7 +65,11 @@ export function LoginForm() {
 
       const profileEmail = (appUser.email as string | null) ?? trimmedEmail;
       const role = appUser.role as UserRole;
-      const portalRole = resolveClientPortalRole(profileEmail, role);
+      // Prefer email identity so candidate@… never lands on the employer portal.
+      const portalRole =
+        clientPortalRoleFromEmail(profileEmail) ??
+        (isClientPortalRole(role) ? role : null) ??
+        emailRole;
 
       if (
         !portalRole ||
