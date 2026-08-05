@@ -422,3 +422,47 @@ export async function createClientMessageThreadAction(formData: {
     id: String(thread.id),
   };
 }
+
+/**
+ * Delete a client↔recruiter thread owned by this employer (cascades client_messages).
+ */
+export async function deleteClientMessageThreadAction(
+  threadId: string,
+): Promise<ActionResult> {
+  const auth = await requireEmployerClientId();
+  if (!auth.ok) return auth;
+
+  const supabase = await createClient();
+  const { data: thread, error: findError } = await supabase
+    .from("client_message_threads")
+    .select("id, subject")
+    .eq("id", threadId)
+    .eq("client_id", auth.clientId)
+    .maybeSingle();
+
+  if (findError || !thread) {
+    return {
+      ok: false,
+      message: findError?.message ?? "Conversation not found for your company.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("client_message_threads")
+    .delete()
+    .eq("id", threadId)
+    .eq("client_id", auth.clientId);
+
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/client/messages");
+  revalidatePath("/client/dashboard");
+
+  return {
+    ok: true,
+    message: thread.subject
+      ? `Deleted “${String(thread.subject)}”.`
+      : "Conversation deleted.",
+  };
+}
+

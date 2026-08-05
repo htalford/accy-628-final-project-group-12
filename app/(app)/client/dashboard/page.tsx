@@ -8,11 +8,16 @@ import { Table, THead, Th, Td } from "@/components/ui/table";
 import { PinActionTaskButton } from "@/components/portal-pins/pin-action-task-button";
 import { PinContractButton } from "@/components/portal-pins/pin-contract-button";
 import {
+  StaffingHealthStrip,
+  type StaffingHealthItem,
+} from "@/components/client-portal/staffing-health-strip";
+import {
   employeesFromPlacements,
   loadClientPortalData,
 } from "@/lib/client-portal/queries";
 import {
   formatMoney,
+  placementPositionTitle,
   placementStatusLabel,
   seedStatusTone,
   shortPlacementNumber,
@@ -26,12 +31,21 @@ function actionStatusLabel(kind: string, status: string): string {
   return placementStatusLabel(status);
 }
 
+function marginPercent(
+  bill: number | null,
+  pay: number | null,
+): number | null {
+  if (bill == null || pay == null || bill <= 0) return null;
+  return ((bill - pay) / bill) * 100;
+}
+
 export default async function ClientDashboardPage() {
   const data = await loadClientPortalData();
   const company = data.client?.name ?? "Your company";
   const openPlacements = data.placements.filter(
     (p) => p.status === "active" || p.status === "at_risk",
   );
+  const atRiskPlacements = data.placements.filter((p) => p.status === "at_risk");
   const employeeRows = employeesFromPlacements(data.placements).map((e) => {
     const hours = data.timesheets
       .filter((t) => t.placement_id === e.placementId)
@@ -40,12 +54,91 @@ export default async function ClientDashboardPage() {
     return { ...e, hoursThisPeriod: hours };
   });
 
+  const openRoles = data.metrics.openPositions;
+  const candidatesWaiting = data.metrics.pendingCandidateReviews;
+  const timesheetsDue = data.metrics.timesheetsAwaitingApproval;
+  const atRiskCount = atRiskPlacements.length;
+
+  const atRiskDetail =
+    atRiskCount === 0
+      ? "All open placements look commercially healthy"
+      : atRiskPlacements
+          .slice(0, 2)
+          .map((p) => {
+            const title = placementPositionTitle(p.title, p.placement_type);
+            const m = marginPercent(p.bill_rate, p.pay_rate);
+            const marginNote =
+              m != null ? ` · ~${m.toFixed(0)}% margin` : " · thin margin";
+            return `${title}${marginNote}`;
+          })
+          .join("; ") + (atRiskCount > 2 ? ` · +${atRiskCount - 2} more` : "");
+
+  const healthItems: Array<
+    StaffingHealthItem & {
+      icon?: "roles" | "candidates" | "timesheets" | "atrisk";
+    }
+  > = [
+    {
+      id: "open-roles",
+      label: "Open roles unfilled",
+      value: openRoles,
+      detail:
+        openRoles === 0
+          ? "No open positions in job requests"
+          : `${openRoles} seat${openRoles === 1 ? "" : "s"} still to fill`,
+      href: "/client/job-requests?status=open",
+      tone: openRoles === 0 ? "ok" : openRoles >= 3 ? "warn" : "info",
+      icon: "roles",
+    },
+    {
+      id: "candidates",
+      label: "Candidates waiting",
+      value: candidatesWaiting,
+      detail:
+        candidatesWaiting === 0
+          ? "No applications need review"
+          : "Submitted / under review — act soon",
+      href: "/client/candidates",
+      tone:
+        candidatesWaiting === 0
+          ? "ok"
+          : candidatesWaiting >= 3
+            ? "warn"
+            : "info",
+      icon: "candidates",
+    },
+    {
+      id: "timesheets",
+      label: "Timesheets due",
+      value: timesheetsDue,
+      detail:
+        timesheetsDue === 0
+          ? "Nothing waiting on your approval"
+          : "Submitted this week — approve or reject",
+      href: "/client/timesheets?status=submitted",
+      tone:
+        timesheetsDue === 0 ? "ok" : timesheetsDue >= 3 ? "warn" : "info",
+      icon: "timesheets",
+    },
+    {
+      id: "at-risk",
+      label: "At-risk contracts",
+      value: atRiskCount,
+      detail: atRiskDetail,
+      href: "/client/contracts?status=at_risk",
+      tone: atRiskCount === 0 ? "ok" : "critical",
+      icon: "atrisk",
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
         description={`${company} · placements, timesheets, and invoices for your company.`}
       />
+
+      <StaffingHealthStrip items={healthItems} />
 
       {data.actionQueue.length > 0 ? (
         <Card className="border-amber-200 bg-amber-50/40">
@@ -193,6 +286,13 @@ export default async function ClientDashboardPage() {
               Review Candidates
             </Button>
             <Button
+              href="/client/candidates/compare"
+              variant="secondary"
+              className="w-full"
+            >
+              Compare Candidates
+            </Button>
+            <Button
               href="/client/timesheets?status=submitted"
               variant="secondary"
               className="w-full"
@@ -282,6 +382,8 @@ export default async function ClientDashboardPage() {
             const name = p.employee
               ? `${p.employee.first_name} ${p.employee.last_name}`
               : "Employee";
+            const title = placementPositionTitle(p.title, p.placement_type);
+            const m = marginPercent(p.bill_rate, p.pay_rate);
             return (
               <li
                 key={p.id}
@@ -289,7 +391,7 @@ export default async function ClientDashboardPage() {
               >
                 <div>
                   <p className="text-sm font-medium text-[var(--cf-ink)]">
-                    {p.title ?? "Assignment"} · {name}
+                    {title} · {name}
                   </p>
                   <p className="text-xs text-[var(--cf-muted)]">
                     {shortPlacementNumber(p.id)} · Started{" "}
@@ -297,6 +399,11 @@ export default async function ClientDashboardPage() {
                     {p.end_date
                       ? ` · Ends ${p.end_date.slice(0, 10)}`
                       : " · Open-ended"}
+                    {p.status === "at_risk"
+                      ? m != null
+                        ? ` · ~${m.toFixed(0)}% margin (at risk)`
+                        : " · at risk"
+                      : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -308,7 +415,7 @@ export default async function ClientDashboardPage() {
                     contractId={p.id}
                     contractNumber={shortPlacementNumber(p.id)}
                     employeeName={name}
-                    positionTitle={p.title ?? undefined}
+                    positionTitle={title}
                   />
                   <Button
                     size="sm"
