@@ -31,11 +31,11 @@ export const DEMO_ACCOUNTS: Record<
   UserRole,
   { email: string; label: string }
 > = {
-  employer: { email: "employer@contractflow.demo", label: "Casey Employer" },
-  candidate: { email: "candidate@contractflow.demo", label: "Jordan Lee" },
-  recruiter: { email: "recruiter@contractflow.demo", label: "Morgan Recruiter" },
+  employer: { email: "employer@talentquest.demo", label: "Casey Employer" },
+  candidate: { email: "candidate@talentquest.demo", label: "Jordan Lee" },
+  recruiter: { email: "recruiter@talentquest.demo", label: "Morgan Recruiter" },
   accounting: {
-    email: "accounting@contractflow.demo",
+    email: "accounting@talentquest.demo",
     label: "Avery Accounting",
   },
 };
@@ -101,7 +101,11 @@ export type NavIcon =
   | "bar-chart-3"
   | "messages-square"
   | "user"
-  | "history";
+  | "history"
+  | "search"
+  | "send"
+  | "circle-check"
+  | "message-square";
 
 export type NavItem = {
   href: string;
@@ -119,7 +123,14 @@ export function getNavForRole(role: UserRole): NavItem[] {
     case "candidate":
       return [
         { href: "/candidate/dashboard", label: "Dashboard", icon: "layout-dashboard" },
-        { href: "/candidate/timesheets", label: "Submit timesheet", icon: "clock" },
+        { href: "/candidate/applications", label: "Applications", icon: "send" },
+        { href: "/candidate/jobs", label: "Available jobs", icon: "search" },
+        { href: "/candidate/completions", label: "Completions", icon: "circle-check" },
+        { href: "/candidate/contracts", label: "Contracts", icon: "file-signature" },
+        { href: "/candidate/messages", label: "Messages", icon: "message-square" },
+        { href: "/candidate/pay", label: "Pay", icon: "wallet" },
+        { href: "/candidate/profile", label: "Profile", icon: "user" },
+        { href: "/candidate/timesheets", label: "Timesheets", icon: "clock" },
       ];
     case "recruiter":
       return [
@@ -159,7 +170,14 @@ export function getPageTitle(pathname: string): string {
     "/employer/dashboard": "Dashboard",
     "/employer/timesheets": "Timesheet approval",
     "/candidate/dashboard": "Dashboard",
-    "/candidate/timesheets": "Submit timesheet",
+    "/candidate/applications": "Applications",
+    "/candidate/jobs": "Available jobs",
+    "/candidate/completions": "Completions",
+    "/candidate/contracts": "Contracts",
+    "/candidate/messages": "Messages",
+    "/candidate/pay": "Pay",
+    "/candidate/profile": "Profile",
+    "/candidate/timesheets": "Timesheets",
     "/recruiter/dashboard": "Dashboard",
     "/recruiter/placements": "Placements",
   };
@@ -168,5 +186,6 @@ export function getPageTitle(pathname: string): string {
   if (pathname === "/accounting/invoices/new") return "Create Invoice";
   if (pathname.startsWith("/accounting/invoices/")) return "Invoice detail";
   if (pathname.startsWith("/accounting/contracts/")) return "Contract detail";
+  if (pathname.startsWith("/candidate/contracts/")) return "Contract detail";
   return "TalentQuest";
 }

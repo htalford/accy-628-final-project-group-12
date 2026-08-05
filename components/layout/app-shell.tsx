@@ -1,6 +1,5 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
-import { RoleSwitcher } from "@/components/demo/role-switcher";
 import { ShellProvider } from "@/components/layout/shell-context";
 import type { AppUser } from "@/lib/types/database";
 
@@ -21,7 +20,6 @@ export function AppShell({
             {children}
           </main>
         </div>
-        <RoleSwitcher currentRole={user.role} />
       </div>
     </ShellProvider>
   );

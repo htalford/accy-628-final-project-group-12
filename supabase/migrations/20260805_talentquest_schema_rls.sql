@@ -1,4 +1,4 @@
--- Local mirror of remote migration: contractflow_schema_rls
+-- Local mirror of remote migration: talentquest_schema_rls
 -- Applied to Supabase project jklrdtzesordhgnxbstp (ACCY 628 - Final Project - Group 12).
 -- Seed data and demo auth users were applied via follow-up SQL (not replayed here).
 
