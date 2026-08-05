@@ -23,8 +23,21 @@ export function moneyExact(n: number | null | undefined): string {
   }).format(v);
 }
 
-export function shortId(id: string): string {
-  return id.slice(0, 8).toUpperCase();
+/**
+ * Stable public-facing ID: unique-looking 8-digit number derived from a UUID.
+ * Routes still use the real UUID; this is display-only.
+ */
+export function shortId(id: string | null | undefined): string {
+  if (!id) return "00000000";
+  const raw = id.replace(/-/g, "").toLowerCase();
+  // FNV-1a 32-bit hash → 8 decimal digits (00000000–99999999)
+  let hash = 2166136261;
+  for (let i = 0; i < raw.length; i++) {
+    hash ^= raw.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const n = (hash >>> 0) % 100_000_000;
+  return String(n).padStart(8, "0");
 }
 
 export function invoiceStatusLabel(status: InvoiceStatus | string): string {

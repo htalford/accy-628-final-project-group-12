@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Panel } from "@/components/accounting/panel";
 import { getAppUser } from "@/lib/auth/get-app-user";
 import { ROLE_LABELS } from "@/lib/auth/roles";
+import { shortId } from "@/lib/accounting/format";
 import { redirect } from "next/navigation";
 import { ProfileEditor } from "@/components/accounting/profile-editor";
 
@@ -26,7 +27,7 @@ export default async function ProfilePage() {
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-[var(--cf-muted)]">Employee ID</dt>
-              <dd className="font-mono text-xs">{user.id.slice(0, 8).toUpperCase()}</dd>
+              <dd className="font-mono text-xs">{shortId(user.id)}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-[var(--cf-muted)]">Email</dt>
