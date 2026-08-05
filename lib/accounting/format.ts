@@ -1,7 +1,8 @@
 import type {
-  ExpenseCategory,
   ExpenseStatus,
+  ExpenseType,
   InvoiceStatus,
+  OperatingExpenseCategory,
   PlacementStatus,
   PlacementType,
 } from "@/lib/types/database";
@@ -71,8 +72,28 @@ export function invoiceDisplayStatus(
   return invoiceStatusLabel(status);
 }
 
-export function expenseCategoryLabel(category: ExpenseCategory | string): string {
+export function expenseTypeLabel(type: ExpenseType | string): string {
   const map: Record<string, string> = {
+    payroll_tax: "Payroll Tax",
+    workers_comp: "Workers Comp",
+    benefits: "Benefits",
+    recruiting_cost: "Recruiting Cost",
+    travel: "Travel",
+    equipment: "Equipment",
+    other: "Other",
+  };
+  return map[type] ?? String(type).replaceAll("_", " ");
+}
+
+export function operatingExpenseCategoryLabel(
+  category: OperatingExpenseCategory | string,
+): string {
+  const map: Record<string, string> = {
+    recruiter_salaries: "Recruiter Salaries",
+    accounting_salaries: "Accounting Salaries",
+    office_rent: "Office Rent",
+    software_tools: "Software / Tools",
+    marketing: "Marketing",
     recruiter_labor: "Recruiter Labor",
     advertising: "Advertising",
     background_checks: "Background Checks",
@@ -81,9 +102,16 @@ export function expenseCategoryLabel(category: ExpenseCategory | string): string
     employee_wages: "Employee Wages",
     referral_bonuses: "Referral Bonuses",
     training: "Training",
-    miscellaneous: "Miscellaneous",
+    other: "Other",
   };
-  return map[category] ?? category;
+  return map[category] ?? String(category).replaceAll("_", " ");
+}
+
+/** @deprecated Prefer operatingExpenseCategoryLabel */
+export function expenseCategoryLabel(
+  category: OperatingExpenseCategory | string,
+): string {
+  return operatingExpenseCategoryLabel(category);
 }
 
 export function expenseStatusLabel(status: ExpenseStatus | string): string {
@@ -110,7 +138,22 @@ export function dueDateFromPeriodEnd(periodEnd: string): string {
   return end.toISOString().slice(0, 10);
 }
 
-export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
+export const EXPENSE_TYPES: ExpenseType[] = [
+  "payroll_tax",
+  "workers_comp",
+  "benefits",
+  "recruiting_cost",
+  "travel",
+  "equipment",
+  "other",
+];
+
+export const OPERATING_EXPENSE_CATEGORIES: OperatingExpenseCategory[] = [
+  "recruiter_salaries",
+  "accounting_salaries",
+  "office_rent",
+  "software_tools",
+  "marketing",
   "recruiter_labor",
   "advertising",
   "background_checks",
@@ -119,5 +162,8 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   "employee_wages",
   "referral_bonuses",
   "training",
-  "miscellaneous",
+  "other",
 ];
+
+/** @deprecated Prefer OPERATING_EXPENSE_CATEGORIES */
+export const EXPENSE_CATEGORIES = OPERATING_EXPENSE_CATEGORIES;

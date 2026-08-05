@@ -1,17 +1,25 @@
-import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
+import { PlacementsSummary } from "@/components/recruiter/placements-summary";
+import { PlacementsTable } from "@/components/recruiter/placements-table";
+import {
+  getPlacementMonthSummary,
+  listPlacementsThisMonth,
+} from "@/lib/recruiter/data";
 
-export default function RecruiterPlacementsPage() {
+export default async function PlacementsPage() {
+  const [summary, rows] = await Promise.all([
+    getPlacementMonthSummary(),
+    listPlacementsThisMonth(),
+  ]);
+
   return (
     <div>
       <PageHeader
-        title="Placements"
-        description="Manage temp and permanent placements across employer companies."
+        title="Placements This Month"
+        description="Seeded placements from Supabase (active, at-risk, completed, and cancelled)."
       />
-      <EmptyState
-        title="Placement list placeholder"
-        description="Table of placements with type, rates/fees, dates, and status will go here."
-      />
+      <PlacementsSummary summary={summary} />
+      <PlacementsTable rows={rows} />
     </div>
   );
 }

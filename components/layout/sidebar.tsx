@@ -7,9 +7,13 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Briefcase,
+  BriefcaseBusiness,
+  Building2,
+  Calendar,
   CheckCircle2,
   CircleDollarSign,
   ClipboardCheck,
+  ClipboardList,
   Clock,
   FileSignature,
   FileText,
@@ -24,10 +28,18 @@ import {
   Send,
   TrendingUp,
   User,
+  UserCircle,
+  UserCog,
+  UserRound,
+  Users,
   Wallet,
   X,
 } from "lucide-react";
-import { getNavForRole, ROLE_LABELS } from "@/lib/auth/roles";
+import {
+  getDashboardPath,
+  getNavForRole,
+  ROLE_LABELS,
+} from "@/lib/auth/roles";
 import type { UserRole } from "@/lib/types/database";
 import type { NavIcon, NavItem } from "@/lib/auth/roles";
 import { useShell } from "@/components/layout/shell-context";
@@ -35,12 +47,13 @@ import { useShell } from "@/components/layout/shell-context";
 const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   "layout-dashboard": LayoutDashboard,
   "clipboard-check": ClipboardCheck,
+  "clipboard-list": ClipboardList,
   briefcase: Briefcase,
   "file-text": FileText,
+  "file-signature": FileSignature,
   clock: Clock,
   wallet: Wallet,
   receipt: Receipt,
-  "file-signature": FileSignature,
   "circle-dollar-sign": CircleDollarSign,
   "trending-up": TrendingUp,
   "bar-chart-3": BarChart3,
@@ -51,6 +64,13 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   send: Send,
   "circle-check": CheckCircle2,
   "message-square": MessageSquare,
+  users: Users,
+  "user-round": UserRound,
+  "user-cog": UserCog,
+  "briefcase-business": BriefcaseBusiness,
+  calendar: Calendar,
+  "building-2": Building2,
+  "user-circle": UserCircle,
 };
 
 const CANDIDATE_DASHBOARD = "/candidate/dashboard";
@@ -110,6 +130,7 @@ function NavLink({
   const active =
     pathname === item.href ||
     (item.href !== "/accounting/dashboard" &&
+      item.href !== "/client/dashboard" &&
       pathname.startsWith(`${item.href}/`)) ||
     (item.href.endsWith("/dashboard") && pathname === item.href);
   const Icon = ICONS[item.icon];
@@ -200,7 +221,7 @@ export function Sidebar({ role }: { role: UserRole }) {
         <div className="flex items-start justify-between gap-2">
           <div className={showCollapsed ? "w-full" : "min-w-0 flex-1"}>
             <Link
-              href={`/${role}/dashboard`}
+              href={getDashboardPath(role)}
               className={`block rounded-md bg-white ${showCollapsed ? "p-1.5" : "p-2"}`}
               title="TalentQuest"
             >

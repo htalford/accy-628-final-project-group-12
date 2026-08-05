@@ -15,18 +15,25 @@ export function DataTable<T extends { id: string }>({
   rowHref,
   emptyTitle = "No records",
   emptyDescription = "Nothing to show yet.",
+  emptyMessage,
 }: {
   columns: Column<T>[];
   rows: T[];
   rowHref?: (row: T) => string;
   emptyTitle?: string;
   emptyDescription?: string;
+  /** Alias for emptyTitle (recruiter portal convenience). */
+  emptyMessage?: string;
 }) {
   if (rows.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-[var(--cf-border)] bg-white px-6 py-10 text-center">
-        <p className="text-sm font-medium text-[var(--cf-ink)]">{emptyTitle}</p>
-        <p className="mt-1 text-sm text-[var(--cf-muted)]">{emptyDescription}</p>
+        <p className="text-sm font-medium text-[var(--cf-ink)]">
+          {emptyMessage ?? emptyTitle}
+        </p>
+        {!emptyMessage ? (
+          <p className="mt-1 text-sm text-[var(--cf-muted)]">{emptyDescription}</p>
+        ) : null}
       </div>
     );
   }

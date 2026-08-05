@@ -1,5 +1,8 @@
--- Expenses table for accounting portal (TalentQuest)
--- Applied remotely as create_expenses_table
+-- SUPERSEDED locally by 20260805_expenses_and_expanded_seed.sql
+-- Madeline's original TalentQuest expenses shape (category/client_id/notes) was
+-- reconciled: placement costs live in public.expenses (expense_type + placement_id);
+-- overhead categories live in public.operating_expenses.category.
+-- Kept as a historical mirror of what was once applied on main — do not re-apply.
 
 CREATE TYPE public.expense_category AS ENUM (
   'recruiter_labor',

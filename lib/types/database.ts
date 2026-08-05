@@ -15,7 +15,26 @@ export type ApplicationStatus =
   | "offered"
   | "rejected"
   | "withdrawn";
-export type ExpenseCategory =
+
+/** Placement-linked direct cost types (public.expenses.expense_type). */
+export type ExpenseType =
+  | "payroll_tax"
+  | "workers_comp"
+  | "benefits"
+  | "recruiting_cost"
+  | "travel"
+  | "equipment"
+  | "other";
+
+export type ExpenseStatus = "pending" | "approved" | "rejected" | "reimbursed";
+
+/** Company overhead categories (public.operating_expenses.category). */
+export type OperatingExpenseCategory =
+  | "recruiter_salaries"
+  | "accounting_salaries"
+  | "office_rent"
+  | "software_tools"
+  | "marketing"
   | "recruiter_labor"
   | "advertising"
   | "background_checks"
@@ -24,8 +43,91 @@ export type ExpenseCategory =
   | "employee_wages"
   | "referral_bonuses"
   | "training"
-  | "miscellaneous";
-export type ExpenseStatus = "pending" | "approved" | "rejected" | "reimbursed";
+  | "other";
+
+/** @deprecated Prefer OperatingExpenseCategory — kept as an alias for overhead labels. */
+export type ExpenseCategory = OperatingExpenseCategory;
+
+/** Client Portal only — employer staffing requests (not public.jobs). */
+export type JobRequestStatus = "open" | "in_progress" | "filled" | "closed";
+
+/** Client Portal only — candidates submitted for a job request. */
+export type SubmittalStage =
+  | "submitted"
+  | "under_review"
+  | "interview"
+  | "offer"
+  | "accepted"
+  | "rejected";
+
+export type PortalJobRequest = {
+  id: string;
+  client_id: string;
+  title: string;
+  department: string;
+  positions: number;
+  status: JobRequestStatus;
+  employment_type: string;
+  location: string | null;
+  pay_rate_text: string | null;
+  start_date: string | null;
+  skills: string[];
+  description: string | null;
+  notes: string | null;
+  recruiter_name: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SubmittalExperience = {
+  company: string;
+  title: string;
+  years: string;
+};
+
+export type PortalSubmittal = {
+  id: string;
+  job_request_id: string;
+  client_id: string;
+  employee_id: string | null;
+  candidate_name: string;
+  candidate_email: string | null;
+  candidate_phone: string | null;
+  position_title: string;
+  recruiter_name: string | null;
+  years_experience: number | null;
+  stage: SubmittalStage;
+  resume_status: string;
+  skills: string[];
+  certifications: string[];
+  experience: SubmittalExperience[];
+  interview_notes: string | null;
+  resume_summary: string | null;
+  created_at: string;
+  updated_at: string;
+  job_title?: string | null;
+};
+
+export type ClientMessageThread = {
+  id: string;
+  client_id: string;
+  subject: string;
+  recruiter_name: string;
+  created_at: string;
+  updated_at: string;
+  preview?: string;
+  unread?: number;
+  messages?: ClientPortalMessage[];
+};
+
+export type ClientPortalMessage = {
+  id: string;
+  thread_id: string;
+  sender_role: "client" | "recruiter" | "staff";
+  body: string;
+  created_at: string;
+};
+
 export type Client = {
   id: string;
   name: string;
@@ -57,6 +159,8 @@ export type Placement = {
   client_id: string;
   employee_id: string;
   placement_type: PlacementType;
+  /** Job/role title for the assignment (e.g. Warehouse Associate). */
+  title: string | null;
   bill_rate: number | null;
   pay_rate: number | null;
   placement_fee: number | null;
@@ -75,6 +179,8 @@ export type Timesheet = {
   hours_regular: number;
   hours_overtime: number;
   status: TimesheetStatus;
+  /** Employer decision note (approve/reject) — employer-facing only. */
+  employer_note?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -113,15 +219,27 @@ export type Payment = {
   updated_at: string;
 };
 
+/** Placement-linked direct cost (public.expenses). */
 export type Expense = {
   id: string;
-  expense_date: string;
-  category: ExpenseCategory;
-  client_id: string | null;
-  placement_id: string | null;
+  placement_id: string;
+  expense_type: ExpenseType;
+  description: string;
   amount: number;
+  expense_date: string;
   status: ExpenseStatus;
-  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Company overhead (public.operating_expenses). */
+export type OperatingExpense = {
+  id: string;
+  category: OperatingExpenseCategory;
+  description: string;
+  amount: number;
+  expense_date: string;
+  month: string;
   created_at: string;
   updated_at: string;
 };
@@ -152,6 +270,8 @@ export type Job = {
   posted_at: string;
   created_at: string;
   updated_at: string;
+  recruiter_notes?: unknown;
+  assigned_employee_id?: string | null;
 };
 
 export type Application = {
@@ -164,6 +284,9 @@ export type Application = {
   resume_url: string | null;
   include_profile: boolean;
   profile_snapshot: Record<string, unknown> | null;
+  interview_at?: string | null;
+  interview_type?: string | null;
+  interview_notes?: string | null;
   created_at: string;
   updated_at: string;
 };
