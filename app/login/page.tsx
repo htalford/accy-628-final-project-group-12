@@ -21,7 +21,11 @@ export default function LoginPage() {
             Client sign in
           </h1>
           <p className="mt-2 text-sm text-[var(--ot-muted)]">
-            This sign-in page is for Talent Quest clients.
+            For employers and candidates only. Use an{" "}
+            <span className="font-medium text-[var(--ot-navy)]">employer@</span>{" "}
+            or{" "}
+            <span className="font-medium text-[var(--ot-navy)]">candidate@</span>{" "}
+            email to sign in.
           </p>
         </div>
         <div className="rounded-xl border border-[var(--ot-border)] bg-white p-6 shadow-sm">

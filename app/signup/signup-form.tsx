@@ -7,7 +7,7 @@ import { getDashboardPath } from "@/lib/auth/roles";
 import type { UserRole } from "@/lib/types/database";
 
 const SIGNUP_OPTIONS: { value: UserRole; label: string }[] = [
-  { value: "employer", label: "a Employer/Recruiter" },
+  { value: "employer", label: "Looking to hire" },
   { value: "candidate", label: "Looking for work" },
 ];
 
@@ -33,6 +33,7 @@ export function SignupForm() {
         return;
       }
 
+      const selectedRole = role;
       const supabase = createClient();
 
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
@@ -60,8 +61,9 @@ export function SignupForm() {
         "complete_signup",
         {
           p_name: name,
-          p_role: role,
-          p_company_name: role === "employer" ? companyName || null : null,
+          p_role: selectedRole,
+          p_company_name:
+            selectedRole === "employer" ? companyName || null : null,
         },
       );
 
@@ -77,7 +79,12 @@ export function SignupForm() {
         role?: UserRole;
       } | null;
 
-      router.replace(getDashboardPath(row?.role ?? role));
+      const destinationRole =
+        row?.role === "employer" || row?.role === "candidate"
+          ? row.role
+          : selectedRole;
+
+      router.replace(getDashboardPath(destinationRole));
       router.refresh();
     });
   }

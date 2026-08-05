@@ -31,5 +31,5 @@ export async function switchDemoRole(role: UserRole) {
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/login");
+  redirect("/");
 }

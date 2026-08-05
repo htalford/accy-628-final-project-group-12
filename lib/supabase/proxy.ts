@@ -23,9 +23,14 @@ function copyCookies(from: NextResponse, to: NextResponse) {
 export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // Public marketing pages skip auth work (login handled below for bypass).
-  const isLoginRoute = pathname === "/login" || pathname === "/signup";
-  if (isPublicPath(pathname) && !isLoginRoute) {
+  // Auth forms must stay interactive — never auto-login / force employer here.
+  const isAuthFormRoute =
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname === "/careers/login";
+
+  // Public marketing pages skip auth work.
+  if (isPublicPath(pathname) && !isAuthFormRoute) {
     return NextResponse.next({ request });
   }
 
@@ -64,8 +69,8 @@ export async function updateSession(request: NextRequest) {
   let isAuthenticated = typeof authId === "string" && authId.length > 0;
   let justSignedInViaBypass = false;
 
-  // Dev/demo: auto sign-in as demo employer so Client Portal works without the form.
-  if (!isAuthenticated && isAuthBypassEnabled()) {
+  // Dev/demo: auto sign-in for protected routes only (never on login/signup forms).
+  if (!isAuthenticated && isAuthBypassEnabled() && !isAuthFormRoute) {
     const password = process.env.DEMO_PASSWORD;
     if (password) {
       const { data: signedIn, error } = await supabase.auth.signInWithPassword({
@@ -80,13 +85,9 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // After programatic sign-in, redirect so App Router cookies() pick up the session.
+  // After programmatic sign-in, redirect so App Router cookies() pick up the session.
   if (justSignedInViaBypass) {
     const url = request.nextUrl.clone();
-    if (isLoginRoute) {
-      url.pathname = getDashboardPath("employer");
-      url.search = "";
-    }
     const redirect = NextResponse.redirect(url);
     return copyCookies(supabaseResponse, redirect);
   }
@@ -106,22 +107,23 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (isLoginRoute && isAuthenticated) {
+  if (isAuthFormRoute && isAuthenticated) {
     const { data: appUser } = await supabase
       .from("users")
-      .select("role")
+      .select("role, email")
       .eq("auth_id", authId)
       .maybeSingle();
 
     if (appUser?.role) {
       const url = request.nextUrl.clone();
       url.pathname = getDashboardPath(appUser.role as UserRole);
+      url.search = "";
       return NextResponse.redirect(url);
     }
   }
 
-  // Public login/signup with no session: fall through to the page.
-  if (isLoginRoute && !isAuthenticated) {
+  // Public auth forms with no session: show the page.
+  if (isAuthFormRoute && !isAuthenticated) {
     return supabaseResponse;
   }
 
