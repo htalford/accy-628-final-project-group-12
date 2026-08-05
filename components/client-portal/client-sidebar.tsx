@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   Briefcase,
@@ -15,6 +16,8 @@ import {
   LayoutDashboard,
   Menu,
   MessagesSquare,
+  Pin,
+  PinOff,
   Receipt,
   UserCog,
   UserRound,
@@ -39,14 +42,62 @@ const ICONS = {
   "user-cog": UserCog,
 } as const;
 
+const CLIENT_DASHBOARD = "/client/dashboard";
+const CLIENT_CANDIDATES = "/client/candidates";
+const CLIENT_PIN_KEY = "cf-client-nav-pins";
+
+/** Default: Dashboard then Candidates, then remaining nav order. */
+const DEFAULT_CLIENT_PINS = [CLIENT_DASHBOARD, CLIENT_CANDIDATES];
+
+function readClientPins(): string[] {
+  if (typeof window === "undefined") return [...DEFAULT_CLIENT_PINS];
+  try {
+    const raw = window.localStorage.getItem(CLIENT_PIN_KEY);
+    if (!raw) return [...DEFAULT_CLIENT_PINS];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [...DEFAULT_CLIENT_PINS];
+    const hrefs = parsed.filter((v): v is string => typeof v === "string");
+    return hrefs.length > 0 ? hrefs : [...DEFAULT_CLIENT_PINS];
+  } catch {
+    return [...DEFAULT_CLIENT_PINS];
+  }
+}
+
+function orderClientNav(items: NavItem[], pinnedHrefs: string[]) {
+  const byHref = new Map(items.map((item) => [item.href, item]));
+  const pinnedSet = new Set(pinnedHrefs);
+
+  const pinned: NavItem[] = [];
+  // Keep Dashboard first when pinned, then Candidates, then other pins.
+  for (const preferred of [CLIENT_DASHBOARD, CLIENT_CANDIDATES]) {
+    if (pinnedSet.has(preferred) && byHref.has(preferred)) {
+      pinned.push(byHref.get(preferred)!);
+    }
+  }
+  for (const href of pinnedHrefs) {
+    if (href === CLIENT_DASHBOARD || href === CLIENT_CANDIDATES) continue;
+    const item = byHref.get(href);
+    if (item) pinned.push(item);
+  }
+
+  const unpinned = items.filter((item) => !pinnedSet.has(item.href));
+  return { pinned, unpinned };
+}
+
 function NavLink({
   item,
   collapsed,
   onNavigate,
+  pinned,
+  showPinControls,
+  onTogglePin,
 }: {
   item: NavItem;
   collapsed: boolean;
   onNavigate?: () => void;
+  pinned?: boolean;
+  showPinControls?: boolean;
+  onTogglePin?: () => void;
 }) {
   const pathname = usePathname();
   const active =
@@ -55,21 +106,42 @@ function NavLink({
     ICONS[item.icon as keyof typeof ICONS] ?? LayoutDashboard;
 
   return (
-    <Link
-      href={item.href}
-      title={item.label}
-      onClick={onNavigate}
-      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-        collapsed ? "justify-center px-2" : ""
-      } ${
-        active
-          ? "bg-[var(--cf-accent)]/20 text-white"
-          : "text-white/70 hover:bg-white/10 hover:text-white"
+    <div
+      className={`group flex items-center gap-0.5 rounded-lg ${
+        active ? "bg-[var(--cf-accent)]/20" : "hover:bg-white/10"
       }`}
     >
-      <Icon className="h-4 w-4 shrink-0" aria-hidden />
-      {!collapsed ? <span>{item.label}</span> : null}
-    </Link>
+      <Link
+        href={item.href}
+        title={item.label}
+        onClick={onNavigate}
+        className={`flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-sm font-medium transition ${
+          collapsed ? "justify-center px-2" : ""
+        } ${active ? "text-white" : "text-white/70 group-hover:text-white"}`}
+      >
+        <Icon className="h-4 w-4 shrink-0" aria-hidden />
+        {!collapsed ? <span className="truncate">{item.label}</span> : null}
+      </Link>
+      {showPinControls && onTogglePin && !collapsed ? (
+        <button
+          type="button"
+          onClick={onTogglePin}
+          title={pinned ? `Unpin ${item.label}` : `Pin ${item.label}`}
+          aria-label={pinned ? `Unpin ${item.label}` : `Pin ${item.label}`}
+          className={`mr-1 rounded p-1.5 transition ${
+            pinned
+              ? "text-[var(--cf-accent)] opacity-100"
+              : "text-white/40 opacity-0 group-hover:opacity-100 hover:text-white"
+          }`}
+        >
+          {pinned ? (
+            <Pin className="h-3.5 w-3.5 fill-current" aria-hidden />
+          ) : (
+            <PinOff className="h-3.5 w-3.5" aria-hidden />
+          )}
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -85,6 +157,49 @@ export function ClientSidebar({
   onMobileClose: () => void;
 }) {
   const items = getNavForRole("employer");
+  const [pinnedHrefs, setPinnedHrefs] = useState<string[]>([
+    ...DEFAULT_CLIENT_PINS,
+  ]);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    setPinnedHrefs(readClientPins());
+    setReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    window.localStorage.setItem(CLIENT_PIN_KEY, JSON.stringify(pinnedHrefs));
+  }, [pinnedHrefs, ready]);
+
+  const { pinned, unpinned } = useMemo(
+    () => orderClientNav(items, pinnedHrefs),
+    [items, pinnedHrefs],
+  );
+
+  function togglePin(href: string) {
+    setPinnedHrefs((prev) => {
+      if (prev.includes(href)) {
+        // Keep at least Dashboard in the pinned list when unpinning others.
+        const next = prev.filter((h) => h !== href);
+        return next.length > 0 ? next : [CLIENT_DASHBOARD];
+      }
+      if (href === CLIENT_CANDIDATES) {
+        // Insert Candidates right after Dashboard when present.
+        const without = prev.filter((h) => h !== href);
+        const dashIdx = without.indexOf(CLIENT_DASHBOARD);
+        if (dashIdx >= 0) {
+          return [
+            ...without.slice(0, dashIdx + 1),
+            CLIENT_CANDIDATES,
+            ...without.slice(dashIdx + 1),
+          ];
+        }
+        return [CLIENT_CANDIDATES, ...without];
+      }
+      return [...prev, href];
+    });
+  }
 
   const rail = (
     <aside
@@ -141,21 +256,56 @@ export function ClientSidebar({
         </div>
       </div>
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
-        {items.map((item) => (
-          <NavLink
-            key={item.href}
-            item={item}
-            collapsed={collapsed}
-            onNavigate={onMobileClose}
-          />
-        ))}
+        {pinned.length > 0 ? (
+          <div className="mb-1">
+            {!collapsed ? (
+              <p className="px-3 pb-1 text-[10px] font-semibold tracking-[0.14em] text-white/35 uppercase">
+                Pinned
+              </p>
+            ) : null}
+            <div className="flex flex-col gap-0.5">
+              {pinned.map((item) => (
+                <NavLink
+                  key={item.href}
+                  item={item}
+                  collapsed={collapsed}
+                  pinned
+                  showPinControls
+                  onTogglePin={() => togglePin(item.href)}
+                  onNavigate={onMobileClose}
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {unpinned.length > 0 ? (
+          <div className={pinned.length > 0 ? "mt-2" : undefined}>
+            {!collapsed && pinned.length > 0 ? (
+              <p className="px-3 pb-1 text-[10px] font-semibold tracking-[0.14em] text-white/35 uppercase">
+                More
+              </p>
+            ) : null}
+            <div className="flex flex-col gap-0.5">
+              {unpinned.map((item) => (
+                <NavLink
+                  key={item.href}
+                  item={item}
+                  collapsed={collapsed}
+                  showPinControls
+                  onTogglePin={() => togglePin(item.href)}
+                  onNavigate={onMobileClose}
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
       </nav>
       <div
         className={`border-t border-white/10 py-3 text-[10px] text-white/40 ${
           collapsed ? "px-1 text-center" : "px-4"
         }`}
       >
-        {collapsed ? "G12" : "ACCY 628 · Group 12"}
+        {collapsed ? "G12" : "Hover a tab to pin or unpin"}
       </div>
     </aside>
   );

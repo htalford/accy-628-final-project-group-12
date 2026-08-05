@@ -6,6 +6,7 @@ import {
   ContractLink,
   PayrollEmployeeLink,
 } from "@/components/accounting/entity-links";
+import { ContractPinCell } from "@/components/accounting/contract-pin-cell";
 import { getContracts } from "@/lib/accounting/queries";
 import {
   moneyExact,
@@ -35,7 +36,10 @@ export default async function ContractsPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Contracts" />
+      <PageHeader
+        title="Contracts"
+        description="Pin a contract to keep it in the sidebar for quick access."
+      />
       <ContractsToolbar />
       <DataTable
         rows={filtered}
@@ -99,6 +103,18 @@ export default async function ContractsPage({
               <StatusBadge
                 label={placementStatusLabel(row.status)}
                 tone={statusTone(row.status)}
+              />
+            ),
+          },
+          {
+            key: "pin",
+            header: "Pin",
+            interactive: true,
+            render: (row) => (
+              <ContractPinCell
+                contractId={row.id}
+                employeeName={row.employeeName}
+                clientName={row.clientName}
               />
             ),
           },

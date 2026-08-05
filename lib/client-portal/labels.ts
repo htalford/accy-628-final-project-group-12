@@ -75,8 +75,31 @@ export function formatDate(date: string | null | undefined): string {
   return d;
 }
 
+/**
+ * Same display number accounting uses for contracts (shared placements table).
+ * Display-only — routes still use the full placement UUID.
+ */
 export function shortPlacementNumber(id: string): string {
-  return `PL-${id.replace(/-/g, "").slice(-4).toUpperCase()}`;
+  const raw = id.replace(/-/g, "").toLowerCase();
+  let hash = 2166136261;
+  for (let i = 0; i < raw.length; i++) {
+    hash ^= raw.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const n = (hash >>> 0) % 100_000_000;
+  return String(n).padStart(8, "0");
+}
+
+/** Position / role title for a placement (contracts & employees). */
+export function placementPositionTitle(
+  title: string | null | undefined,
+  placementType?: string | null,
+): string {
+  const trimmed = title?.trim();
+  if (trimmed) return trimmed;
+  if (placementType === "permanent") return "Permanent Placement";
+  if (placementType === "temp") return "Temporary Assignment";
+  return "Assignment";
 }
 
 export function shortInvoiceNumber(id: string): string {

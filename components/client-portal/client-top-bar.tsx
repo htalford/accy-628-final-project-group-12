@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Bell,
   ChevronDown,
@@ -41,20 +41,25 @@ function pageTitleFromPath(pathname: string): string {
   return "Client Portal";
 }
 
-function SearchHitLink({
+function SearchHitButton({
   item,
   onSelect,
   showCategory,
 }: {
   item: ClientSearchHit;
-  onSelect: () => void;
+  onSelect: (href: string) => void;
   showCategory?: boolean;
 }) {
   return (
-    <Link
-      href={item.href}
-      onClick={onSelect}
-      className="block rounded-lg px-2 py-2 hover:bg-[var(--cf-surface)]"
+    <button
+      type="button"
+      onMouseDown={(e) => {
+        // Prevent document mousedown from closing the panel before navigation.
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onClick={() => onSelect(item.href)}
+      className="block w-full rounded-lg px-2 py-2 text-left hover:bg-[var(--cf-surface)]"
     >
       <p className="text-sm font-medium text-[var(--cf-ink)]">{item.label}</p>
       <p className="text-xs text-[var(--cf-muted)]">
@@ -62,7 +67,7 @@ function SearchHitLink({
           ? `${item.category} · ${item.sublabel}`
           : item.sublabel}
       </p>
-    </Link>
+    </button>
   );
 }
 
@@ -75,7 +80,7 @@ function DesktopSearchResults({
   query: string;
   hits: ClientSearchHit[];
   grouped: Map<ClientSearchHit["category"], ClientSearchHit[]>;
-  onSelect: () => void;
+  onSelect: (href: string) => void;
 }) {
   if (hits.length === 0) {
     return (
@@ -93,7 +98,7 @@ function DesktopSearchResults({
             {category}
           </p>
           {items.map((item) => (
-            <SearchHitLink key={item.id} item={item} onSelect={onSelect} />
+            <SearchHitButton key={item.id} item={item} onSelect={onSelect} />
           ))}
         </div>
       ))}
@@ -106,7 +111,7 @@ function MobileSearchResults({
   onSelect,
 }: {
   hits: ClientSearchHit[];
-  onSelect: () => void;
+  onSelect: (href: string) => void;
 }) {
   if (hits.length === 0) {
     return (
@@ -117,7 +122,7 @@ function MobileSearchResults({
   return (
     <>
       {hits.map((item) => (
-        <SearchHitLink
+        <SearchHitButton
           key={item.id}
           item={item}
           onSelect={onSelect}
@@ -139,6 +144,7 @@ export function ClientTopBar({
   searchIndex: ClientSearchHit[];
   onOpenMobileMenu: () => void;
 }) {
+  const router = useRouter();
   const pathname = usePathname();
   const title = useMemo(() => pageTitleFromPath(pathname), [pathname]);
 
@@ -167,9 +173,10 @@ export function ClientTopBar({
 
   const actionableCount = notifications.filter((n) => n.id !== "all-clear").length;
 
-  function clearSearch() {
+  function goToResult(href: string) {
     setSearchOpen(false);
     setQuery("");
+    router.push(href);
   }
 
   useEffect(() => {
@@ -192,6 +199,12 @@ export function ClientTopBar({
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
+
+  // Clear the search box when the route changes after a result click.
+  useEffect(() => {
+    setSearchOpen(false);
+    setQuery("");
+  }, [pathname]);
 
   return (
     <header
@@ -223,7 +236,18 @@ export function ClientTopBar({
             setSearchOpen(true);
           }}
           onFocus={() => setSearchOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setSearchOpen(false);
+              setQuery("");
+            }
+            if (e.key === "Enter" && hits[0]) {
+              e.preventDefault();
+              goToResult(hits[0].href);
+            }
+          }}
           aria-label="Global search"
+          autoComplete="off"
         />
         {searchOpen && query.trim() ? (
           <div className="absolute top-full z-40 mt-1 max-h-80 w-full overflow-y-auto rounded-xl border border-[var(--cf-border)] bg-white py-2 shadow-lg">
@@ -231,7 +255,7 @@ export function ClientTopBar({
               query={query}
               hits={hits}
               grouped={grouped}
-              onSelect={clearSearch}
+              onSelect={goToResult}
             />
           </div>
         ) : null}
@@ -359,10 +383,21 @@ export function ClientTopBar({
               placeholder="Search portal…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setSearchOpen(false);
+                  setQuery("");
+                }
+                if (e.key === "Enter" && hits[0]) {
+                  e.preventDefault();
+                  goToResult(hits[0].href);
+                }
+              }}
+              autoComplete="off"
             />
             {query.trim() ? (
               <div className="mt-2 max-h-60 overflow-y-auto">
-                <MobileSearchResults hits={hits} onSelect={clearSearch} />
+                <MobileSearchResults hits={hits} onSelect={goToResult} />
               </div>
             ) : null}
           </div>

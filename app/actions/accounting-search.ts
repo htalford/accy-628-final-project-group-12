@@ -60,7 +60,7 @@ export async function searchAccounting(query: string): Promise<SearchHit[]> {
       type: "Employee",
       id: row.id,
       label: name,
-      href: `/accounting/payroll?employee=${encodeURIComponent(name)}`,
+      href: `/accounting/timesheets?employee=${encodeURIComponent(name)}`,
     });
   }
 

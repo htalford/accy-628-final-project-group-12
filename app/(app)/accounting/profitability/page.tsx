@@ -45,29 +45,14 @@ export default async function ProfitabilityPage() {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Profit by Client">
-          <HorizontalProfitBars
-            data={data.profitByClient.map((r) => ({
-              name: r.name,
-              profit: r.profit,
-            }))}
-          />
-        </Panel>
-        <Panel title="Profit by Recruiter">
-          <p className="mb-3 text-xs text-[var(--cf-muted)]">
-            Placements are not attributed to individual recruiters in the
-            database, so this shows agency gross profit rather than an
-            allocated estimate.
-          </p>
-          <HorizontalProfitBars
-            data={data.profitByRecruiter.map((r) => ({
-              name: r.name,
-              profit: r.profit,
-            }))}
-          />
-        </Panel>
-      </div>
+      <Panel title="Profit by Client">
+        <HorizontalProfitBars
+          data={data.profitByClient.map((r) => ({
+            name: r.name,
+            profit: r.profit,
+          }))}
+        />
+      </Panel>
 
       <Panel
         title="Profit by Placement"

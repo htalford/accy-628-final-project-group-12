@@ -24,7 +24,7 @@ import {
   isApprovedTimesheet,
   isAtRiskMargin,
   isCompletedPayment,
-  isCurrentCalendarMonth,
+  isWithinLastDays,
   isOpenReceivable,
   isRecognizedInvoice,
   lineItemsBalance,
@@ -43,7 +43,7 @@ import type {
 } from "@/lib/types/database";
 
 type Named = { name: string };
-type EmpName = { first_name: string; last_name: string };
+type EmpName = { id?: string; first_name: string; last_name: string };
 
 function asOne<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null;
@@ -192,12 +192,13 @@ export async function getInvoiceById(id: string) {
   };
 }
 
-export async function getPayrollRows() {
+/** All candidate/employee timesheets (staff-visible via RLS). */
+export async function getTimesheets() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("timesheets")
     .select(
-      "id, week_ending_date, hours_regular, hours_overtime, status, placements(id, pay_rate, bill_rate, clients(name), employees(first_name, last_name))",
+      "id, week_ending_date, hours_regular, hours_overtime, status, employer_note, created_at, placements(id, pay_rate, bill_rate, clients(id, name), employees(id, first_name, last_name, email))",
     )
     .order("week_ending_date", { ascending: false });
 
@@ -208,15 +209,47 @@ export async function getPayrollRows() {
             id: string;
             pay_rate: number | null;
             bill_rate: number | null;
-            clients: Named | Named[] | null;
-            employees: EmpName | EmpName[] | null;
+            clients:
+              | { id: string; name: string }
+              | { id: string; name: string }[]
+              | null;
+            employees:
+              | {
+                  id: string;
+                  first_name: string;
+                  last_name: string;
+                  email: string;
+                }
+              | {
+                  id: string;
+                  first_name: string;
+                  last_name: string;
+                  email: string;
+                }[]
+              | null;
           }
         | {
             id: string;
             pay_rate: number | null;
             bill_rate: number | null;
-            clients: Named | Named[] | null;
-            employees: EmpName | EmpName[] | null;
+            clients:
+              | { id: string; name: string }
+              | { id: string; name: string }[]
+              | null;
+            employees:
+              | {
+                  id: string;
+                  first_name: string;
+                  last_name: string;
+                  email: string;
+                }
+              | {
+                  id: string;
+                  first_name: string;
+                  last_name: string;
+                  email: string;
+                }[]
+              | null;
           }[]
         | null,
     );
@@ -241,9 +274,12 @@ export async function getPayrollRows() {
     return {
       id: row.id as string,
       placementId: placement?.id ?? null,
+      employeeId: employee?.id ?? null,
       employeeName: employee
         ? `${employee.first_name} ${employee.last_name}`
         : "Unknown",
+      employeeEmail: employee?.email ?? null,
+      clientId: client?.id ?? null,
       assignment: client?.name ?? "Unassigned",
       weekEnding: row.week_ending_date as string,
       hoursWorked: hours,
@@ -254,8 +290,20 @@ export async function getPayrollRows() {
       grossPay,
       billAmount,
       status: row.status as string,
+      employerNote: (row.employer_note as string | null) ?? null,
+      createdAt: (row.created_at as string | null) ?? null,
     };
   });
+}
+
+/** @deprecated Prefer getTimesheets — same rows with payroll fields. */
+export async function getPayrollRows() {
+  return getTimesheets();
+}
+
+export async function getTimesheetById(id: string) {
+  const rows = await getTimesheets();
+  return rows.find((r) => r.id === id) ?? null;
 }
 
 export async function getContracts() {
@@ -569,9 +617,9 @@ export async function getDashboardData() {
   );
   const earnedRevenue = sumMoney(approvedSheets.map((t) => t.billAmount));
   const directLabor = sumMoney(approvedSheets.map((t) => t.grossPay));
-  const payrollThisMonth = sumMoney(
+  const payrollLast30Days = sumMoney(
     approvedSheets
-      .filter((t) => isCurrentCalendarMonth(t.weekEnding))
+      .filter((t) => isWithinLastDays(t.weekEnding, 30))
       .map((t) => t.grossPay),
   );
 
@@ -665,7 +713,7 @@ export async function getDashboardData() {
       billedRevenue,
       totalRevenue: billedRevenue,
       outstandingInvoices,
-      payrollThisMonth,
+      payrollLast30Days,
       directLabor,
       activeContracts,
       totalExpenses: operatingExpenses,

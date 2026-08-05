@@ -1,8 +1,8 @@
 import "server-only";
 
 import {
+  listApplicationsForClient,
   listJobRequestsForClient,
-  listSubmittalsForClient,
 } from "@/lib/client-portal/portal-data";
 import { loadClientPortalData } from "@/lib/client-portal/queries";
 import type {
@@ -21,9 +21,9 @@ export { filterSearchIndex } from "@/lib/client-portal/chrome-shared";
 /** Live bell feed + search index for employer top bar (portal data only). */
 export async function loadClientPortalChrome(): Promise<ClientPortalChrome> {
   const data = await loadClientPortalData();
-  const [jobRequests, submittals] = await Promise.all([
+  const [jobRequests, applications] = await Promise.all([
     listJobRequestsForClient(),
-    listSubmittalsForClient(),
+    listApplicationsForClient(),
   ]);
 
   const notifications: ClientNotification[] = [];
@@ -38,15 +38,15 @@ export async function loadClientPortalChrome(): Promise<ClientPortalChrome> {
     });
   }
 
-  for (const s of submittals.filter(
+  for (const a of applications.filter(
     (c) => c.stage === "submitted" || c.stage === "under_review",
   )) {
     notifications.push({
-      id: `sub-${s.id}`,
+      id: `app-${a.id}`,
       title: "Candidate awaiting review",
-      detail: `${s.candidate_name} · ${s.position_title}`,
-      time: s.updated_at.slice(0, 10),
-      href: `/client/candidates/${s.id}`,
+      detail: `${a.candidate_name} · ${a.position_title}`,
+      time: a.updated_at.slice(0, 10),
+      href: a.detail_href,
     });
   }
 
@@ -54,7 +54,7 @@ export async function loadClientPortalChrome(): Promise<ClientPortalChrome> {
     notifications.push({
       id: "all-clear",
       title: "You're all caught up",
-      detail: "No timesheets, invoices, or submittals need action.",
+      detail: "No timesheets, invoices, or candidates need action.",
       time: "Just now",
       href: "/client/dashboard",
     });
@@ -73,15 +73,22 @@ export async function loadClientPortalChrome(): Promise<ClientPortalChrome> {
       sublabel: p.title ?? p.placement_type,
       href: `/client/employees/${p.employee_id}`,
     });
+    searchIndex.push({
+      id: `ctr-${p.id}`,
+      category: "Contracts",
+      label: p.title ?? "Assignment",
+      sublabel: name,
+      href: `/client/contracts/${p.id}`,
+    });
   }
 
-  for (const s of submittals) {
+  for (const a of applications) {
     searchIndex.push({
-      id: `cand-${s.id}`,
+      id: `app-${a.id}`,
       category: "Candidates",
-      label: s.candidate_name,
-      sublabel: `${s.position_title} · ${s.stage}`,
-      href: `/client/candidates/${s.id}`,
+      label: a.candidate_name,
+      sublabel: `${a.position_title} · ${a.stage}`,
+      href: a.detail_href,
     });
   }
 
@@ -109,7 +116,7 @@ export async function loadClientPortalChrome(): Promise<ClientPortalChrome> {
     searchIndex.push({
       id: `inv-${inv.id}`,
       category: "Invoices",
-      label: `Invoice ${inv.id.slice(0, 8)}…`,
+      label: `Invoice ${inv.id.slice(0, 8)}`,
       sublabel: `$${Number(inv.amount).toFixed(2)} · ${inv.status}`,
       href: `/client/invoices/${inv.id}`,
     });

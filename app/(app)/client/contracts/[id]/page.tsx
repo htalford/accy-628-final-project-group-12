@@ -4,9 +4,11 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/client-portal/breadcrumbs";
+import { PinContractButton } from "@/components/portal-pins/pin-contract-button";
 import { getPlacementForClient } from "@/lib/client-portal/queries";
 import {
   formatMoney,
+  placementPositionTitle,
   placementStatusLabel,
   placementTypeLabel,
   seedStatusTone,
@@ -25,7 +27,7 @@ export default async function ContractDetailPage({
   const name = p.employee
     ? `${p.employee.first_name} ${p.employee.last_name}`
     : "Employee";
-  const title = p.title ?? "Assignment";
+  const title = placementPositionTitle(p.title, p.placement_type);
   const number = shortPlacementNumber(p.id);
 
   return (
@@ -38,13 +40,21 @@ export default async function ContractDetailPage({
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <PageHeader
-          title={number}
-          description={`${title} · ${name}`}
+          title={`Contract ${number}`}
+          description={`${title} · ${name} · linked to Accounting portal contract #${number}`}
         />
         <div className="flex items-center gap-2">
           <Badge tone={seedStatusTone(p.status)}>
             {placementStatusLabel(p.status)}
           </Badge>
+          <PinContractButton
+            scope="client"
+            contractId={p.id}
+            contractNumber={number}
+            employeeName={name}
+            positionTitle={title}
+            size="md"
+          />
           <Button size="sm" variant="secondary" href="/client/contracts">
             Back
           </Button>
@@ -55,10 +65,14 @@ export default async function ContractDetailPage({
         <Card>
           <CardTitle className="mb-3">Contract Summary</CardTitle>
           <p className="text-sm text-[var(--cf-ink)]">
-            Live placement for your client with role title stored on the
-            placement record.
+            Live placement record shared with accounting. Contract number and
+            billing rates match the Accounting portal for this assignment.
           </p>
           <dl className="mt-4 space-y-2 text-sm">
+            <div className="flex justify-between">
+              <dt className="text-[var(--cf-muted)]">Contract #</dt>
+              <dd className="font-mono text-xs font-medium">{number}</dd>
+            </div>
             <div className="flex justify-between">
               <dt className="text-[var(--cf-muted)]">Position title</dt>
               <dd className="font-medium">{title}</dd>

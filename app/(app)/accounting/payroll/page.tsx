@@ -1,32 +1,43 @@
 import { PageHeader } from "@/components/ui/page-header";
+import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge, statusTone } from "@/components/ui/status-badge";
 import {
   ContractLink,
   EntityLink,
   PayrollEmployeeLink,
+  TimesheetLink,
 } from "@/components/accounting/entity-links";
-import { getPayrollRows } from "@/lib/accounting/queries";
+import { getTimesheets } from "@/lib/accounting/queries";
 import { moneyExact } from "@/lib/accounting/format";
 import { PayrollToolbar } from "@/components/accounting/payroll-toolbar";
+import { timesheetsHref } from "@/lib/accounting/timesheet-links";
 
 export default async function PayrollPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string; employee?: string; status?: string }>;
+  searchParams: Promise<{
+    period?: string;
+    employee?: string;
+    status?: string;
+    from?: string;
+  }>;
 }) {
   const params = await searchParams;
-  const rows = await getPayrollRows();
+  const rows = await getTimesheets();
   const employees = [...new Set(rows.map((r) => r.employeeName))].sort();
   const periods = [...new Set(rows.map((r) => r.weekEnding))].sort().reverse();
 
   const employeeParam = params.employee
     ? decodeURIComponent(params.employee)
     : undefined;
+  const fromParam =
+    params.from && /^\d{4}-\d{2}-\d{2}$/.test(params.from) ? params.from : undefined;
 
   const filtered = rows.filter((r) => {
     if (params.period && params.period !== "all" && r.weekEnding !== params.period)
       return false;
+    if (fromParam && r.weekEnding < fromParam) return false;
     if (
       employeeParam &&
       employeeParam !== "all" &&
@@ -40,17 +51,35 @@ export default async function PayrollPage({
     return true;
   });
 
+  const sharedFilters = {
+    period: params.period,
+    employee: employeeParam,
+    status: params.status,
+  };
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Payroll" />
+      <PageHeader
+        title="Payroll"
+        actions={
+          <Button href={timesheetsHref(sharedFilters)} variant="secondary">
+            View timesheets
+          </Button>
+        }
+      />
 
       <PayrollToolbar employees={employees} periods={periods} />
 
       <DataTable
         rows={filtered}
         emptyTitle="No payroll rows"
-        emptyDescription="Approved timesheets will appear here automatically."
+        emptyDescription="Candidate timesheets feed this payroll view automatically."
         columns={[
+          {
+            key: "timesheet",
+            header: "Timesheet",
+            render: (row) => <TimesheetLink id={row.id} />,
+          },
           {
             key: "employee",
             header: "Employee Name",
@@ -79,10 +108,27 @@ export default async function PayrollPage({
               ),
           },
           {
+            key: "week",
+            header: "Week Ending",
+            render: (row) => (
+              <EntityLink
+                href={timesheetsHref({
+                  period: row.weekEnding,
+                  employee: row.employeeName,
+                })}
+              >
+                {row.weekEnding}
+              </EntityLink>
+            ),
+          },
+          {
             key: "hours",
             header: "Hours Worked",
-            render: (row) =>
-              `${row.hoursWorked} (R ${row.hoursRegular} / OT ${row.hoursOvertime})`,
+            render: (row) => (
+              <EntityLink href={`/accounting/timesheets/${row.id}`}>
+                {`${row.hoursWorked} (R ${row.hoursRegular} / OT ${row.hoursOvertime})`}
+              </EntityLink>
+            ),
           },
           {
             key: "rate",

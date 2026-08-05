@@ -54,10 +54,10 @@ export default function ApplyPage() {
         <p className="mt-8 text-sm leading-relaxed text-[var(--ot-muted)]">
           Interested in working at TalentQuest? Email{" "}
           <a
-            href="mailto:careers@talentquest.com"
+            href="mailto:recruiter@talentquest.demo"
             className="font-semibold text-[var(--ot-ocean)] hover:underline"
           >
-            careers@talentquest.com
+            recruiter@talentquest.demo
           </a>{" "}
           to get your application started.
         </p>

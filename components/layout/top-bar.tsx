@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -8,13 +9,11 @@ import {
   ChevronDown,
   LogOut,
   Menu,
-  PanelLeftClose,
-  PanelLeftOpen,
   Search,
   User,
 } from "lucide-react";
 import { signOut } from "@/app/actions/demo-switch-role";
-import { getPageTitle, ROLE_LABELS } from "@/lib/auth/roles";
+import { getDashboardPath, getPageTitle, ROLE_LABELS } from "@/lib/auth/roles";
 import { SAMPLE_NOTIFICATIONS } from "@/lib/accounting/notifications";
 import { useShell } from "@/components/layout/shell-context";
 import type { AppUser } from "@/lib/types/database";
@@ -29,8 +28,7 @@ type SearchHit = {
 
 export function TopBar({ user }: { user: AppUser }) {
   const pathname = usePathname();
-  const title = getPageTitle(pathname);
-  const { collapsed, toggleCollapsed, toggleMobileOpen } = useShell();
+  const { toggleMobileOpen } = useShell();
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -79,27 +77,21 @@ export function TopBar({ user }: { user: AppUser }) {
       >
         <Menu className="h-4 w-4" />
       </button>
-      <button
-        type="button"
-        className="hidden rounded-md border border-[var(--cf-border)] p-2 text-[var(--cf-ink)] hover:bg-[var(--cf-surface)] lg:inline-flex"
-        onClick={toggleCollapsed}
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      >
-        {collapsed ? (
-          <PanelLeftOpen className="h-4 w-4" />
-        ) : (
-          <PanelLeftClose className="h-4 w-4" />
-        )}
-      </button>
 
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-[var(--cf-ink)]">
-          {title}
-        </p>
-        <p className="hidden text-xs text-[var(--cf-muted)] sm:block">
-          TalentQuest
-        </p>
-      </div>
+      <Link
+        href={getDashboardPath(user.role)}
+        className="flex min-w-0 shrink-0 items-center"
+        title="TalentQuest"
+      >
+        <Image
+          src="/talentquest-logo.png"
+          alt="TalentQuest"
+          width={168}
+          height={118}
+          className="h-8 w-auto"
+          priority
+        />
+      </Link>
 
       <div className="relative ml-auto min-w-0 flex-1 max-w-md" ref={searchRef}>
         <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[var(--cf-muted)]" />

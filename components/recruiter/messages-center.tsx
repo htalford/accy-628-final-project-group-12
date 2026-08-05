@@ -1,15 +1,23 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { sendEmployerMessage, sendRecruiterMessage } from "@/app/actions/recruiter";
+import { useRouter } from "next/navigation";
+import {
+  sendAccountingStaffMessage,
+  sendEmployerMessage,
+  sendRecruiterMessage,
+} from "@/app/actions/recruiter";
 import type { RecruiterMessageThread } from "@/lib/recruiter/types";
+
+type Filter = "all" | "employer" | "candidate" | "accounting";
 
 export function MessagesCenter({
   threads,
 }: {
   threads: RecruiterMessageThread[];
 }) {
-  const [filter, setFilter] = useState<"all" | "employer" | "candidate">("all");
+  const router = useRouter();
+  const [filter, setFilter] = useState<Filter>("all");
   const [activeId, setActiveId] = useState(threads[0]?.id ?? "");
   const [draft, setDraft] = useState("");
   const [subject, setSubject] = useState("");
@@ -36,25 +44,27 @@ export function MessagesCenter({
       ) : null}
       <div className="grid min-h-[28rem] lg:grid-cols-[18rem_1fr]">
         <aside className="border-b border-[var(--cf-border)] lg:border-r lg:border-b-0">
-          <div className="flex gap-1 border-b border-[var(--cf-border)] p-3">
-            {(["all", "employer", "candidate"] as const).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize ${
-                  filter === f
-                    ? "bg-[var(--cf-navy)] text-white"
-                    : "text-[var(--cf-muted)] hover:bg-[var(--cf-surface)]"
-                }`}
-              >
-                {f}
-              </button>
-            ))}
+          <div className="flex flex-wrap gap-1 border-b border-[var(--cf-border)] p-3">
+            {(["all", "accounting", "employer", "candidate"] as const).map(
+              (f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setFilter(f)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize ${
+                    filter === f
+                      ? "bg-[var(--cf-navy)] text-white"
+                      : "text-[var(--cf-muted)] hover:bg-[var(--cf-surface)]"
+                  }`}
+                >
+                  {f}
+                </button>
+              ),
+            )}
           </div>
           <ul className="max-h-[24rem] overflow-y-auto">
             {filtered.map((t) => (
-              <li key={t.id}>
+              <li key={`${t.participantType}-${t.id}`}>
                 <button
                   type="button"
                   onClick={() => setActiveId(t.id)}
@@ -145,15 +155,13 @@ export function MessagesCenter({
                                 ? result.message ?? "Sent"
                                 : result.error ?? "Failed",
                             );
+                            if (result.ok) router.refresh();
                           });
                         }}
                       >
                         Send
                       </button>
                     </div>
-                    <p className="text-[11px] text-[var(--cf-muted)]">
-                      Attachment support will connect to storage in a later release.
-                    </p>
                   </>
                 ) : (
                   <>
@@ -162,7 +170,11 @@ export function MessagesCenter({
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
                         rows={2}
-                        placeholder="Reply to employer…"
+                        placeholder={
+                          active.participantType === "accounting"
+                            ? "Reply to accounting…"
+                            : "Reply to employer…"
+                        }
                         className="min-h-[2.5rem] flex-1 rounded-lg border border-[var(--cf-border)] px-3 py-2 text-sm"
                       />
                       <button
@@ -173,15 +185,22 @@ export function MessagesCenter({
                           const body = draft.trim();
                           setDraft("");
                           startTransition(async () => {
-                            const result = await sendEmployerMessage({
-                              threadId: active.id,
-                              body,
-                            });
+                            const result =
+                              active.participantType === "accounting"
+                                ? await sendAccountingStaffMessage({
+                                    threadId: active.id,
+                                    body,
+                                  })
+                                : await sendEmployerMessage({
+                                    threadId: active.id,
+                                    body,
+                                  });
                             setNotice(
                               result.ok
                                 ? result.message ?? "Sent"
                                 : result.error ?? "Failed",
                             );
+                            if (result.ok) router.refresh();
                           });
                         }}
                       >
@@ -189,7 +208,9 @@ export function MessagesCenter({
                       </button>
                     </div>
                     <p className="text-[11px] text-[var(--cf-muted)]">
-                      Synced with Client Portal employer conversations.
+                      {active.participantType === "accounting"
+                        ? "Synced with Accounting Portal staff conversations."
+                        : "Synced with Client Portal employer conversations."}
                     </p>
                   </>
                 )}

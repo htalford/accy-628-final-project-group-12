@@ -42,7 +42,9 @@ import {
 } from "@/lib/auth/roles";
 import type { UserRole } from "@/lib/types/database";
 import type { NavIcon, NavItem } from "@/lib/auth/roles";
-import { useShell } from "@/components/layout/shell-context";
+import { useSidebarLayout } from "@/components/layout/shell-context";
+import { usePinnedTasks } from "@/components/portal-pins/use-pinned-tasks";
+import type { PinnedTask } from "@/lib/portal-pins";
 
 const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   "layout-dashboard": LayoutDashboard,
@@ -226,12 +228,77 @@ function NavLink({
   );
 }
 
+function AccountingPinnedTaskLink({
+  task,
+  collapsed,
+  onNavigate,
+  onUnpin,
+}: {
+  task: PinnedTask;
+  collapsed: boolean;
+  onNavigate?: () => void;
+  onUnpin: () => void;
+}) {
+  const pathname = usePathname();
+  const active =
+    pathname === task.href || pathname.startsWith(`${task.href}/`);
+
+  return (
+    <div
+      className={`group flex items-center gap-0.5 rounded-md ${
+        active ? "bg-[var(--cf-accent)]/15" : "hover:bg-white/5"
+      }`}
+    >
+      <Link
+        href={task.href}
+        title={task.sublabel ? `${task.label} · ${task.sublabel}` : task.label}
+        onClick={onNavigate}
+        className={`flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-sm font-medium transition ${
+          collapsed ? "justify-center px-2" : ""
+        } ${active ? "text-white" : "text-white/70 group-hover:text-white"}`}
+      >
+        <Pin className="h-3.5 w-3.5 shrink-0 fill-current text-[var(--cf-accent)]" />
+        {!collapsed ? (
+          <span className="min-w-0">
+            <span className="block truncate">{task.label}</span>
+            {task.sublabel ? (
+              <span className="block truncate text-[10px] font-normal text-white/40">
+                {task.sublabel}
+              </span>
+            ) : null}
+          </span>
+        ) : null}
+      </Link>
+      {!collapsed ? (
+        <button
+          type="button"
+          onClick={onUnpin}
+          title={`Unpin ${task.label}`}
+          aria-label={`Unpin ${task.label}`}
+          className="mr-1 rounded p-1.5 text-white/35 opacity-0 transition group-hover:opacity-100 hover:text-white"
+        >
+          <X className="h-3.5 w-3.5" aria-hidden />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export function Sidebar({ role }: { role: UserRole }) {
   const items = getNavForRole(role);
   const isCandidate = role === "candidate";
   const isRecruiter = role === "recruiter";
+  const isAccounting = role === "accounting";
   const usesTabPins = isCandidate || isRecruiter;
-  const { collapsed, mobileOpen, setMobileOpen } = useShell();
+  const homePath = getDashboardPath(role);
+  const {
+    showCollapsed,
+    mobileOpen,
+    setMobileOpen,
+    pinned: sidebarPinned,
+    togglePinned,
+    canTogglePin,
+  } = useSidebarLayout(homePath);
 
   const dashboardHref = isRecruiter
     ? RECRUITER_DASHBOARD
@@ -240,6 +307,8 @@ export function Sidebar({ role }: { role: UserRole }) {
 
   const [pinnedHrefs, setPinnedHrefs] = useState<string[]>([dashboardHref]);
   const [ready, setReady] = useState(!usesTabPins);
+  const { tasks: accountingPins, unpin: unpinAccounting } =
+    usePinnedTasks("accounting");
 
   useEffect(() => {
     if (!usesTabPins) return;
@@ -281,51 +350,138 @@ export function Sidebar({ role }: { role: UserRole }) {
     });
   }
 
-  const showCollapsed = collapsed && !mobileOpen;
+  const navCollapsed = showCollapsed && !mobileOpen;
+  // Recruiter uses per-tab pins; hide whole-sidebar pin control for that role.
+  const showSidebarPinControl = !isRecruiter && canTogglePin;
+  const showHomeLockedPin = !isRecruiter && !canTogglePin;
+
+  const accountingPinnedSection =
+    isAccounting && accountingPins.length > 0 ? (
+      <div className="mb-2">
+        {!navCollapsed ? (
+          <p className="px-3 pb-1 text-[10px] font-semibold tracking-[0.14em] text-white/35 uppercase">
+            Pinned tasks
+          </p>
+        ) : null}
+        <div className="flex flex-col gap-0.5">
+          {accountingPins.map((task) => (
+            <AccountingPinnedTaskLink
+              key={task.id}
+              task={task}
+              collapsed={navCollapsed}
+              onNavigate={() => setMobileOpen(false)}
+              onUnpin={() => unpinAccounting(task.id)}
+            />
+          ))}
+        </div>
+      </div>
+    ) : null;
 
   const nav = (
     <>
       <div
-        className={`border-b border-white/10 ${showCollapsed ? "px-2 py-3" : "px-4 py-4"}`}
+        className={`relative border-b border-white/10 ${navCollapsed ? "px-2 py-3" : "px-4 py-4"}`}
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className={showCollapsed ? "w-full" : "min-w-0 flex-1"}>
-            <Link
-              href={getDashboardPath(role)}
-              className={`block rounded-md bg-white ${showCollapsed ? "p-1.5" : "p-2"}`}
-              title="TalentQuest"
-            >
-              <Image
-                src="/talentquest-logo.png"
-                alt="TalentQuest"
-                width={168}
-                height={118}
-                className={`w-auto ${showCollapsed ? "mx-auto h-8" : "h-11"}`}
-                priority
-              />
-            </Link>
-            {!showCollapsed ? (
-              <p className="mt-2 text-sm text-white/60">
-                {ROLE_LABELS[role]} portal
-              </p>
-            ) : null}
-          </div>
+        <button
+          type="button"
+          className="absolute top-3 right-3 rounded-md p-1 text-white/60 hover:bg-white/10 hover:text-white lg:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-label="Close menu"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        {!navCollapsed && showSidebarPinControl ? (
           <button
             type="button"
-            className="rounded-md p-1 text-white/60 hover:bg-white/10 hover:text-white lg:hidden"
-            onClick={() => setMobileOpen(false)}
-            aria-label="Close menu"
+            className={`absolute top-3 right-3 hidden rounded-md p-1.5 transition lg:inline-flex ${
+              sidebarPinned
+                ? "text-[var(--cf-accent)] hover:bg-white/10"
+                : "text-white/50 hover:bg-white/10 hover:text-white"
+            }`}
+            onClick={togglePinned}
+            aria-label={sidebarPinned ? "Unpin sidebar" : "Pin sidebar"}
+            title={
+              sidebarPinned
+                ? "Unpin sidebar"
+                : "Pin sidebar open on all pages"
+            }
           >
-            <X className="h-4 w-4" />
+            <Pin
+              className={`h-4 w-4 ${sidebarPinned ? "fill-current" : ""}`}
+              aria-hidden
+            />
           </button>
+        ) : null}
+        {!navCollapsed && showHomeLockedPin ? (
+          <span
+            className="absolute top-3 right-3 hidden rounded-md p-1.5 text-[var(--cf-accent)] lg:inline-flex"
+            title="Sidebar stays open on Home"
+            aria-label="Sidebar pinned on Home"
+          >
+            <Pin className="h-4 w-4 fill-current" aria-hidden />
+          </span>
+        ) : null}
+        <div className="flex w-full flex-col items-center text-center">
+          <Link
+            href={getDashboardPath(role)}
+            className={`inline-flex rounded-md bg-white ${navCollapsed ? "p-1.5" : "p-2"}`}
+            title="TalentQuest"
+          >
+            <Image
+              src="/talentquest-logo.png"
+              alt="TalentQuest"
+              width={168}
+              height={118}
+              className={`mx-auto w-auto ${navCollapsed ? "h-8" : "h-11"}`}
+              priority
+            />
+          </Link>
+          {!navCollapsed ? (
+            <p className="mt-2 text-sm text-white/60">
+              {ROLE_LABELS[role]} Portal
+            </p>
+          ) : null}
+          {navCollapsed ? (
+            showSidebarPinControl ? (
+              <button
+                type="button"
+                className={`mt-2 hidden rounded-md p-1.5 transition lg:inline-flex ${
+                  sidebarPinned
+                    ? "text-[var(--cf-accent)] hover:bg-white/10"
+                    : "text-white/50 hover:bg-white/10 hover:text-white"
+                }`}
+                onClick={togglePinned}
+                aria-label={sidebarPinned ? "Unpin sidebar" : "Pin sidebar"}
+                title={
+                  sidebarPinned
+                    ? "Unpin sidebar"
+                    : "Pin sidebar open on all pages"
+                }
+              >
+                <Pin
+                  className={`h-4 w-4 ${sidebarPinned ? "fill-current" : ""}`}
+                  aria-hidden
+                />
+              </button>
+            ) : showHomeLockedPin ? (
+              <span
+                className="mt-2 hidden rounded-md p-1.5 text-[var(--cf-accent)] lg:inline-flex"
+                title="Sidebar stays open on Home"
+                aria-label="Sidebar pinned on Home"
+              >
+                <Pin className="h-4 w-4 fill-current" aria-hidden />
+              </span>
+            ) : null
+          ) : null}
         </div>
       </div>
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+        {accountingPinnedSection}
         {usesTabPins ? (
           <>
             {pinned.length > 0 ? (
               <div className="mb-1">
-                {!showCollapsed ? (
+                {!navCollapsed ? (
                   <p className="px-3 pb-1 text-[10px] font-semibold tracking-[0.14em] text-white/35 uppercase">
                     Pinned
                   </p>
@@ -335,7 +491,7 @@ export function Sidebar({ role }: { role: UserRole }) {
                     <NavLink
                       key={item.href}
                       item={item}
-                      collapsed={showCollapsed}
+                      collapsed={navCollapsed}
                       pinned
                       showPinControls
                       pinLocked={
@@ -350,7 +506,7 @@ export function Sidebar({ role }: { role: UserRole }) {
             ) : null}
             {unpinned.length > 0 ? (
               <div className={pinned.length > 0 ? "mt-2" : undefined}>
-                {!showCollapsed && pinned.length > 0 ? (
+                {!navCollapsed && pinned.length > 0 ? (
                   <p className="px-3 pb-1 text-[10px] font-semibold tracking-[0.14em] text-white/35 uppercase">
                     More
                   </p>
@@ -360,7 +516,7 @@ export function Sidebar({ role }: { role: UserRole }) {
                     <NavLink
                       key={item.href}
                       item={item}
-                      collapsed={showCollapsed}
+                      collapsed={navCollapsed}
                       showPinControls
                       onTogglePin={() => togglePin(item.href)}
                       onNavigate={() => setMobileOpen(false)}
@@ -371,21 +527,30 @@ export function Sidebar({ role }: { role: UserRole }) {
             ) : null}
           </>
         ) : (
-          items.map((item) => (
-            <NavLink
-              key={item.href}
-              item={item}
-              collapsed={showCollapsed}
-              onNavigate={() => setMobileOpen(false)}
-            />
-          ))
+          <>
+            {isAccounting && accountingPins.length > 0 && !navCollapsed ? (
+              <p className="px-3 pb-1 text-[10px] font-semibold tracking-[0.14em] text-white/35 uppercase">
+                Menu
+              </p>
+            ) : null}
+            {items.map((item) => (
+              <NavLink
+                key={item.href}
+                item={item}
+                collapsed={navCollapsed}
+                onNavigate={() => setMobileOpen(false)}
+              />
+            ))}
+          </>
         )}
       </nav>
-      {!showCollapsed ? (
+      {!navCollapsed ? (
         <div className="border-t border-white/10 px-4 py-3 text-xs text-white/40">
           {usesTabPins
-            ? "Hover a tab to pin or unpin"
-            : "ACCY 628 · Group 12"}
+            ? "Use the pin icon on a tab to pin or unpin"
+            : isAccounting
+              ? "Pin contracts from the Contracts page"
+              : "ACCY 628 · Group 12"}
         </div>
       ) : null}
     </>
@@ -412,7 +577,7 @@ export function Sidebar({ role }: { role: UserRole }) {
 
       <aside
         className={`hidden shrink-0 flex-col bg-[var(--cf-navy)] text-white transition-[width] lg:flex ${
-          collapsed ? "w-[4.25rem]" : "w-60"
+          showCollapsed ? "w-[4.25rem]" : "w-60"
         }`}
       >
         {nav}
