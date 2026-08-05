@@ -17,15 +17,35 @@ import { signOut } from "@/app/actions/demo-switch-role";
 import { getPageTitle, ROLE_LABELS } from "@/lib/auth/roles";
 import { SAMPLE_NOTIFICATIONS } from "@/lib/accounting/notifications";
 import { useShell } from "@/components/layout/shell-context";
-import type { AppUser } from "@/lib/types/database";
-import { searchAccounting } from "@/app/actions/accounting-search";
+import type { AppUser, UserRole } from "@/lib/types/database";
+import {
+  searchAccounting,
+  type SearchHit,
+} from "@/app/actions/accounting-search";
+import { searchCandidate } from "@/app/actions/candidate-search";
+import { searchRecruiter } from "@/app/actions/recruiter-search";
 
-type SearchHit = {
-  type: string;
-  id: string;
-  label: string;
-  href: string;
-};
+function searchPlaceholder(role: UserRole): string {
+  switch (role) {
+    case "candidate":
+      return "Search applications, jobs, contracts…";
+    case "recruiter":
+      return "Search candidates, jobs, clients…";
+    case "accounting":
+      return "Search clients, invoices, contracts…";
+    default:
+      return "Search…";
+  }
+}
+
+async function searchForRole(
+  role: UserRole,
+  query: string,
+): Promise<SearchHit[]> {
+  if (role === "candidate") return searchCandidate(query);
+  if (role === "recruiter") return searchRecruiter(query);
+  return searchAccounting(query);
+}
 
 export function TopBar({ user }: { user: AppUser }) {
   const pathname = usePathname();
@@ -38,6 +58,7 @@ export function TopBar({ user }: { user: AppUser }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const searchRef = useRef<HTMLDivElement>(null);
+  const placeholder = searchPlaceholder(user.role);
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -56,13 +77,13 @@ export function TopBar({ user }: { user: AppUser }) {
     }
     const handle = setTimeout(() => {
       startTransition(async () => {
-        const results = await searchAccounting(query.trim());
+        const results = await searchForRole(user.role, query.trim());
         setHits(results);
         setSearchOpen(true);
       });
     }, 250);
     return () => clearTimeout(handle);
-  }, [query]);
+  }, [query, user.role]);
 
   const profileHref = useMemo(() => {
     if (user.role === "accounting") return "/accounting/profile";
@@ -108,7 +129,7 @@ export function TopBar({ user }: { user: AppUser }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => hits.length > 0 && setSearchOpen(true)}
-          placeholder="Search clients, invoices, contracts…"
+          placeholder={placeholder}
           className="w-full rounded-md border border-[var(--cf-border)] bg-[var(--cf-surface)] py-2 pr-3 pl-9 text-sm outline-none ring-[var(--cf-accent)] focus:bg-white focus:ring-2"
         />
         {searchOpen && (hits.length > 0 || pending) ? (
