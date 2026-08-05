@@ -36,8 +36,8 @@ export function ProfileCompletionCard({
           <ul className="mt-2 space-y-1.5 text-sm text-[var(--cf-muted)]">
             {missing.map((item) => (
               <li key={item.id} className="flex items-center gap-2">
-                <span className="text-[var(--cf-accent)]" aria-hidden>
-                  ✓
+                <span className="font-semibold text-red-600" aria-hidden>
+                  ✕
                 </span>
                 {item.label}
               </li>
