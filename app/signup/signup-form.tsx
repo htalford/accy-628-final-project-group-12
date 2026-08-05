@@ -7,7 +7,7 @@ import { getDashboardPath } from "@/lib/auth/roles";
 import type { UserRole } from "@/lib/types/database";
 
 const SIGNUP_OPTIONS: { value: UserRole; label: string }[] = [
-  { value: "employer", label: "a Employer/Recruiter" },
+  { value: "employer", label: "Looking to hire" },
   { value: "candidate", label: "Looking for work" },
 ];
 
