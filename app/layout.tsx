@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ACCY 628 — Group 12",
-  description: "ACCY 628 Final Project — Group 12",
+  title: "ContractFlow · ACCY 628 Group 12",
+  description:
+    "Contract-to-cash management for staffing agencies — ACCY 628 Final Project, Group 12",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

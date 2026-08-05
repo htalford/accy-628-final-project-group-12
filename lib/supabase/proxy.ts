@@ -1,5 +1,19 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  getDashboardPath,
+  isRolePath,
+  pathRequiresAuth,
+  USER_ROLES,
+} from "@/lib/auth/roles";
+import type { UserRole } from "@/lib/types/database";
+
+function roleFromPath(pathname: string): UserRole | null {
+  for (const role of USER_ROLES) {
+    if (isRolePath(pathname, role)) return role;
+  }
+  return null;
+}
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -32,9 +46,46 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // Do not run code between createServerClient and getClaims().
-  // Removing getClaims() can cause users to be randomly logged out.
-  await supabase.auth.getClaims();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const authId = claimsData?.claims?.sub;
+  const pathname = request.nextUrl.pathname;
+  const isAuthenticated = typeof authId === "string" && authId.length > 0;
+
+  if (pathRequiresAuth(pathname) && !isAuthenticated) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("next", pathname);
+    return NextResponse.redirect(url);
+  }
+
+  if (pathname === "/login" && isAuthenticated) {
+    const { data: appUser } = await supabase
+      .from("users")
+      .select("role")
+      .eq("auth_id", authId)
+      .maybeSingle();
+
+    if (appUser?.role) {
+      const url = request.nextUrl.clone();
+      url.pathname = getDashboardPath(appUser.role as UserRole);
+      return NextResponse.redirect(url);
+    }
+  }
+
+  const pathRole = roleFromPath(pathname);
+  if (pathRole && isAuthenticated) {
+    const { data: appUser } = await supabase
+      .from("users")
+      .select("role")
+      .eq("auth_id", authId)
+      .maybeSingle();
+
+    if (appUser?.role && appUser.role !== pathRole) {
+      const url = request.nextUrl.clone();
+      url.pathname = getDashboardPath(appUser.role as UserRole);
+      return NextResponse.redirect(url);
+    }
+  }
 
   return supabaseResponse;
 }

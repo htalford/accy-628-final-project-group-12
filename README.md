@@ -1,14 +1,50 @@
-# ACCY 628 Final Project — Group 12
+# ContractFlow · ACCY 628 Final Project — Group 12
 
-Next.js (App Router + TypeScript) app wired to Supabase and ready for Vercel.
+Next.js (App Router + TypeScript) contract-to-cash app for a staffing agency, wired to Supabase and ready for Vercel.
 
 ## Stack
 
-- **Next.js** (App Router) + TypeScript + Tailwind CSS
-- **Supabase** (`@supabase/ssr` + `@supabase/supabase-js`)
-- **Vercel** (zero-config Next.js deploy)
+- **Next.js** (App Router) + TypeScript + Tailwind CSS + Lucide icons
+- **Supabase** Auth + Postgres (RLS) — project `jklrdtzesordhgnxbstp`
+- **Vercel**-friendly env vars (no special `vercel.json` required)
 
-## Supabase project
+## Product
+
+**ContractFlow** tracks placements (temp + permanent), timesheets, invoices, and payments across four roles: client, employee, manager, accounting.
+
+## Getting started
+
+```bash
+npm install
+cp .env.example .env.local   # if needed; fill publishable key + DEMO_PASSWORD
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### Demo logins
+
+Password for all: `DemoPass123!`
+
+| Role | Email |
+|---|---|
+| Client | `client@contractflow.demo` |
+| Employee | `employee@contractflow.demo` |
+| Manager | `manager@contractflow.demo` |
+| Accounting | `accounting@contractflow.demo` |
+
+After login, use the **Demo role switcher** (bottom-right) to jump between roles without typing credentials again.
+
+### Role routes
+
+| Role | Pages |
+|---|---|
+| Client | `/client/dashboard`, `/client/timesheets` |
+| Employee | `/employee/dashboard`, `/employee/timesheets` |
+| Manager | `/manager/dashboard`, `/manager/placements` |
+| Accounting | `/accounting/dashboard`, `/accounting/invoices` |
+
+## Supabase
 
 | | |
 |---|---|
@@ -16,35 +52,19 @@ Next.js (App Router + TypeScript) app wired to Supabase and ready for Vercel.
 | Project ref | `jklrdtzesordhgnxbstp` |
 | URL | `https://jklrdtzesordhgnxbstp.supabase.co` |
 
-## Getting started
+Tables (RLS enabled): `clients`, `employees`, `placements`, `timesheets`, `invoices`, `invoice_line_items`, `payments`, `users`.
 
-```bash
-npm install
-cp .env.example .env.local   # if .env.local is missing
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-### Supabase clients
+### Clients
 
 | File | Use |
 |---|---|
-| `lib/supabase/client.ts` | Client Components (browser) |
-| `lib/supabase/server.ts` | Server Components, Server Actions, Route Handlers |
-| `lib/supabase/proxy.ts` + `proxy.ts` | Refresh auth session cookies on each request |
+| `lib/supabase/client.ts` | Client Components |
+| `lib/supabase/server.ts` | Server Components / Actions |
+| `lib/supabase/proxy.ts` + `proxy.ts` | Session refresh + auth/role gates |
 
 ## Deploy to Vercel
 
-1. Push this repo to GitHub.
-2. Import the repo in [Vercel](https://vercel.com/new).
-3. Set environment variables (same names as `.env.example`):
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-4. Deploy. Vercel detects Next.js automatically (no `vercel.json` required).
-
-Or from the CLI:
-
-```bash
-npx vercel
-```
+1. Push the repo to GitHub.
+2. Import in [Vercel](https://vercel.com/new).
+3. Set env vars from `.env.example` (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `DEMO_PASSWORD`).
+4. Deploy.
