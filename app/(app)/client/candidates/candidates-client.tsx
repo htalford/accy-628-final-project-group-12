@@ -12,15 +12,15 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination } from "@/components/ui/form";
 import { ConfirmActionDialog } from "@/components/client-portal/confirm-action-dialog";
 import { useToast } from "@/components/client-portal/toast";
-import {
-  updateApplicationStatusAction,
-} from "@/app/actions/client-portal";
+import { updateApplicationStatusAction } from "@/app/actions/client-portal";
 import type { ClientCandidate, SubmittalStage } from "@/lib/types/database";
 import {
   seedStatusTone,
   submittalStageLabel,
 } from "@/lib/client-portal/labels";
 import { paginate } from "@/lib/client-portal/pagination";
+
+const MAX_COMPARE = 3;
 
 export function CandidatesClient({
   initial,
@@ -34,13 +34,13 @@ export function CandidatesClient({
   const [position, setPosition] = useState("All");
   const [status, setStatus] = useState("All");
   const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<string[]>([]);
   const [dialog, setDialog] = useState<{
     id: string;
     name: string;
     next: Extract<SubmittalStage, "accepted" | "rejected">;
   } | null>(null);
 
-  // Candidates tab is applications-only; never surface submittals/employees here.
   const candidatesOnly = useMemo(
     () => initial.filter((c) => c.source === "application"),
     [initial],
@@ -73,6 +73,27 @@ export function CandidatesClient({
   const hasFilters =
     q.trim() !== "" || position !== "All" || status !== "All";
 
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= MAX_COMPARE) {
+        toast.push(`You can compare up to ${MAX_COMPARE} candidates.`, "info");
+        return prev;
+      }
+      return [...prev, id];
+    });
+  }
+
+  function openCompare() {
+    if (selected.length < 2) {
+      toast.push("Select at least 2 candidates to compare.", "info");
+      return;
+    }
+    router.push(
+      `/client/candidates/compare?ids=${encodeURIComponent(selected.join(","))}`,
+    );
+  }
+
   async function confirmDecision(reason: string) {
     if (!dialog) return;
     const result = await updateApplicationStatusAction(
@@ -96,7 +117,7 @@ export function CandidatesClient({
     <div className="space-y-6">
       <PageHeader
         title="Candidates"
-        description="People who applied to your open jobs on the candidate portal."
+        description="People who applied to your open jobs on the candidate portal. Select 2–3 to compare side by side."
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -137,6 +158,29 @@ export function CandidatesClient({
           <option value="accepted">Accepted</option>
           <option value="rejected">Rejected</option>
         </Select>
+        {selected.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+            <span className="text-sm text-[var(--cf-muted)]">
+              {selected.length} selected (max {MAX_COMPARE})
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => setSelected([])}
+            >
+              Clear
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={selected.length < 2}
+              onClick={openCompare}
+            >
+              Compare side by side
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {filtered.length === 0 ? (
@@ -175,71 +219,86 @@ export function CandidatesClient({
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {paged.items.map((c) => (
-              <Card key={`${c.source}-${c.id}`} className="flex flex-col">
-                <div className="mb-2 flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-semibold text-[var(--cf-ink)]">
-                      {c.candidate_name}
-                    </p>
-                    <p className="text-sm text-[var(--cf-muted)]">
-                      {c.position_title || c.job_title || "Role"}
-                    </p>
+            {paged.items.map((c) => {
+              const isSelected = selected.includes(c.id);
+              return (
+                <Card
+                  key={`${c.source}-${c.id}`}
+                  className={`flex flex-col ${
+                    isSelected
+                      ? "border-[var(--cf-navy)] ring-1 ring-[var(--cf-navy)]/30"
+                      : ""
+                  }`}
+                >
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <label className="flex min-w-0 cursor-pointer items-start gap-2">
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4 shrink-0 rounded border-[var(--cf-border)] text-[var(--cf-navy)] focus:ring-[var(--cf-navy)]"
+                        checked={isSelected}
+                        onChange={() => toggleSelect(c.id)}
+                        aria-label={`Select ${c.candidate_name} for compare`}
+                      />
+                      <span>
+                        <span className="block font-semibold text-[var(--cf-ink)]">
+                          {c.candidate_name}
+                        </span>
+                        <span className="block text-sm text-[var(--cf-muted)]">
+                          {c.position_title || c.job_title || "Role"}
+                        </span>
+                      </span>
+                    </label>
+                    <Badge tone={seedStatusTone(c.stage)}>
+                      {submittalStageLabel(c.stage)}
+                    </Badge>
                   </div>
-                  <Badge tone={seedStatusTone(c.stage)}>
-                    {submittalStageLabel(c.stage)}
-                  </Badge>
-                </div>
-                <p className="mb-3 text-xs text-[var(--cf-muted)]">
-                  {c.candidate_email ?? "No email on file"}
-                </p>
-                <div className="mt-auto flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    href={c.detail_href}
-                  >
-                    View Profile
-                  </Button>
-                  {c.stage !== "accepted" &&
-                  c.stage !== "rejected" &&
-                  c.stage !== "offer" ? (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="success"
-                        type="button"
-                        disabled={pending}
-                        onClick={() =>
-                          setDialog({
-                            id: c.id,
-                            name: c.candidate_name,
-                            next: "accepted",
-                          })
-                        }
-                      >
-                        Accept
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        type="button"
-                        disabled={pending}
-                        onClick={() =>
-                          setDialog({
-                            id: c.id,
-                            name: c.candidate_name,
-                            next: "rejected",
-                          })
-                        }
-                      >
-                        Reject
-                      </Button>
-                    </>
-                  ) : null}
-                </div>
-              </Card>
-            ))}
+                  <p className="mb-3 text-xs text-[var(--cf-muted)]">
+                    {c.candidate_email ?? "No email on file"}
+                  </p>
+                  <div className="mt-auto flex flex-wrap gap-2">
+                    <Button size="sm" variant="secondary" href={c.detail_href}>
+                      View Profile
+                    </Button>
+                    {c.stage !== "accepted" &&
+                    c.stage !== "rejected" &&
+                    c.stage !== "offer" ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="success"
+                          type="button"
+                          disabled={pending}
+                          onClick={() =>
+                            setDialog({
+                              id: c.id,
+                              name: c.candidate_name,
+                              next: "accepted",
+                            })
+                          }
+                        >
+                          Accept
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          type="button"
+                          disabled={pending}
+                          onClick={() =>
+                            setDialog({
+                              id: c.id,
+                              name: c.candidate_name,
+                              next: "rejected",
+                            })
+                          }
+                        >
+                          Reject
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
+                </Card>
+              );
+            })}
           </div>
           <Pagination
             page={paged.page}
@@ -248,6 +307,14 @@ export function CandidatesClient({
           />
         </>
       )}
+
+      {selected.length >= 2 ? (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--cf-border)] bg-white/95 p-3 shadow-lg backdrop-blur sm:hidden">
+          <Button type="button" className="w-full" onClick={openCompare}>
+            Compare {selected.length} selected
+          </Button>
+        </div>
+      ) : null}
 
       <ConfirmActionDialog
         open={dialog != null}

@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ClientSidebar } from "@/components/client-portal/client-sidebar";
+import {
+  ClientSidebar,
+  readClientIconsOnly,
+  writeClientIconsOnly,
+} from "@/components/client-portal/client-sidebar";
 import { ClientTopBar } from "@/components/client-portal/client-top-bar";
 import { ToastProvider } from "@/components/client-portal/toast";
 import type {
@@ -26,8 +30,17 @@ export function ClientPortalShell({
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    setCollapsed(readClientIconsOnly());
     setReady(true);
   }, []);
+
+  function toggleIconsOnly() {
+    setCollapsed((c) => {
+      const next = !c;
+      writeClientIconsOnly(next);
+      return next;
+    });
+  }
 
   return (
     <ToastProvider>
@@ -35,7 +48,7 @@ export function ClientPortalShell({
         {ready ? (
           <ClientSidebar
             collapsed={collapsed}
-            onToggleCollapse={() => setCollapsed((c) => !c)}
+            onToggleCollapse={toggleIconsOnly}
             mobileOpen={mobileOpen}
             onMobileClose={() => setMobileOpen(false)}
           />
