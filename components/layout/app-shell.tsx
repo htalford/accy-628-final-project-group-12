@@ -4,6 +4,7 @@ import { ClientPortalShell } from "@/components/client-portal/client-portal-shel
 import { RoleSwitcher } from "@/components/demo/role-switcher";
 import { ShellProvider } from "@/components/layout/shell-context";
 import { loadClientPortalChrome } from "@/lib/client-portal/chrome";
+import { loadCandidateNotifications } from "@/lib/candidate/notifications";
 import type { AppUser } from "@/lib/types/database";
 
 export async function AppShell({
@@ -29,12 +30,15 @@ export async function AppShell({
     );
   }
 
+  const candidateNotifications =
+    user.role === "candidate" ? await loadCandidateNotifications() : null;
+
   return (
     <ShellProvider>
       <div className="flex min-h-full flex-1">
         <Sidebar role={user.role} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <TopBar user={user} />
+          <TopBar user={user} notifications={candidateNotifications ?? undefined} />
           <main className="flex-1 bg-[var(--cf-surface)] p-4 sm:p-6">
             {children}
           </main>

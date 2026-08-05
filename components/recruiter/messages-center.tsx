@@ -1,15 +1,15 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  sendAccountingStaffMessage,
+  markRecruiterCandidateThreadRead,
   sendEmployerMessage,
   sendRecruiterMessage,
 } from "@/app/actions/recruiter";
 import type { RecruiterMessageThread } from "@/lib/recruiter/types";
 
-type Filter = "all" | "employer" | "candidate" | "accounting";
+type Filter = "all" | "employer" | "candidate";
 
 export function MessagesCenter({
   threads,
@@ -24,6 +24,12 @@ export function MessagesCenter({
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  useEffect(() => {
+    if (threads.length && !threads.some((t) => t.id === activeId)) {
+      setActiveId(threads[0]!.id);
+    }
+  }, [threads, activeId]);
+
   const filtered = useMemo(
     () =>
       threads.filter(
@@ -35,6 +41,26 @@ export function MessagesCenter({
   const active =
     filtered.find((t) => t.id === activeId) ?? filtered[0] ?? null;
 
+  useEffect(() => {
+    if (
+      !active ||
+      active.participantType !== "candidate" ||
+      active.unread === 0
+    ) {
+      return;
+    }
+    startTransition(async () => {
+      await markRecruiterCandidateThreadRead(active.participantId);
+      router.refresh();
+    });
+  }, [
+    active?.id,
+    active?.unread,
+    active?.participantType,
+    active?.participantId,
+    router,
+  ]);
+
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--cf-border)] bg-white shadow-sm">
       {notice ? (
@@ -44,27 +70,25 @@ export function MessagesCenter({
       ) : null}
       <div className="grid min-h-[28rem] lg:grid-cols-[18rem_1fr]">
         <aside className="border-b border-[var(--cf-border)] lg:border-r lg:border-b-0">
-          <div className="flex flex-wrap gap-1 border-b border-[var(--cf-border)] p-3">
-            {(["all", "accounting", "employer", "candidate"] as const).map(
-              (f) => (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => setFilter(f)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize ${
-                    filter === f
-                      ? "bg-[var(--cf-navy)] text-white"
-                      : "text-[var(--cf-muted)] hover:bg-[var(--cf-surface)]"
-                  }`}
-                >
-                  {f}
-                </button>
-              ),
-            )}
+          <div className="flex gap-1 border-b border-[var(--cf-border)] p-3">
+            {(["all", "employer", "candidate"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFilter(f)}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize ${
+                  filter === f
+                    ? "bg-[var(--cf-navy)] text-white"
+                    : "text-[var(--cf-muted)] hover:bg-[var(--cf-surface)]"
+                }`}
+              >
+                {f}
+              </button>
+            ))}
           </div>
           <ul className="max-h-[24rem] overflow-y-auto">
             {filtered.map((t) => (
-              <li key={`${t.participantType}-${t.id}`}>
+              <li key={t.id}>
                 <button
                   type="button"
                   onClick={() => setActiveId(t.id)}
@@ -100,7 +124,11 @@ export function MessagesCenter({
                 <p className="font-semibold text-[var(--cf-ink)]">
                   {active.participantName}
                 </p>
-                <p className="text-xs text-[var(--cf-muted)]">{active.subject}</p>
+                <p className="text-xs text-[var(--cf-muted)]">
+                  {active.participantType === "candidate"
+                    ? "Candidate · recruiter lane only"
+                    : active.subject}
+                </p>
               </div>
               <div className="flex-1 space-y-3 overflow-y-auto p-4">
                 {active.messages.map((m) => (
@@ -152,8 +180,8 @@ export function MessagesCenter({
                             });
                             setNotice(
                               result.ok
-                                ? result.message ?? "Sent"
-                                : result.error ?? "Failed",
+                                ? (result.message ?? "Sent")
+                                : (result.error ?? "Failed"),
                             );
                             if (result.ok) router.refresh();
                           });
@@ -170,11 +198,7 @@ export function MessagesCenter({
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
                         rows={2}
-                        placeholder={
-                          active.participantType === "accounting"
-                            ? "Reply to accounting…"
-                            : "Reply to employer…"
-                        }
+                        placeholder="Reply to employer…"
                         className="min-h-[2.5rem] flex-1 rounded-lg border border-[var(--cf-border)] px-3 py-2 text-sm"
                       />
                       <button
@@ -185,20 +209,14 @@ export function MessagesCenter({
                           const body = draft.trim();
                           setDraft("");
                           startTransition(async () => {
-                            const result =
-                              active.participantType === "accounting"
-                                ? await sendAccountingStaffMessage({
-                                    threadId: active.id,
-                                    body,
-                                  })
-                                : await sendEmployerMessage({
-                                    threadId: active.id,
-                                    body,
-                                  });
+                            const result = await sendEmployerMessage({
+                              threadId: active.id,
+                              body,
+                            });
                             setNotice(
                               result.ok
-                                ? result.message ?? "Sent"
-                                : result.error ?? "Failed",
+                                ? (result.message ?? "Sent")
+                                : (result.error ?? "Failed"),
                             );
                             if (result.ok) router.refresh();
                           });
@@ -208,9 +226,7 @@ export function MessagesCenter({
                       </button>
                     </div>
                     <p className="text-[11px] text-[var(--cf-muted)]">
-                      {active.participantType === "accounting"
-                        ? "Synced with Accounting Portal staff conversations."
-                        : "Synced with Client Portal employer conversations."}
+                      Synced with Client Portal employer conversations.
                     </p>
                   </>
                 )}

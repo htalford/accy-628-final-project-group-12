@@ -1,106 +1,50 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import { requireAccounting } from "@/lib/accounting/messages";
+import { getAppUser } from "@/lib/auth/get-app-user";
+import {
+  markStaffThreadRead,
+  sendStaffMessageToCandidate,
+} from "@/lib/staff/messages";
 
-function revalidateMessaging() {
+async function requireAccounting() {
+  const user = await getAppUser();
+  if (!user || user.role !== "accounting") {
+    return { error: "Only accounting can perform this action." as const, user: null };
+  }
+  return { error: null, user };
+}
+
+function revalidateAccountingMessages() {
   revalidatePath("/accounting/messages");
-  revalidatePath("/recruiter/messages");
   revalidatePath("/candidate/messages");
-  revalidatePath("/client/messages");
 }
 
-export async function sendAccountingCandidateMessage(input: {
+export async function sendAccountingMessage(input: {
   employeeId: string;
-  subject: string;
+  subject?: string;
   body: string;
 }) {
-  const { error: authError, user } = await requireAccounting();
-  if (authError || !user) {
-    return { ok: false as const, error: authError ?? "Unauthorized" };
-  }
+  const { error: authError } = await requireAccounting();
+  if (authError) return { ok: false as const, error: authError };
 
-  const body = input.body.trim();
-  const subject = input.subject.trim() || "Message from Accounting";
-  if (!input.employeeId || !body) {
-    return { ok: false as const, error: "Employee and message body are required." };
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase.from("messages").insert({
-    employee_id: input.employeeId,
-    sender_name: user.name,
-    sender_role: "accounting",
-    subject,
-    body,
-    is_read: false,
+  const result = await sendStaffMessageToCandidate({
+    lane: "accounting",
+    employeeId: input.employeeId,
+    subject: input.subject ?? "Message from accounting",
+    body: input.body,
   });
-
-  if (error) return { ok: false as const, error: error.message };
-  revalidateMessaging();
-  return { ok: true as const, message: "Message sent to candidate." };
+  if (!result.ok) return result;
+  revalidateAccountingMessages();
+  return { ok: true as const, message: "Message sent." };
 }
 
-export async function sendAccountingEmployerMessage(input: {
-  threadId: string;
-  body: string;
-}) {
-  const { error: authError, user } = await requireAccounting();
-  if (authError || !user) {
-    return { ok: false as const, error: authError ?? "Unauthorized" };
-  }
+export async function markAccountingCandidateThreadRead(employeeId: string) {
+  const { error: authError } = await requireAccounting();
+  if (authError) return { ok: false as const, error: authError };
 
-  const body = input.body.trim();
-  if (!input.threadId || !body) {
-    return { ok: false as const, error: "Thread and message body are required." };
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase.from("client_messages").insert({
-    thread_id: input.threadId,
-    sender_role: "staff",
-    body,
-  });
-  if (error) return { ok: false as const, error: error.message };
-
-  await supabase
-    .from("client_message_threads")
-    .update({ updated_at: new Date().toISOString() })
-    .eq("id", input.threadId);
-
-  revalidateMessaging();
-  return { ok: true as const, message: "Message sent to employer." };
-}
-
-export async function sendAccountingRecruiterMessage(input: {
-  threadId: string;
-  body: string;
-}) {
-  const { error: authError, user } = await requireAccounting();
-  if (authError || !user) {
-    return { ok: false as const, error: authError ?? "Unauthorized" };
-  }
-
-  const body = input.body.trim();
-  if (!input.threadId || !body) {
-    return { ok: false as const, error: "Thread and message body are required." };
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase.from("staff_messages").insert({
-    thread_id: input.threadId,
-    sender_user_id: user.id,
-    sender_role: "accounting",
-    body,
-  });
-  if (error) return { ok: false as const, error: error.message };
-
-  await supabase
-    .from("staff_message_threads")
-    .update({ updated_at: new Date().toISOString() })
-    .eq("id", input.threadId);
-
-  revalidateMessaging();
-  return { ok: true as const, message: "Message sent to recruiter." };
+  const result = await markStaffThreadRead("accounting", employeeId);
+  if (!result.ok) return result;
+  revalidateAccountingMessages();
+  return { ok: true as const };
 }

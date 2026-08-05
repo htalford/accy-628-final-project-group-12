@@ -686,57 +686,23 @@ export async function listRecentActivity(limit = 8): Promise<ActivityEvent[]> {
 }
 
 export async function listMessageThreads(): Promise<RecruiterMessageThread[]> {
-  const supabase = await createClient();
-  const { data: messages, error } = await supabase
-    .from("messages")
-    .select(
-      "id, employee_id, sender_name, sender_role, subject, body, is_read, created_at, employees(first_name, last_name)",
-    )
-    .order("created_at", { ascending: false });
+  const { listStaffCandidateThreads } = await import("@/lib/staff/messages");
+  const candidateThreads = await listStaffCandidateThreads("recruiter");
 
-  if (error) {
-    console.error("listMessageThreads", error.message);
-  }
-
-  const byEmployee = new Map<string, RecruiterMessageThread>();
-  for (const m of messages ?? []) {
-    const emp = asRecord(m.employees);
-    const empId = m.employee_id as string;
-    const name = emp
-      ? fullName(str(emp.first_name), str(emp.last_name))
-      : (m.sender_name as string);
-    const existing = byEmployee.get(empId);
-    const msg = {
-      id: m.id as string,
-      sender: m.sender_name as string,
-      senderRole: m.sender_role as string,
-      body: m.body as string,
-      createdAt: m.created_at as string,
-      mine: (m.sender_role as string) === "recruiter",
-    };
-    if (!existing) {
-      byEmployee.set(empId, {
-        id: empId,
-        participantType: "candidate",
-        participantName: name,
-        participantId: empId,
-        subject: m.subject as string,
-        preview: m.body as string,
-        updatedAt: m.created_at as string,
-        unread: m.is_read ? 0 : 1,
-        messages: [msg],
-      });
-    } else {
-      existing.messages.push(msg);
-      if (!m.is_read) existing.unread += 1;
-    }
-  }
-
-  for (const t of byEmployee.values()) {
-    t.messages.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  }
+  const byEmployee: RecruiterMessageThread[] = candidateThreads.map((t) => ({
+    id: t.employeeId,
+    participantType: "candidate" as const,
+    participantName: t.participantName,
+    participantId: t.employeeId,
+    subject: t.subject,
+    preview: t.preview,
+    updatedAt: t.updatedAt,
+    unread: t.unread,
+    messages: t.messages,
+  }));
 
   // Live employer threads from Client Portal (same table employers use).
+  const supabase = await createClient();
   const [{ data: threads }, clients] = await Promise.all([
     supabase
       .from("client_message_threads")
@@ -795,77 +761,9 @@ export async function listMessageThreads(): Promise<RecruiterMessageThread[]> {
     };
   });
 
-  const { data: staffThreads } = await supabase
-    .from("staff_message_threads")
-    .select(
-      "id, subject, accounting_user_id, recruiter_user_id, updated_at, created_at",
-    )
-    .order("updated_at", { ascending: false });
-
-  const staffIds = (staffThreads ?? []).map((t) => String(t.id));
-  const [{ data: staffMsgs }, { data: staffUsers }] = await Promise.all([
-    staffIds.length === 0
-      ? Promise.resolve({ data: [] as Record<string, unknown>[] })
-      : supabase
-          .from("staff_messages")
-          .select("*")
-          .in("thread_id", staffIds)
-          .order("created_at", { ascending: true }),
-    supabase
-      .from("users")
-      .select("id, name, role")
-      .in("role", ["recruiter", "accounting"]),
-  ]);
-
-  const userName = new Map(
-    (staffUsers ?? []).map((u) => [String(u.id), String(u.name)]),
+  return [...byEmployee, ...employerThreads].sort((a, b) =>
+    b.updatedAt.localeCompare(a.updatedAt),
   );
-  const msgsByStaff = new Map<string, Record<string, unknown>[]>();
-  for (const m of staffMsgs ?? []) {
-    const tid = String(m.thread_id);
-    const list = msgsByStaff.get(tid) ?? [];
-    list.push(m as Record<string, unknown>);
-    msgsByStaff.set(tid, list);
-  }
-
-  const accountingThreads: RecruiterMessageThread[] = (staffThreads ?? []).map(
-    (t) => {
-      const id = String(t.id);
-      const msgs = msgsByStaff.get(id) ?? [];
-      const last = msgs[msgs.length - 1];
-      const accountingId = String(t.accounting_user_id ?? "");
-      const accountingName =
-        userName.get(accountingId) ?? "Avery Accounting";
-      return {
-        id,
-        participantType: "accounting" as const,
-        participantName: accountingName,
-        participantId: accountingId,
-        subject: String(t.subject ?? "Staff conversation"),
-        preview: last ? String(last.body).slice(0, 80) : "No messages yet",
-        updatedAt: String(t.updated_at ?? t.created_at),
-        unread: 0,
-        messages: msgs.map((m) => ({
-          id: String(m.id),
-          sender:
-            userName.get(String(m.sender_user_id)) ??
-            (m.sender_role === "accounting"
-              ? "Avery Accounting"
-              : "Morgan Recruiter"),
-          senderRole: String(m.sender_role),
-          body: String(m.body),
-          createdAt: String(m.created_at),
-          mine: m.sender_role === "recruiter",
-        })),
-      };
-    },
-  );
-
-  return [
-    ...byEmployee.values(),
-    ...employerThreads,
-    ...accountingThreads,
-  ].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export async function getRecruiterProfile(): Promise<RecruiterProfile> {
