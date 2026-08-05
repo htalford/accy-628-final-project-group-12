@@ -450,57 +450,22 @@ export async function listRecentActivity(limit = 8): Promise<ActivityEvent[]> {
 }
 
 export async function listMessageThreads(): Promise<RecruiterMessageThread[]> {
-  const supabase = await createClient();
-  const { data: messages, error } = await supabase
-    .from("messages")
-    .select(
-      "id, employee_id, sender_name, sender_role, subject, body, is_read, created_at, employees(first_name, last_name)",
-    )
-    .order("created_at", { ascending: false });
+  const { listStaffCandidateThreads } = await import("@/lib/staff/messages");
+  const candidateThreads = await listStaffCandidateThreads("recruiter");
 
-  if (error) {
-    console.error("listMessageThreads", error.message);
-  }
+  const byEmployee: RecruiterMessageThread[] = candidateThreads.map((t) => ({
+    id: t.employeeId,
+    participantType: "candidate" as const,
+    participantName: t.participantName,
+    participantId: t.employeeId,
+    subject: t.subject,
+    preview: t.preview,
+    updatedAt: t.updatedAt,
+    unread: t.unread,
+    messages: t.messages,
+  }));
 
-  const byEmployee = new Map<string, RecruiterMessageThread>();
-  for (const m of messages ?? []) {
-    const emp = asRecord(m.employees);
-    const empId = m.employee_id as string;
-    const name = emp
-      ? fullName(str(emp.first_name), str(emp.last_name))
-      : (m.sender_name as string);
-    const existing = byEmployee.get(empId);
-    const msg = {
-      id: m.id as string,
-      sender: m.sender_name as string,
-      senderRole: m.sender_role as string,
-      body: m.body as string,
-      createdAt: m.created_at as string,
-      mine: (m.sender_role as string) === "recruiter",
-    };
-    if (!existing) {
-      byEmployee.set(empId, {
-        id: empId,
-        participantType: "candidate",
-        participantName: name,
-        participantId: empId,
-        subject: m.subject as string,
-        preview: m.body as string,
-        updatedAt: m.created_at as string,
-        unread: m.is_read ? 0 : 1,
-        messages: [msg],
-      });
-    } else {
-      existing.messages.push(msg);
-      if (!m.is_read) existing.unread += 1;
-    }
-  }
-
-  for (const t of byEmployee.values()) {
-    t.messages.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  }
-
-  // Structured employer placeholder threads (no employer messages table yet).
+  // Structured employer placeholder threads (client portal uses client_messages).
   const clients = await listClients();
   const employerThreads: RecruiterMessageThread[] = clients.slice(0, 3).map((c) => ({
     id: `emp-${c.id}`,
@@ -531,7 +496,7 @@ export async function listMessageThreads(): Promise<RecruiterMessageThread[]> {
     ],
   }));
 
-  return [...byEmployee.values(), ...employerThreads].sort((a, b) =>
+  return [...byEmployee, ...employerThreads].sort((a, b) =>
     b.updatedAt.localeCompare(a.updatedAt),
   );
 }

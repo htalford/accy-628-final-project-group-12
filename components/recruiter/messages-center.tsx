@@ -1,7 +1,11 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { sendRecruiterMessage } from "@/app/actions/recruiter";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import {
+  markRecruiterCandidateThreadRead,
+  sendRecruiterMessage,
+} from "@/app/actions/recruiter";
 import type { RecruiterMessageThread } from "@/lib/recruiter/types";
 
 export function MessagesCenter({
@@ -9,12 +13,19 @@ export function MessagesCenter({
 }: {
   threads: RecruiterMessageThread[];
 }) {
+  const router = useRouter();
   const [filter, setFilter] = useState<"all" | "employer" | "candidate">("all");
   const [activeId, setActiveId] = useState(threads[0]?.id ?? "");
   const [draft, setDraft] = useState("");
   const [subject, setSubject] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (threads.length && !threads.some((t) => t.id === activeId)) {
+      setActiveId(threads[0]!.id);
+    }
+  }, [threads, activeId]);
 
   const filtered = useMemo(
     () =>
@@ -26,6 +37,26 @@ export function MessagesCenter({
 
   const active =
     filtered.find((t) => t.id === activeId) ?? filtered[0] ?? null;
+
+  useEffect(() => {
+    if (
+      !active ||
+      active.participantType !== "candidate" ||
+      active.unread === 0
+    ) {
+      return;
+    }
+    startTransition(async () => {
+      await markRecruiterCandidateThreadRead(active.participantId);
+      router.refresh();
+    });
+  }, [
+    active?.id,
+    active?.unread,
+    active?.participantType,
+    active?.participantId,
+    router,
+  ]);
 
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--cf-border)] bg-white shadow-sm">
@@ -90,7 +121,11 @@ export function MessagesCenter({
                 <p className="font-semibold text-[var(--cf-ink)]">
                   {active.participantName}
                 </p>
-                <p className="text-xs text-[var(--cf-muted)]">{active.subject}</p>
+                <p className="text-xs text-[var(--cf-muted)]">
+                  {active.participantType === "candidate"
+                    ? "Candidate · recruiter lane only"
+                    : active.subject}
+                </p>
               </div>
               <div className="flex-1 space-y-3 overflow-y-auto p-4">
                 {active.messages.map((m) => (
@@ -142,23 +177,21 @@ export function MessagesCenter({
                             });
                             setNotice(
                               result.ok
-                                ? result.message ?? "Sent"
-                                : result.error ?? "Failed",
+                                ? (result.message ?? "Sent")
+                                : (result.error ?? "Failed"),
                             );
+                            if (result.ok) router.refresh();
                           });
                         }}
                       >
                         Send
                       </button>
                     </div>
-                    <p className="text-[11px] text-[var(--cf-muted)]">
-                      Attachment support will connect to storage in a later release.
-                    </p>
                   </>
                 ) : (
                   <p className="text-sm text-[var(--cf-muted)]">
-                    Employer messaging is structured for future DB integration.
-                    Candidate threads send through Supabase `messages`.
+                    Employer messaging stays on the client portal threads.
+                    Candidate chats here are recruiter-only.
                   </p>
                 )}
               </div>

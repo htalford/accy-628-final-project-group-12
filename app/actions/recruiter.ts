@@ -16,6 +16,7 @@ async function requireRecruiter() {
 
 function revalidateRecruiter() {
   revalidatePath("/recruiter", "layout");
+  revalidatePath("/candidate/messages");
 }
 
 export async function approveApplication(applicationId: string) {
@@ -152,14 +153,27 @@ export async function sendRecruiterMessage(input: {
     employee_id: input.employeeId,
     sender_name: user.name,
     sender_role: "recruiter",
+    counterpart_role: "recruiter",
     subject: input.subject,
     body: input.body,
     is_read: false,
+    staff_is_read: true,
   });
 
   if (error) return { ok: false as const, error: error.message };
   revalidateRecruiter();
   return { ok: true as const, message: "Message sent." };
+}
+
+export async function markRecruiterCandidateThreadRead(employeeId: string) {
+  const { error: authError } = await requireRecruiter();
+  if (authError) return { ok: false as const, error: authError };
+
+  const { markStaffThreadRead } = await import("@/lib/staff/messages");
+  const result = await markStaffThreadRead("recruiter", employeeId);
+  if (!result.ok) return result;
+  revalidateRecruiter();
+  return { ok: true as const };
 }
 
 export async function updateJobStatus(jobId: string, status: JobOrderStatus) {

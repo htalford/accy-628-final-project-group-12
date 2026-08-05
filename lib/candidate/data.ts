@@ -184,6 +184,19 @@ export async function getCandidateApplications() {
   return (data as ApplicationWithJob[] | null) ?? [];
 }
 
+export async function getCandidateJobInterests() {
+  const user = await requireCandidateContext();
+  if (!user) return [] as string[];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("job_interests")
+    .select("job_id")
+    .eq("employee_id", user.linked_employee_id!);
+
+  return (data ?? []).map((row) => row.job_id as string);
+}
+
 export async function getCandidateTimesheets() {
   const user = await requireCandidateContext();
   if (!user) return [] as Timesheet[];

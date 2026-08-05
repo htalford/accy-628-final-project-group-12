@@ -117,6 +117,41 @@ export async function applyToJob(formData: FormData): Promise<ActionResult> {
   return { ok: true };
 }
 
+export async function toggleJobInterest(
+  jobId: string,
+  interested: boolean,
+): Promise<ActionResult> {
+  const user = await requireCandidateContext();
+  if (!user) return { ok: false, error: "Candidate session required." };
+
+  const trimmed = jobId.trim();
+  if (!trimmed) return { ok: false, error: "Job is required." };
+
+  const supabase = await createClient();
+  const employeeId = user.linked_employee_id!;
+
+  if (interested) {
+    const { error } = await supabase.from("job_interests").insert({
+      job_id: trimmed,
+      employee_id: employeeId,
+    });
+    if (error && error.code !== "23505") {
+      return { ok: false, error: error.message };
+    }
+  } else {
+    const { error } = await supabase
+      .from("job_interests")
+      .delete()
+      .eq("job_id", trimmed)
+      .eq("employee_id", employeeId);
+    if (error) return { ok: false, error: error.message };
+  }
+
+  revalidatePath("/candidate/jobs");
+  revalidatePath("/candidate/dashboard");
+  return { ok: true };
+}
+
 export async function submitTimesheet(formData: {
   placementId: string;
   weekEndingDate: string;
@@ -183,16 +218,22 @@ export async function markMessageRead(messageId: string): Promise<ActionResult> 
 }
 
 export async function sendCandidateMessage(formData: {
-  subject: string;
+  subject?: string;
   body: string;
+  counterpartRole?: "recruiter" | "accounting";
 }): Promise<ActionResult> {
   const user = await requireCandidateContext();
   if (!user) return { ok: false, error: "Candidate session required." };
 
-  const subject = formData.subject.trim();
   const body = formData.body.trim();
-  if (!subject || !body) {
-    return { ok: false, error: "Subject and message are required." };
+  const counterpartRole = formData.counterpartRole ?? "recruiter";
+  const subject =
+    (formData.subject ?? "").trim() ||
+    (counterpartRole === "accounting"
+      ? "Chat with accounting"
+      : "Chat with recruiter");
+  if (!body) {
+    return { ok: false, error: "Message is required." };
   }
 
   const supabase = await createClient();
@@ -200,14 +241,19 @@ export async function sendCandidateMessage(formData: {
     employee_id: user.linked_employee_id!,
     sender_name: user.name,
     sender_role: "candidate",
+    counterpart_role: counterpartRole,
     subject,
     body,
     is_read: true,
+    staff_is_read: false,
   });
 
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/candidate/messages");
+  revalidatePath("/candidate/dashboard");
+  revalidatePath("/recruiter/messages");
+  revalidatePath("/accounting/messages");
   return { ok: true };
 }
 

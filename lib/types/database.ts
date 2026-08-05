@@ -300,8 +300,11 @@ export type Message = {
   employee_id: string;
   sender_name: string;
   sender_role: string;
+  /** Which staff portal owns this conversation: recruiter | accounting | system */
+  counterpart_role?: "recruiter" | "accounting" | "system" | null;
   subject: string;
   body: string;
   is_read: boolean;
+  staff_is_read?: boolean;
   created_at: string;
 };
