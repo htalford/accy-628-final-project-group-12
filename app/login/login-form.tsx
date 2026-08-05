@@ -8,7 +8,7 @@ import type { UserRole } from "@/lib/types/database";
 
 export function LoginForm() {
   const router = useRouter();
-  const [email, setEmail] = useState("candidate@contractflow.demo");
+  const [email, setEmail] = useState("candidate@talentquest.demo");
   const [password, setPassword] = useState("DemoPass123!");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

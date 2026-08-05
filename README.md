@@ -37,10 +37,10 @@ Password for all: `DemoPass123!`
 
 | Role | Email |
 |---|---|
-| Employer | `employer@contractflow.demo` |
-| Candidate | `candidate@contractflow.demo` |
-| Recruiter | `recruiter@contractflow.demo` |
-| Accounting | `accounting@contractflow.demo` |
+| Employer | `employer@talentquest.demo` |
+| Candidate | `candidate@talentquest.demo` |
+| Recruiter | `recruiter@talentquest.demo` |
+| Accounting | `accounting@talentquest.demo` |
 
 After login, use the **Demo role switcher** (bottom-right) to jump between roles without typing credentials again.
 

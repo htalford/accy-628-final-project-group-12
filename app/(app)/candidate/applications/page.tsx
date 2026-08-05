@@ -13,6 +13,20 @@ function toneForStatus(status: string) {
   return "neutral" as const;
 }
 
+function materialsSummary(app: {
+  include_profile: boolean;
+  cover_letter: string | null;
+  resume_url: string | null;
+  note: string | null;
+}) {
+  const parts: string[] = [];
+  if (app.include_profile) parts.push("Profile");
+  if (app.cover_letter) parts.push("Cover letter");
+  if (app.resume_url) parts.push("Resume");
+  if (parts.length === 0) return app.note ?? "—";
+  return parts.join(" · ");
+}
+
 export default async function CandidateApplicationsPage() {
   const applications = await getCandidateApplications();
 
@@ -20,7 +34,7 @@ export default async function CandidateApplicationsPage() {
     <div>
       <PageHeader
         title="Applications"
-        description="Track every role you’ve applied to and where it stands."
+        description="Track every role you’ve applied to and what you sent with each application."
       />
       {applications.length === 0 ? (
         <EmptyState
@@ -36,7 +50,7 @@ export default async function CandidateApplicationsPage() {
             "Type",
             "Status",
             "Applied",
-            "Note",
+            "Materials",
           ]}
         >
           {applications.map((app) => (
@@ -56,7 +70,19 @@ export default async function CandidateApplicationsPage() {
               </td>
               <td className="px-4 py-3">{formatDate(app.created_at)}</td>
               <td className="px-4 py-3 text-[var(--cf-muted)]">
-                {app.note ?? "—"}
+                <div className="space-y-1">
+                  <p>{materialsSummary(app)}</p>
+                  {app.resume_url ? (
+                    <a
+                      href={app.resume_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs font-medium text-[var(--cf-accent)] hover:underline"
+                    >
+                      View resume
+                    </a>
+                  ) : null}
+                </div>
               </td>
             </tr>
           ))}

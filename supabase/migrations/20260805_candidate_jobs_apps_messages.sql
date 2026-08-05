@@ -223,7 +223,7 @@ SELECT
   e.id,
   'Morgan Recruiter',
   'recruiter',
-  'Welcome to your ContractFlow candidate portal',
+  'Welcome to your TalentQuest candidate portal',
   'Hi! Use this portal to browse open roles, track applications, submit timesheets, and review your contracts. Reply here anytime if you need help.',
   false
 FROM public.employees e
@@ -234,7 +234,7 @@ LIMIT 1;
 INSERT INTO public.messages (employee_id, sender_name, sender_role, subject, body, is_read)
 SELECT
   e.id,
-  'ContractFlow Desk',
+  'TalentQuest Desk',
   'system',
   'Reminder: submit last week''s timesheet',
   'Your active placement expects hours by Monday 10am. Open Timesheets to enter regular and overtime hours.',

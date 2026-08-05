@@ -31,11 +31,11 @@ export const DEMO_ACCOUNTS: Record<
   UserRole,
   { email: string; label: string }
 > = {
-  employer: { email: "employer@contractflow.demo", label: "Casey Employer" },
-  candidate: { email: "candidate@contractflow.demo", label: "Jordan Lee" },
-  recruiter: { email: "recruiter@contractflow.demo", label: "Morgan Recruiter" },
+  employer: { email: "employer@talentquest.demo", label: "Casey Employer" },
+  candidate: { email: "candidate@talentquest.demo", label: "Jordan Lee" },
+  recruiter: { email: "recruiter@talentquest.demo", label: "Morgan Recruiter" },
   accounting: {
-    email: "accounting@contractflow.demo",
+    email: "accounting@talentquest.demo",
     label: "Avery Accounting",
   },
 };
@@ -186,5 +186,6 @@ export function getPageTitle(pathname: string): string {
   if (pathname === "/accounting/invoices/new") return "Create Invoice";
   if (pathname.startsWith("/accounting/invoices/")) return "Invoice detail";
   if (pathname.startsWith("/accounting/contracts/")) return "Contract detail";
+  if (pathname.startsWith("/candidate/contracts/")) return "Contract detail";
   return "TalentQuest";
 }

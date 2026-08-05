@@ -160,6 +160,10 @@ export type Application = {
   employee_id: string;
   status: ApplicationStatus;
   note: string | null;
+  cover_letter: string | null;
+  resume_url: string | null;
+  include_profile: boolean;
+  profile_snapshot: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 };

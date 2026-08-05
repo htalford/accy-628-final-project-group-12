@@ -9,7 +9,7 @@ export default async function CandidateMessagesPage() {
     <div>
       <PageHeader
         title="Messages"
-        description="Talk with your recruiter and ContractFlow support from one inbox."
+        description="Talk with your recruiter and TalentQuest support from one inbox."
       />
       <MessagesPanel messages={messages} />
     </div>

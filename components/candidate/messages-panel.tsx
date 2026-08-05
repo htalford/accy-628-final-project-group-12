@@ -92,7 +92,7 @@ export function MessagesPanel({ messages }: { messages: Message[] }) {
               if (result.ok) {
                 setSubject("");
                 setBody("");
-                setNotice("Message sent to your ContractFlow inbox.");
+                setNotice("Message sent to your TalentQuest inbox.");
               } else {
                 setNotice(result.error);
               }

@@ -6,13 +6,15 @@ import {
   formatCurrency,
   formatDate,
   getCandidateApplications,
+  getCandidateEmployee,
   getOpenJobs,
 } from "@/lib/candidate/data";
 
 export default async function CandidateJobsPage() {
-  const [jobs, applications] = await Promise.all([
+  const [jobs, applications, { employee }] = await Promise.all([
     getOpenJobs(),
     getCandidateApplications(),
+    getCandidateEmployee(),
   ]);
   const appliedJobIds = new Set(applications.map((a) => a.job_id));
 
@@ -20,7 +22,7 @@ export default async function CandidateJobsPage() {
     <div>
       <PageHeader
         title="Available jobs"
-        description="Open roles from ContractFlow employers. Apply directly from here."
+        description="Open roles from TalentQuest employers. Apply with your profile, cover letter, and/or resume."
       />
       {jobs.length === 0 ? (
         <EmptyState
@@ -63,7 +65,11 @@ export default async function CandidateJobsPage() {
                 {appliedJobIds.has(job.id) ? (
                   <StatusPill label="Applied" tone="good" />
                 ) : (
-                  <ApplyButton jobId={job.id} />
+                  <ApplyButton
+                    jobId={job.id}
+                    jobTitle={job.title}
+                    profileResumeUrl={employee?.resume_url}
+                  />
                 )}
               </td>
             </tr>

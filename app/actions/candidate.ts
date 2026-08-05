@@ -6,19 +6,86 @@ import { requireCandidateContext } from "@/lib/candidate/data";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
-export async function applyToJob(
-  jobId: string,
-  note?: string,
-): Promise<ActionResult> {
+export async function applyToJob(formData: FormData): Promise<ActionResult> {
   const user = await requireCandidateContext();
   if (!user) return { ok: false, error: "Candidate session required." };
 
+  const jobId = String(formData.get("jobId") ?? "").trim();
+  if (!jobId) return { ok: false, error: "Job is required." };
+
+  const includeProfile = formData.get("includeProfile") === "on";
+  const coverLetter = String(formData.get("coverLetter") ?? "").trim();
+  let resumeUrl = String(formData.get("resumeUrl") ?? "").trim();
+  const resumeFile = formData.get("resumeFile");
+
   const supabase = await createClient();
+  const employeeId = user.linked_employee_id!;
+
+  if (resumeFile instanceof File && resumeFile.size > 0) {
+    const safeName = resumeFile.name.replace(/[^\w.\-()+ ]+/g, "_");
+    const path = `${employeeId}/${Date.now()}-${safeName}`;
+    const bytes = new Uint8Array(await resumeFile.arrayBuffer());
+    const { error: uploadError } = await supabase.storage
+      .from("candidate-resumes")
+      .upload(path, bytes, {
+        contentType: resumeFile.type || "application/octet-stream",
+        upsert: false,
+      });
+    if (uploadError) {
+      return { ok: false, error: `Resume upload failed: ${uploadError.message}` };
+    }
+    const { data: signed, error: signError } = await supabase.storage
+      .from("candidate-resumes")
+      .createSignedUrl(path, 60 * 60 * 24 * 365);
+    if (signError || !signed?.signedUrl) {
+      return {
+        ok: false,
+        error: signError?.message ?? "Could not create resume link.",
+      };
+    }
+    resumeUrl = signed.signedUrl;
+  }
+
+  if (!includeProfile && !coverLetter && !resumeUrl) {
+    return {
+      ok: false,
+      error:
+        "Choose at least one option: send profile, add a cover letter, or attach a resume.",
+    };
+  }
+
+  let profileSnapshot: Record<string, unknown> | null = null;
+  if (includeProfile) {
+    const { data: employee } = await supabase
+      .from("employees")
+      .select(
+        "first_name, last_name, email, phone, certifications, resume_url, emergency_contact_name, emergency_contact_phone, employment_type, status",
+      )
+      .eq("id", employeeId)
+      .maybeSingle();
+
+    profileSnapshot = {
+      displayName: user.name,
+      accountEmail: user.email,
+      ...(employee ?? {}),
+    };
+  }
+
   const { error } = await supabase.from("applications").insert({
     job_id: jobId,
-    employee_id: user.linked_employee_id!,
+    employee_id: employeeId,
     status: "submitted",
-    note: note?.trim() || null,
+    note: coverLetter
+      ? null
+      : includeProfile
+        ? "Sent profile information"
+        : resumeUrl
+          ? "Attached resume"
+          : null,
+    cover_letter: coverLetter || null,
+    resume_url: resumeUrl || null,
+    include_profile: includeProfile,
+    profile_snapshot: profileSnapshot,
   });
 
   if (error) {
