@@ -12,6 +12,15 @@ Next.js (App Router + TypeScript) contract-to-cash app for a staffing agency, wi
 
 **ContractFlow** tracks placements (temp + permanent), timesheets, invoices, and payments across four roles: client, employee, manager, accounting.
 
+### Billing rules (for invoice generation)
+
+When building invoice-generation logic, follow these rules:
+
+- **Regular hours** bill at the placement `bill_rate`.
+- **Overtime hours** bill to the client at **1.5 × `bill_rate`** (not the flat regular rate).
+- Invoice `amount` must equal the sum of its `invoice_line_items.amount` values exactly.
+- Temp margin / profitability uses `bill_rate − pay_rate` on regular hours; OT premium is a client billing concept (do not assume the same 1.5× applies to `pay_rate` unless product later defines it).
+
 ## Getting started
 
 ```bash
