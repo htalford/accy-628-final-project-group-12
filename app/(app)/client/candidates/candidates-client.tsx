@@ -97,7 +97,7 @@ export function CandidatesClient({
     <div className="space-y-6">
       <PageHeader
         title="Candidates"
-        description="Submittals from your recruiters for open job requests. Accept/reject updates the submittals table only."
+        description="Recruiter submittals and candidates who applied through the TalentQuest job board for your openings."
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
