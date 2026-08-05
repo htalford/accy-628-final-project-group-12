@@ -2,7 +2,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 
-export default function EmployeeDashboardPage() {
+export default function CandidateDashboardPage() {
   return (
     <div>
       <PageHeader
@@ -10,7 +10,7 @@ export default function EmployeeDashboardPage() {
         description="Your current placement details, rates, and schedule context."
       />
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <StatCard label="Current client" value="—" />
+        <StatCard label="Current employer" value="—" />
         <StatCard label="Placement type" value="—" />
         <StatCard label="Status" value="—" />
       </div>

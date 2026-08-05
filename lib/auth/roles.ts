@@ -1,16 +1,16 @@
 import type { UserRole } from "@/lib/types/database";
 
 export const USER_ROLES: UserRole[] = [
-  "client",
-  "employee",
-  "manager",
+  "employer",
+  "candidate",
+  "recruiter",
   "accounting",
 ];
 
 export const ROLE_LABELS: Record<UserRole, string> = {
-  client: "Client",
-  employee: "Employee",
-  manager: "Manager",
+  employer: "Employer",
+  candidate: "Candidate",
+  recruiter: "Recruiter",
   accounting: "Accounting",
 };
 
@@ -18,9 +18,9 @@ export const DEMO_ACCOUNTS: Record<
   UserRole,
   { email: string; label: string }
 > = {
-  client: { email: "client@contractflow.demo", label: "Casey Client" },
-  employee: { email: "employee@contractflow.demo", label: "Jordan Lee" },
-  manager: { email: "manager@contractflow.demo", label: "Morgan Manager" },
+  employer: { email: "employer@contractflow.demo", label: "Casey Employer" },
+  candidate: { email: "candidate@contractflow.demo", label: "Jordan Lee" },
+  recruiter: { email: "recruiter@contractflow.demo", label: "Morgan Recruiter" },
   accounting: {
     email: "accounting@contractflow.demo",
     label: "Avery Accounting",
@@ -29,12 +29,12 @@ export const DEMO_ACCOUNTS: Record<
 
 export function getDashboardPath(role: UserRole): string {
   switch (role) {
-    case "client":
-      return "/client/dashboard";
-    case "employee":
-      return "/employee/dashboard";
-    case "manager":
-      return "/manager/dashboard";
+    case "employer":
+      return "/employer/dashboard";
+    case "candidate":
+      return "/candidate/dashboard";
+    case "recruiter":
+      return "/recruiter/dashboard";
     case "accounting":
       return "/accounting/dashboard";
   }
@@ -54,9 +54,9 @@ export function pathRequiresAuth(pathname: string): boolean {
   if (pathname === "/login") return false;
   if (pathname.startsWith("/auth/")) return false;
   return (
-    pathname.startsWith("/client") ||
-    pathname.startsWith("/employee") ||
-    pathname.startsWith("/manager") ||
+    pathname.startsWith("/employer") ||
+    pathname.startsWith("/candidate") ||
+    pathname.startsWith("/recruiter") ||
     pathname.startsWith("/accounting")
   );
 }
@@ -69,20 +69,20 @@ export type NavItem = {
 
 export function getNavForRole(role: UserRole): NavItem[] {
   switch (role) {
-    case "client":
+    case "employer":
       return [
-        { href: "/client/dashboard", label: "Dashboard", icon: "layout-dashboard" },
-        { href: "/client/timesheets", label: "Timesheet approval", icon: "clipboard-check" },
+        { href: "/employer/dashboard", label: "Dashboard", icon: "layout-dashboard" },
+        { href: "/employer/timesheets", label: "Timesheet approval", icon: "clipboard-check" },
       ];
-    case "employee":
+    case "candidate":
       return [
-        { href: "/employee/dashboard", label: "Dashboard", icon: "layout-dashboard" },
-        { href: "/employee/timesheets", label: "Submit timesheet", icon: "clock" },
+        { href: "/candidate/dashboard", label: "Dashboard", icon: "layout-dashboard" },
+        { href: "/candidate/timesheets", label: "Submit timesheet", icon: "clock" },
       ];
-    case "manager":
+    case "recruiter":
       return [
-        { href: "/manager/dashboard", label: "Dashboard", icon: "layout-dashboard" },
-        { href: "/manager/placements", label: "Placements", icon: "briefcase" },
+        { href: "/recruiter/dashboard", label: "Dashboard", icon: "layout-dashboard" },
+        { href: "/recruiter/placements", label: "Placements", icon: "briefcase" },
       ];
     case "accounting":
       return [

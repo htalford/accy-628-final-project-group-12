@@ -4,7 +4,7 @@
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-CREATE TYPE public.user_role AS ENUM ('client', 'employee', 'manager', 'accounting');
+CREATE TYPE public.user_role AS ENUM ('employer', 'candidate', 'recruiter', 'accounting');
 CREATE TYPE public.placement_type AS ENUM ('temp', 'permanent');
 CREATE TYPE public.placement_status AS ENUM ('active', 'completed', 'cancelled', 'at_risk');
 CREATE TYPE public.employment_type AS ENUM ('temp', 'permanent');
@@ -112,11 +112,11 @@ CREATE TABLE public.users (
   linked_employee_id uuid REFERENCES public.employees(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT users_client_link_chk CHECK (
-    role <> 'client' OR linked_client_id IS NOT NULL
+  CONSTRAINT users_employer_link_chk CHECK (
+    role <> 'employer' OR linked_client_id IS NOT NULL
   ),
-  CONSTRAINT users_employee_link_chk CHECK (
-    role <> 'employee' OR linked_employee_id IS NOT NULL
+  CONSTRAINT users_candidate_link_chk CHECK (
+    role <> 'candidate' OR linked_employee_id IS NOT NULL
   )
 );
 
@@ -146,7 +146,7 @@ AS $$ SELECT linked_employee_id FROM public.users WHERE auth_id = auth.uid() $$;
 CREATE OR REPLACE FUNCTION public.is_staff()
 RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
-AS $$ SELECT public.current_app_role() IN ('manager', 'accounting') $$;
+AS $$ SELECT public.current_app_role() IN ('recruiter', 'accounting') $$;
 
 REVOKE ALL ON FUNCTION public.current_app_role() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.current_app_client_id() FROM PUBLIC, anon;
@@ -261,8 +261,8 @@ CREATE POLICY invoices_select ON public.invoices
 
 CREATE POLICY invoices_write_staff ON public.invoices
   FOR ALL TO authenticated
-  USING (public.current_app_role() IN ('accounting', 'manager'))
-  WITH CHECK (public.current_app_role() IN ('accounting', 'manager'));
+  USING (public.current_app_role() IN ('accounting', 'recruiter'))
+  WITH CHECK (public.current_app_role() IN ('accounting', 'recruiter'));
 
 CREATE POLICY invoice_line_items_select ON public.invoice_line_items
   FOR SELECT TO authenticated
@@ -291,5 +291,5 @@ CREATE POLICY payments_select ON public.payments
 
 CREATE POLICY payments_write_accounting ON public.payments
   FOR ALL TO authenticated
-  USING (public.current_app_role() IN ('accounting', 'manager'))
-  WITH CHECK (public.current_app_role() IN ('accounting', 'manager'));
+  USING (public.current_app_role() IN ('accounting', 'recruiter'))
+  WITH CHECK (public.current_app_role() IN ('accounting', 'recruiter'));

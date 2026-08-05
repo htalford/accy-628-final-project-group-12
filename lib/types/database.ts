@@ -1,4 +1,4 @@
-export type UserRole = "client" | "employee" | "manager" | "accounting";
+export type UserRole = "employer" | "candidate" | "recruiter" | "accounting";
 
 export type PlacementType = "temp" | "permanent";
 export type PlacementStatus = "active" | "completed" | "cancelled" | "at_risk";

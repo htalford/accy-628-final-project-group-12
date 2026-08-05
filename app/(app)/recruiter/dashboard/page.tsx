@@ -2,7 +2,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 
-export default function ManagerDashboardPage() {
+export default function RecruiterDashboardPage() {
   return (
     <div>
       <PageHeader
@@ -16,7 +16,7 @@ export default function ManagerDashboardPage() {
       </div>
       <EmptyState
         title="Portfolio overview coming soon"
-        description="Managers will see placement health, margins at risk, and aging timesheets."
+        description="Recruiters will see placement health, margins at risk, and aging timesheets."
       />
     </div>
   );

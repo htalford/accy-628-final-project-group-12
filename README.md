@@ -10,7 +10,7 @@ Next.js (App Router + TypeScript) contract-to-cash app for a staffing agency, wi
 
 ## Product
 
-**ContractFlow** tracks placements (temp + permanent), timesheets, invoices, and payments across four roles: client, employee, manager, accounting.
+**ContractFlow** tracks placements (temp + permanent), timesheets, invoices, and payments across four roles: employer, candidate, recruiter, accounting.
 
 ### Billing rules (for invoice generation)
 
@@ -37,9 +37,9 @@ Password for all: `DemoPass123!`
 
 | Role | Email |
 |---|---|
-| Client | `client@contractflow.demo` |
-| Employee | `employee@contractflow.demo` |
-| Manager | `manager@contractflow.demo` |
+| Employer | `employer@contractflow.demo` |
+| Candidate | `candidate@contractflow.demo` |
+| Recruiter | `recruiter@contractflow.demo` |
 | Accounting | `accounting@contractflow.demo` |
 
 After login, use the **Demo role switcher** (bottom-right) to jump between roles without typing credentials again.
@@ -48,9 +48,9 @@ After login, use the **Demo role switcher** (bottom-right) to jump between roles
 
 | Role | Pages |
 |---|---|
-| Client | `/client/dashboard`, `/client/timesheets` |
-| Employee | `/employee/dashboard`, `/employee/timesheets` |
-| Manager | `/manager/dashboard`, `/manager/placements` |
+| Employer | `/employer/dashboard`, `/employer/timesheets` |
+| Candidate | `/candidate/dashboard`, `/candidate/timesheets` |
+| Recruiter | `/recruiter/dashboard`, `/recruiter/placements` |
 | Accounting | `/accounting/dashboard`, `/accounting/invoices` |
 
 ## Supabase
