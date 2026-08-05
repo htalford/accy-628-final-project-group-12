@@ -21,6 +21,8 @@ type ShellContextValue = {
 
 const ShellContext = createContext<ShellContextValue | null>(null);
 const PINNED_KEY = "cf-sidebar-pinned";
+const LEGACY_COLLAPSED_KEY = "cf-sidebar-collapsed";
+const LEGACY_RECRUITER_SIDEBAR_PIN_KEY = "cf-recruiter-sidebar-pinned";
 
 export function ShellProvider({ children }: { children: React.ReactNode }) {
   const [pinned, setPinnedState] = useState(false);
@@ -28,6 +30,8 @@ export function ShellProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
+      localStorage.removeItem(LEGACY_COLLAPSED_KEY);
+      localStorage.removeItem(LEGACY_RECRUITER_SIDEBAR_PIN_KEY);
       const savedPinned = localStorage.getItem(PINNED_KEY);
       if (savedPinned === "1") setPinnedState(true);
     } catch {

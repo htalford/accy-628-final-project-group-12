@@ -414,6 +414,15 @@ function ScheduleModal({
   );
 }
 
+function formatApplicationStatusLabel(status: ApplicationStatus): string {
+  if (status === "reviewing") return "Approved";
+  return status
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
 function StatusModal({
   current,
   onClose,
@@ -442,7 +451,7 @@ function StatusModal({
         >
           {options.map((o) => (
             <option key={o} value={o}>
-              {o === "reviewing" ? "Approved (reviewing)" : o}
+              {formatApplicationStatusLabel(o)}
             </option>
           ))}
         </select>

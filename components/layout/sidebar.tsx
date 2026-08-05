@@ -77,21 +77,25 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
 
 const CANDIDATE_DASHBOARD = "/candidate/dashboard";
 const CANDIDATE_PIN_KEY = "cf-candidate-nav-pins";
+const RECRUITER_DASHBOARD = "/recruiter/dashboard";
+const RECRUITER_PIN_KEY = "cf-recruiter-nav-pins";
 
-function readCandidatePins(): string[] {
-  if (typeof window === "undefined") return [CANDIDATE_DASHBOARD];
+function readPinnedHrefs(storageKey: string, dashboardHref: string): string[] {
+  if (typeof window === "undefined") return [dashboardHref];
   try {
-    const raw = window.localStorage.getItem(CANDIDATE_PIN_KEY);
-    if (!raw) return [CANDIDATE_DASHBOARD];
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return [dashboardHref];
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [CANDIDATE_DASHBOARD];
+    if (!Array.isArray(parsed)) return [dashboardHref];
     const hrefs = parsed.filter((v): v is string => typeof v === "string");
-    return hrefs.length > 0 ? hrefs : [CANDIDATE_DASHBOARD];
+    const withoutDash = hrefs.filter((h) => h !== dashboardHref);
+    return [dashboardHref, ...withoutDash];
   } catch {
-    return [CANDIDATE_DASHBOARD];
+    return [dashboardHref];
   }
 }
 
+/** Candidate: Dashboard first (if pinned), then other pins in stored order, then alpha unpinned. */
 function orderCandidateNav(items: NavItem[], pinnedHrefs: string[]) {
   const byHref = new Map(items.map((item) => [item.href, item]));
   const pinnedSet = new Set(pinnedHrefs);
@@ -113,12 +117,44 @@ function orderCandidateNav(items: NavItem[], pinnedHrefs: string[]) {
   return { pinned, unpinned };
 }
 
+/**
+ * Recruiter: Dashboard always first & locked pinned.
+ * Other pinned tabs alphabetical below Dashboard.
+ * Remaining unpinned tabs alphabetical.
+ */
+function orderRecruiterNav(items: NavItem[], pinnedHrefs: string[]) {
+  const byHref = new Map(items.map((item) => [item.href, item]));
+  const dashboard = byHref.get(RECRUITER_DASHBOARD);
+  const pinnedSet = new Set(pinnedHrefs);
+
+  const pinnedExtras = items
+    .filter(
+      (item) =>
+        item.href !== RECRUITER_DASHBOARD && pinnedSet.has(item.href),
+    )
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  const pinned: NavItem[] = dashboard
+    ? [dashboard, ...pinnedExtras]
+    : pinnedExtras;
+
+  const unpinned = items
+    .filter(
+      (item) =>
+        item.href !== RECRUITER_DASHBOARD && !pinnedSet.has(item.href),
+    )
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  return { pinned, unpinned };
+}
+
 function NavLink({
   item,
   collapsed,
   onNavigate,
   pinned,
   showPinControls,
+  pinLocked,
   onTogglePin,
 }: {
   item: NavItem;
@@ -126,6 +162,7 @@ function NavLink({
   onNavigate?: () => void;
   pinned?: boolean;
   showPinControls?: boolean;
+  pinLocked?: boolean;
   onTogglePin?: () => void;
 }) {
   const pathname = usePathname();
@@ -154,24 +191,38 @@ function NavLink({
         <Icon className="h-4 w-4 shrink-0" aria-hidden />
         {!collapsed ? <span className="truncate">{item.label}</span> : null}
       </Link>
-      {showPinControls && onTogglePin && !collapsed ? (
-        <button
-          type="button"
-          onClick={onTogglePin}
-          title={pinned ? `Unpin ${item.label}` : `Pin ${item.label}`}
-          aria-label={pinned ? `Unpin ${item.label}` : `Pin ${item.label}`}
-          className={`mr-1 rounded p-1.5 transition ${
-            pinned
-              ? "text-[var(--cf-accent)] opacity-100"
-              : "text-white/40 opacity-0 group-hover:opacity-100 hover:text-white"
-          }`}
-        >
-          {pinned ? (
+      {showPinControls && !collapsed ? (
+        pinLocked ? (
+          <span
+            title={`${item.label} is always pinned`}
+            aria-label={`${item.label} is always pinned`}
+            className="mr-1 inline-flex rounded p-1.5 text-[var(--cf-accent)]"
+          >
             <Pin className="h-3.5 w-3.5 fill-current" aria-hidden />
-          ) : (
-            <PinOff className="h-3.5 w-3.5" aria-hidden />
-          )}
-        </button>
+          </span>
+        ) : onTogglePin ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onTogglePin();
+            }}
+            title={pinned ? `Unpin ${item.label}` : `Pin ${item.label}`}
+            aria-label={pinned ? `Unpin ${item.label}` : `Pin ${item.label}`}
+            className={`mr-1 rounded p-1.5 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
+              pinned
+                ? "text-[var(--cf-accent)]"
+                : "text-white/45 hover:text-white"
+            }`}
+          >
+            {pinned ? (
+              <Pin className="h-3.5 w-3.5 fill-current" aria-hidden />
+            ) : (
+              <PinOff className="h-3.5 w-3.5" aria-hidden />
+            )}
+          </button>
+        ) : null
       ) : null}
     </div>
   );
@@ -236,7 +287,9 @@ function AccountingPinnedTaskLink({
 export function Sidebar({ role }: { role: UserRole }) {
   const items = getNavForRole(role);
   const isCandidate = role === "candidate";
+  const isRecruiter = role === "recruiter";
   const isAccounting = role === "accounting";
+  const usesTabPins = isCandidate || isRecruiter;
   const homePath = getDashboardPath(role);
   const {
     showCollapsed,
@@ -246,41 +299,61 @@ export function Sidebar({ role }: { role: UserRole }) {
     togglePinned,
     canTogglePin,
   } = useSidebarLayout(homePath);
-  const [pinnedHrefs, setPinnedHrefs] = useState<string[]>([
-    CANDIDATE_DASHBOARD,
-  ]);
-  const [ready, setReady] = useState(!isCandidate);
+
+  const dashboardHref = isRecruiter
+    ? RECRUITER_DASHBOARD
+    : CANDIDATE_DASHBOARD;
+  const pinStorageKey = isRecruiter ? RECRUITER_PIN_KEY : CANDIDATE_PIN_KEY;
+
+  const [pinnedHrefs, setPinnedHrefs] = useState<string[]>([dashboardHref]);
+  const [ready, setReady] = useState(!usesTabPins);
   const { tasks: accountingPins, unpin: unpinAccounting } =
     usePinnedTasks("accounting");
 
   useEffect(() => {
-    if (!isCandidate) return;
-    setPinnedHrefs(readCandidatePins());
+    if (!usesTabPins) return;
+    setPinnedHrefs(readPinnedHrefs(pinStorageKey, dashboardHref));
     setReady(true);
-  }, [isCandidate]);
+  }, [usesTabPins, pinStorageKey, dashboardHref]);
 
   useEffect(() => {
-    if (!isCandidate || !ready) return;
-    window.localStorage.setItem(CANDIDATE_PIN_KEY, JSON.stringify(pinnedHrefs));
-  }, [isCandidate, pinnedHrefs, ready]);
+    if (!usesTabPins || !ready) return;
+    const normalized = isRecruiter
+      ? [
+          RECRUITER_DASHBOARD,
+          ...pinnedHrefs.filter((h) => h !== RECRUITER_DASHBOARD),
+        ]
+      : pinnedHrefs.length > 0
+        ? pinnedHrefs
+        : [CANDIDATE_DASHBOARD];
+    window.localStorage.setItem(pinStorageKey, JSON.stringify(normalized));
+  }, [usesTabPins, pinnedHrefs, ready, pinStorageKey, isRecruiter]);
 
   const { pinned, unpinned } = useMemo(() => {
-    if (!isCandidate) {
-      return { pinned: items, unpinned: [] as NavItem[] };
-    }
-    return orderCandidateNav(items, pinnedHrefs);
-  }, [isCandidate, items, pinnedHrefs]);
+    if (isRecruiter) return orderRecruiterNav(items, pinnedHrefs);
+    if (isCandidate) return orderCandidateNav(items, pinnedHrefs);
+    return { pinned: items, unpinned: [] as NavItem[] };
+  }, [isCandidate, isRecruiter, items, pinnedHrefs]);
 
   function togglePin(href: string) {
+    if (isRecruiter && href === RECRUITER_DASHBOARD) return;
     setPinnedHrefs((prev) => {
-      if (prev.includes(href)) {
-        return prev.filter((h) => h !== href);
+      const base = isRecruiter
+        ? prev.includes(RECRUITER_DASHBOARD)
+          ? prev
+          : [RECRUITER_DASHBOARD, ...prev]
+        : prev;
+      if (base.includes(href)) {
+        return base.filter((h) => h !== href);
       }
-      return [...prev, href];
+      return [...base, href];
     });
   }
 
   const navCollapsed = showCollapsed && !mobileOpen;
+  // Recruiter uses per-tab pins; hide whole-sidebar pin control for that role.
+  const showSidebarPinControl = !isRecruiter && canTogglePin;
+  const showHomeLockedPin = !isRecruiter && !canTogglePin;
 
   const accountingPinnedSection =
     isAccounting && accountingPins.length > 0 ? (
@@ -317,7 +390,7 @@ export function Sidebar({ role }: { role: UserRole }) {
         >
           <X className="h-4 w-4" />
         </button>
-        {!navCollapsed && canTogglePin ? (
+        {!navCollapsed && showSidebarPinControl ? (
           <button
             type="button"
             className={`absolute top-3 right-3 hidden rounded-md p-1.5 transition lg:inline-flex ${
@@ -339,7 +412,7 @@ export function Sidebar({ role }: { role: UserRole }) {
             />
           </button>
         ) : null}
-        {!navCollapsed && !canTogglePin ? (
+        {!navCollapsed && showHomeLockedPin ? (
           <span
             className="absolute top-3 right-3 hidden rounded-md p-1.5 text-[var(--cf-accent)] lg:inline-flex"
             title="Sidebar stays open on Home"
@@ -369,7 +442,7 @@ export function Sidebar({ role }: { role: UserRole }) {
             </p>
           ) : null}
           {navCollapsed ? (
-            canTogglePin ? (
+            showSidebarPinControl ? (
               <button
                 type="button"
                 className={`mt-2 hidden rounded-md p-1.5 transition lg:inline-flex ${
@@ -390,7 +463,7 @@ export function Sidebar({ role }: { role: UserRole }) {
                   aria-hidden
                 />
               </button>
-            ) : (
+            ) : showHomeLockedPin ? (
               <span
                 className="mt-2 hidden rounded-md p-1.5 text-[var(--cf-accent)] lg:inline-flex"
                 title="Sidebar stays open on Home"
@@ -398,13 +471,13 @@ export function Sidebar({ role }: { role: UserRole }) {
               >
                 <Pin className="h-4 w-4 fill-current" aria-hidden />
               </span>
-            )
+            ) : null
           ) : null}
         </div>
       </div>
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
         {accountingPinnedSection}
-        {isCandidate ? (
+        {usesTabPins ? (
           <>
             {pinned.length > 0 ? (
               <div className="mb-1">
@@ -421,6 +494,9 @@ export function Sidebar({ role }: { role: UserRole }) {
                       collapsed={navCollapsed}
                       pinned
                       showPinControls
+                      pinLocked={
+                        isRecruiter && item.href === RECRUITER_DASHBOARD
+                      }
                       onTogglePin={() => togglePin(item.href)}
                       onNavigate={() => setMobileOpen(false)}
                     />
@@ -470,8 +546,8 @@ export function Sidebar({ role }: { role: UserRole }) {
       </nav>
       {!navCollapsed ? (
         <div className="border-t border-white/10 px-4 py-3 text-xs text-white/40">
-          {isCandidate
-            ? "Hover a tab to pin or unpin"
+          {usesTabPins
+            ? "Use the pin icon on a tab to pin or unpin"
             : isAccounting
               ? "Pin contracts from the Contracts page"
               : "ACCY 628 · Group 12"}
