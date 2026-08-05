@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge, statusTone } from "@/components/ui/status-badge";
 import { Panel } from "@/components/accounting/panel";
+import { ScrollToFocus } from "@/components/accounting/scroll-to-focus";
 import {
   ClientArLink,
   ContractLink,
@@ -19,7 +20,12 @@ import {
   operatingExpenseCategoryLabel,
 } from "@/lib/accounting/format";
 
-export default async function ExpensesPage() {
+export default async function ExpensesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ focus?: string }>;
+}) {
+  const { focus } = await searchParams;
   const [placementExpenses, operatingExpenses] = await Promise.all([
     getExpenses(),
     getOperatingExpenses(),
@@ -30,6 +36,7 @@ export default async function ExpensesPage() {
 
   return (
     <div className="space-y-8">
+      <ScrollToFocus focusId={focus} />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <PageHeader
           title="Expenses"
@@ -50,6 +57,12 @@ export default async function ExpensesPage() {
         >
           <DataTable
             rows={placementExpenses}
+            rowHtmlId={(row) => `expense-${row.id}`}
+            rowClassName={(row) =>
+              focus === row.id
+                ? "bg-[var(--cf-accent)]/10 ring-2 ring-inset ring-[var(--cf-accent)]"
+                : undefined
+            }
             emptyTitle="No placement expenses yet"
             emptyDescription="When placement-linked expenses are recorded in Supabase, they appear here."
             columns={[
@@ -123,6 +136,12 @@ export default async function ExpensesPage() {
         >
           <DataTable
             rows={operatingExpenses}
+            rowHtmlId={(row) => `expense-${row.id}`}
+            rowClassName={(row) =>
+              focus === row.id
+                ? "bg-[var(--cf-accent)]/10 ring-2 ring-inset ring-[var(--cf-accent)]"
+                : undefined
+            }
             emptyTitle="No operating expenses yet"
             emptyDescription="When operating expenses are recorded in Supabase, they appear here."
             columns={[
