@@ -110,7 +110,7 @@ export async function searchAccounting(query: string): Promise<SearchHit[]> {
       type: "Placement expense",
       id: row.id,
       label: `${row.expense_type} · ${row.description} · $${Number(row.amount).toLocaleString()} · ${row.expense_date}`,
-      href: "/accounting/expenses",
+      href: `/accounting/expenses?focus=${row.id}`,
     });
   }
 
@@ -119,7 +119,7 @@ export async function searchAccounting(query: string): Promise<SearchHit[]> {
       type: "Operating expense",
       id: row.id,
       label: `${row.category} · ${row.description} · $${Number(row.amount).toLocaleString()} · ${row.expense_date}`,
-      href: "/accounting/expenses",
+      href: `/accounting/expenses?focus=${row.id}`,
     });
   }
 

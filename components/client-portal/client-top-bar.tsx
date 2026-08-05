@@ -146,7 +146,8 @@ export function ClientTopBar({
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
+  const desktopSearchRef = useRef<HTMLDivElement>(null);
+  const mobileSearchRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -174,7 +175,11 @@ export function ClientTopBar({
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
       const t = e.target as Node;
-      if (searchRef.current && !searchRef.current.contains(t)) {
+      const inDesktop = desktopSearchRef.current?.contains(t) ?? false;
+      const inMobile = mobileSearchRef.current?.contains(t) ?? false;
+      // Treat either panel as "inside" so desktop result clicks are not
+      // mistaken for outside clicks when the mobile panel also mounts.
+      if (!inDesktop && !inMobile) {
         setSearchOpen(false);
       }
       if (notifRef.current && !notifRef.current.contains(t)) {
@@ -208,7 +213,7 @@ export function ClientTopBar({
 
       <div
         className="relative mx-auto hidden max-w-md flex-1 md:block"
-        ref={searchRef}
+        ref={desktopSearchRef}
       >
         <SearchInput
           placeholder="Search employees, candidates, jobs…"
@@ -346,7 +351,7 @@ export function ClientTopBar({
       {searchOpen ? (
         <div
           className="absolute top-16 right-4 left-4 z-40 md:hidden"
-          ref={searchRef}
+          ref={mobileSearchRef}
         >
           <div className="rounded-xl border border-[var(--cf-border)] bg-white p-3 shadow-lg">
             <SearchInput

@@ -20,6 +20,40 @@ export function staffEmailFromUsername(input: string): string {
   return `${local}@${STAFF_EMAIL_DOMAIN}`;
 }
 
+/** Username / email local-part → staff role, if this is an allowed staff identity. */
+export function staffRoleFromEmail(emailOrUsername: string): UserRole | null {
+  const normalized = emailOrUsername.trim().toLowerCase();
+  if (!normalized) return null;
+
+  const local = normalized.includes("@")
+    ? (normalized.split("@")[0] ?? "")
+    : normalized;
+
+  if (
+    normalized === DEMO_ACCOUNTS.accounting.email.toLowerCase() ||
+    local === "accounting" ||
+    local === "accountant" ||
+    local === "avery"
+  ) {
+    return "accounting";
+  }
+
+  if (
+    normalized === DEMO_ACCOUNTS.recruiter.email.toLowerCase() ||
+    local === "recruiter" ||
+    local === "manager" ||
+    local === "morgan"
+  ) {
+    return "recruiter";
+  }
+
+  return null;
+}
+
+export function isStaffEmail(emailOrUsername: string): boolean {
+  return staffRoleFromEmail(emailOrUsername) !== null;
+}
+
 export const ROLE_LABELS: Record<UserRole, string> = {
   employer: "Employer",
   candidate: "Candidate",
@@ -39,6 +73,62 @@ export const DEMO_ACCOUNTS: Record<
     label: "Avery Accounting",
   },
 };
+
+export const CLIENT_PORTAL_ROLES: UserRole[] = ["employer", "candidate"];
+
+export function isClientPortalRole(role: UserRole): boolean {
+  return CLIENT_PORTAL_ROLES.includes(role);
+}
+
+/** Email → employer/candidate if this is an allowed client-portal identity. */
+export function clientPortalRoleFromEmail(email: string): UserRole | null {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+
+  const local = normalized.includes("@")
+    ? (normalized.split("@")[0] ?? "")
+    : normalized;
+
+  if (
+    normalized === DEMO_ACCOUNTS.employer.email.toLowerCase() ||
+    local === "employer" ||
+    local.startsWith("employer+") ||
+    normalized.startsWith("employer@") ||
+    normalized.includes("+employer@")
+  ) {
+    return "employer";
+  }
+
+  if (
+    normalized === DEMO_ACCOUNTS.candidate.email.toLowerCase() ||
+    local === "candidate" ||
+    local.startsWith("candidate+") ||
+    normalized.startsWith("candidate@") ||
+    normalized.includes("+candidate@")
+  ) {
+    return "candidate";
+  }
+
+  return null;
+}
+
+export function isClientPortalEmail(email: string): boolean {
+  return clientPortalRoleFromEmail(email) !== null;
+}
+
+/**
+ * Resolve employer vs candidate for the client login portal.
+ * Prefers the profile role; falls back to email when needed.
+ */
+export function resolveClientPortalRole(
+  email: string,
+  role?: UserRole | null,
+): UserRole | null {
+  if (role && isClientPortalRole(role)) {
+    return role;
+  }
+  return clientPortalRoleFromEmail(email);
+}
 
 export function getDashboardPath(role: UserRole): string {
   switch (role) {
@@ -171,7 +261,7 @@ export function getNavForRole(role: UserRole): NavItem[] {
         { href: "/candidate/dashboard", label: "Dashboard", icon: "layout-dashboard" },
         { href: "/candidate/applications", label: "Applications", icon: "send" },
         { href: "/candidate/jobs", label: "Available jobs", icon: "search" },
-        { href: "/candidate/completions", label: "Completions", icon: "circle-check" },
+        { href: "/candidate/completions", label: "Completion status", icon: "circle-check" },
         { href: "/candidate/contracts", label: "Contracts", icon: "file-signature" },
         { href: "/candidate/messages", label: "Messages", icon: "message-square" },
         { href: "/candidate/pay", label: "Pay", icon: "wallet" },
@@ -237,7 +327,7 @@ export function getPageTitle(pathname: string): string {
     "/candidate/dashboard": "Dashboard",
     "/candidate/applications": "Applications",
     "/candidate/jobs": "Available jobs",
-    "/candidate/completions": "Completions",
+    "/candidate/completions": "Completion status",
     "/candidate/contracts": "Contracts",
     "/candidate/messages": "Messages",
     "/candidate/pay": "Pay",
@@ -258,6 +348,7 @@ export function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/accounting/invoices/")) return "Invoice detail";
   if (pathname.startsWith("/accounting/contracts/")) return "Contract detail";
   if (pathname.startsWith("/candidate/contracts/")) return "Contract detail";
+  if (pathname.startsWith("/candidate/completions/")) return "Completion detail";
   if (pathname.startsWith("/client/job-requests/new")) return "New Job Request";
   if (pathname.startsWith("/client/job-requests/")) return "Job Request";
   if (pathname.startsWith("/client/candidates/")) return "Candidate Profile";

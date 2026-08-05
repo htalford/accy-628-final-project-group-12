@@ -95,9 +95,25 @@ export async function applyToJob(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: error.message };
   }
 
+  // DB trigger also forwards; call RPC so the employer Candidates list updates even if trigger is missing.
+  const { data: appRow } = await supabase
+    .from("applications")
+    .select("id")
+    .eq("job_id", jobId)
+    .eq("employee_id", employeeId)
+    .maybeSingle();
+  if (appRow?.id) {
+    await supabase.rpc("forward_application_to_client", {
+      p_application_id: appRow.id,
+    });
+  }
+
   revalidatePath("/candidate/jobs");
   revalidatePath("/candidate/applications");
   revalidatePath("/candidate/dashboard");
+  revalidatePath("/client/candidates");
+  revalidatePath("/client/dashboard");
+  revalidatePath("/client/job-requests");
   return { ok: true };
 }
 

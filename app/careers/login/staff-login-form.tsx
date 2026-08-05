@@ -7,26 +7,24 @@ import {
   DEMO_ACCOUNTS,
   STAFF_EMAIL_DOMAIN,
   getDashboardPath,
+  isStaffEmail,
   isStaffRole,
   staffEmailFromUsername,
+  staffRoleFromEmail,
 } from "@/lib/auth/roles";
 import type { UserRole } from "@/lib/types/database";
 
 function demoEmailForUsername(username: string): string | null {
-  const local = username.trim().toLowerCase().split("@")[0] ?? "";
-  if (local === "accounting" || local === "accountant" || local === "avery") {
-    return DEMO_ACCOUNTS.accounting.email;
-  }
-  if (local === "recruiter" || local === "manager" || local === "morgan") {
-    return DEMO_ACCOUNTS.recruiter.email;
-  }
+  const role = staffRoleFromEmail(username);
+  if (role === "accounting") return DEMO_ACCOUNTS.accounting.email;
+  if (role === "recruiter") return DEMO_ACCOUNTS.recruiter.email;
   return null;
 }
 
 export function StaffLoginForm() {
   const router = useRouter();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("accounting");
+  const [password, setPassword] = useState("DemoPass123!");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -41,8 +39,16 @@ export function StaffLoginForm() {
         return;
       }
 
+      if (!isStaffEmail(local)) {
+        setError(
+          "Employee sign in is only for accounting or recruiter emails (for example accounting or recruiter).",
+        );
+        return;
+      }
+
       const supabase = createClient();
       const staffEmail = staffEmailFromUsername(local);
+      let signedInEmail = staffEmail;
       let signInError = (
         await supabase.auth.signInWithPassword({
           email: staffEmail,
@@ -53,6 +59,7 @@ export function StaffLoginForm() {
       if (signInError) {
         const demoEmail = demoEmailForUsername(local);
         if (demoEmail) {
+          signedInEmail = demoEmail;
           signInError = (
             await supabase.auth.signInWithPassword({
               email: demoEmail,
@@ -76,7 +83,7 @@ export function StaffLoginForm() {
 
       const { data: appUser, error: userError } = await supabase
         .from("users")
-        .select("role")
+        .select("role, email")
         .eq("auth_id", authId)
         .maybeSingle();
 
@@ -87,10 +94,12 @@ export function StaffLoginForm() {
       }
 
       const role = appUser.role as UserRole;
-      if (!isStaffRole(role)) {
+      const profileEmail = (appUser.email as string | null) ?? signedInEmail;
+
+      if (!isStaffRole(role) || !isStaffEmail(profileEmail)) {
         await supabase.auth.signOut();
         setError(
-          "This portal is for Talent Quest staff only. Clients should use Client sign in.",
+          "This portal only accepts accounting or recruiter Talent Quest emails. Clients should use Client sign in.",
         );
         return;
       }
@@ -111,13 +120,16 @@ export function StaffLoginForm() {
             required
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="first.last"
+            placeholder="accounting or recruiter"
             className="min-w-0 flex-1 px-3 py-2 text-[var(--ot-ink)] outline-none"
           />
           <span className="shrink-0 border-l border-[var(--ot-border)] bg-[var(--ot-mist)] px-3 py-2 text-sm text-[var(--ot-muted)]">
             @{STAFF_EMAIL_DOMAIN}
           </span>
         </div>
+        <span className="text-xs text-[var(--ot-muted)]">
+          Only accounting or recruiter usernames are accepted.
+        </span>
       </label>
       <label className="flex flex-col gap-1.5 text-sm">
         <span className="font-medium text-[var(--ot-ink)]">Password</span>

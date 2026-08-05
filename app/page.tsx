@@ -24,18 +24,12 @@ export default function HomePage() {
             contract, and permanent — with people who are ready to contribute
             from day one.
           </p>
-          <div className="mt-8 flex flex-wrap items-center gap-4">
+          <div className="mt-8">
             <Link
               href="/signup"
-              className="rounded-md bg-[var(--ot-ocean)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ot-ocean-hover)]"
+              className="inline-flex rounded-md bg-[var(--ot-ocean)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ot-ocean-hover)]"
             >
               Get Started
-            </Link>
-            <Link
-              href="/login"
-              className="text-sm font-semibold text-[var(--ot-navy)] hover:text-[var(--ot-ocean)]"
-            >
-              Existing user login
             </Link>
           </div>
         </div>

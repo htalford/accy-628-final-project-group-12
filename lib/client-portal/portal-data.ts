@@ -46,6 +46,8 @@ export function mapJobRequest(row: Record<string, unknown>): PortalJobRequest {
     notes: row.notes == null ? null : String(row.notes),
     recruiter_name:
       row.recruiter_name == null ? null : String(row.recruiter_name),
+    source_job_id:
+      row.source_job_id == null ? null : String(row.source_job_id),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
   };
@@ -58,6 +60,8 @@ export function mapSubmittal(row: Record<string, unknown>): PortalSubmittal {
     job_request_id: String(row.job_request_id),
     client_id: String(row.client_id),
     employee_id: row.employee_id == null ? null : String(row.employee_id),
+    application_id:
+      row.application_id == null ? null : String(row.application_id),
     candidate_name: String(row.candidate_name),
     candidate_email:
       row.candidate_email == null ? null : String(row.candidate_email),

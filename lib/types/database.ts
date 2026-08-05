@@ -75,6 +75,8 @@ export type PortalJobRequest = {
   description: string | null;
   notes: string | null;
   recruiter_name: string | null;
+  /** Optional link to a public.jobs board posting. */
+  source_job_id?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -90,6 +92,8 @@ export type PortalSubmittal = {
   job_request_id: string;
   client_id: string;
   employee_id: string | null;
+  /** Linked candidate-portal application when sourced from the job board. */
+  application_id?: string | null;
   candidate_name: string;
   candidate_email: string | null;
   candidate_phone: string | null;

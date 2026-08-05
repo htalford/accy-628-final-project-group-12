@@ -3,12 +3,17 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { getDashboardPath } from "@/lib/auth/roles";
+import {
+  clientPortalRoleFromEmail,
+  getDashboardPath,
+  isClientPortalEmail,
+  isClientPortalRole,
+} from "@/lib/auth/roles";
 import type { UserRole } from "@/lib/types/database";
 
 export function LoginForm() {
   const router = useRouter();
-  const [email, setEmail] = useState("candidate@talentquest.demo");
+  const [email, setEmail] = useState("employer@talentquest.demo");
   const [password, setPassword] = useState("DemoPass123!");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -18,9 +23,19 @@ export function LoginForm() {
     setError(null);
 
     startTransition(async () => {
+      const trimmedEmail = email.trim().toLowerCase();
+      const emailRole = clientPortalRoleFromEmail(trimmedEmail);
+
+      if (!emailRole || !isClientPortalEmail(trimmedEmail)) {
+        setError(
+          "Client sign in is only for employer or candidate emails (for example employer@… or candidate@…).",
+        );
+        return;
+      }
+
       const supabase = createClient();
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
+        email: trimmedEmail,
         password,
       });
 
@@ -38,16 +53,37 @@ export function LoginForm() {
 
       const { data: appUser, error: userError } = await supabase
         .from("users")
-        .select("role")
+        .select("role, email")
         .eq("auth_id", authId)
         .maybeSingle();
 
       if (userError || !appUser) {
+        await supabase.auth.signOut();
         setError("No application profile found for this account.");
         return;
       }
 
-      router.replace(getDashboardPath(appUser.role as UserRole));
+      const profileEmail = (appUser.email as string | null) ?? trimmedEmail;
+      const role = appUser.role as UserRole;
+      // Prefer email identity so candidate@… never lands on the employer portal.
+      const portalRole =
+        clientPortalRoleFromEmail(profileEmail) ??
+        (isClientPortalRole(role) ? role : null) ??
+        emailRole;
+
+      if (
+        !portalRole ||
+        !isClientPortalRole(role) ||
+        !isClientPortalEmail(profileEmail)
+      ) {
+        await supabase.auth.signOut();
+        setError(
+          "This portal only accepts employer or candidate emails. Staff should use Employee sign in.",
+        );
+        return;
+      }
+
+      router.replace(getDashboardPath(portalRole));
       router.refresh();
     });
   }
@@ -62,8 +98,12 @@ export function LoginForm() {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          placeholder="employer@… or candidate@…"
           className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-[var(--cf-ink)] outline-none ring-[var(--cf-accent)] focus:ring-2"
         />
+        <span className="text-xs text-[var(--cf-muted)]">
+          Only employer or candidate emails are accepted.
+        </span>
       </label>
       <label className="flex flex-col gap-1.5 text-sm">
         <span className="font-medium text-[var(--cf-ink)]">Password</span>
