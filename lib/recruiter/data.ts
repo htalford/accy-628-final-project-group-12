@@ -1,14 +1,19 @@
 /**
- * Recruiter data accessors — Supabase jobs, applications, employees,
- * clients, placements, and messages.
+ * Recruiter data accessors — Supabase jobs/applications plus employer Client
+ * Portal tables (job_requests, submittals, client messages) so recruiters see
+ * the same hiring activity employers create. Does not call employer-gated loaders.
  */
 
 import { createClient } from "@/lib/supabase/server";
 import { getAppUser } from "@/lib/auth/get-app-user";
 import { filterCandidates, filterJobOrders } from "@/lib/recruiter/filters";
+import { mapJobRequest, mapSubmittal } from "@/lib/client-portal/portal-data";
 import {
   applicationStatusToPipeline,
+  jobRequestStatusToDb,
+  jobRequestStatusToUi,
   jobStatusToUi,
+  submittalStageToPipeline,
   type ActivityEvent,
   type CandidateFilters,
   type DashboardMetrics,
@@ -26,6 +31,7 @@ import {
 } from "@/lib/recruiter/types";
 import type {
   ApplicationStatus,
+  JobRequestStatus,
   JobStatus,
   PlacementStatus,
   PlacementType,
@@ -71,6 +77,172 @@ function mapPlacementStatusUi(status: PlacementStatus, startDate: string) {
   if (status === "cancelled") return "Ended" as const;
   if (status === "active" && startDate > today) return "Starting Soon" as const;
   return "Active" as const;
+}
+
+/** Staff-scoped: all employer job requests (same rows Client Portal shows). */
+async function fetchEmployerJobRequests() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("job_requests")
+    .select(
+      `*, clients(id, name, billing_email)`,
+    )
+    .order("updated_at", { ascending: false });
+  if (error) {
+    console.error("fetchEmployerJobRequests", error.message);
+    return [];
+  }
+  return data ?? [];
+}
+
+/** Staff-scoped: all employer candidate submittals. */
+async function fetchEmployerSubmittals() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("submittals")
+    .select("*, job_request:job_requests(title, location), clients(name)")
+    .order("updated_at", { ascending: false });
+  if (error) {
+    console.error("fetchEmployerSubmittals", error.message);
+    return [];
+  }
+  return data ?? [];
+}
+
+function mapEmployerRequestToJobOrder(
+  row: Record<string, unknown>,
+): RecruiterJobOrder {
+  const mapped = mapJobRequest(row);
+  const client = asRecord(row.clients);
+  const status = mapped.status as JobRequestStatus;
+  const uiStatus = jobRequestStatusToUi(status);
+  const open =
+    status === "open" || status === "in_progress" ? mapped.positions : 0;
+
+  return {
+    id: mapped.id,
+    title: mapped.title,
+    clientId: mapped.client_id,
+    client: str(client?.name, "Employer"),
+    employerName: str(client?.name, "Employer"),
+    primaryContact: str(client?.billing_email, "Primary contact TBD"),
+    company: str(client?.name, "Employer"),
+    location: mapped.location || "—",
+    status: uiStatus,
+    dbStatus: jobRequestStatusToDb(status),
+    openPositions: open,
+    filledPositions: status === "filled" ? mapped.positions : 0,
+    priority: status === "open" ? "High" : "Medium",
+    description: mapped.description || mapped.notes || "",
+    requiredSkills: mapped.skills,
+    payRate: 0,
+    billRate: 0,
+    assignedRecruiter: mapped.recruiter_name || "Morgan Recruiter",
+    contractSummary: mapped.employment_type,
+    assignedCandidateIds: [],
+    assignedEmployeeId: null,
+    interviewProgress: `${mapped.positions} open seat(s) · Employer request`,
+    notes: mapped.notes || "",
+    recruiterNotes: mapped.notes
+      ? [
+          {
+            id: `note-${mapped.id}`,
+            body: mapped.notes,
+            author: mapped.recruiter_name || "Employer / Recruiter",
+            createdAt: mapped.updated_at,
+          },
+        ]
+      : [],
+    source: "employer_request",
+  };
+}
+
+function parseInterviewFromNotes(notes: string | null | undefined): {
+  interviewAt: string | null;
+  interviewType: InterviewType | null;
+} {
+  if (!notes) return { interviewAt: null, interviewType: null };
+  const typeMatch = notes.match(/\((Virtual|Phone|In Person)\)/i);
+  const interviewType = (typeMatch?.[1] as InterviewType | undefined) ?? null;
+
+  // Prefer ISO if present
+  const iso = notes.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
+  if (iso) {
+    const d = new Date(iso[0]);
+    if (!Number.isNaN(d.getTime())) {
+      return { interviewAt: d.toISOString(), interviewType };
+    }
+  }
+
+  // Locale string from scheduleInterview: "Interview 9/10/2026, 10:30:00 AM (Virtual)"
+  const legacy = notes.match(
+    /Interview\s+(\d{1,2}\/\d{1,2}\/\d{4}),\s*(\d{1,2}:\d{2}:\d{2}\s*[AP]M)/i,
+  );
+  if (legacy) {
+    const d = new Date(`${legacy[1]} ${legacy[2]}`);
+    if (!Number.isNaN(d.getTime())) {
+      return { interviewAt: d.toISOString(), interviewType };
+    }
+  }
+
+  return { interviewAt: null, interviewType };
+}
+
+function mapEmployerSubmittalToCandidate(
+  row: Record<string, unknown>,
+): RecruiterCandidate {
+  const mapped = mapSubmittal(row);
+  const jr = asRecord(row.job_request);
+  const client = asRecord(row.clients);
+  const stage = mapped.stage;
+  const status = submittalStageToPipeline(stage);
+  const fromCol = (row.interview_at as string | null) ?? null;
+  const typeCol = (row.interview_type as InterviewType | null) ?? null;
+  const parsed = parseInterviewFromNotes(mapped.interview_notes);
+  const interviewAt = fromCol || parsed.interviewAt;
+  const interviewType = typeCol || parsed.interviewType;
+
+  return {
+    id: mapped.id,
+    applicationId: null,
+    employeeId: mapped.employee_id || mapped.id,
+    name: mapped.candidate_name,
+    email: mapped.candidate_email || "—",
+    phone: mapped.candidate_phone || "—",
+    positionApplied:
+      mapped.position_title || mapped.job_title || str(jr?.title, "Role"),
+    jobId: mapped.job_request_id,
+    jobTitle: mapped.job_title || str(jr?.title) || null,
+    experienceYears: mapped.years_experience ?? 0,
+    status: interviewAt && status === "Applied" ? "Interview Scheduled" : status,
+    applicationStatus: null,
+    skills: mapped.skills.length
+      ? mapped.skills
+      : [str(client?.name, "General")].filter(Boolean),
+    location: str(jr?.location, str(client?.name, "—")),
+    recruiter: mapped.recruiter_name || "Morgan Recruiter",
+    lastUpdated: mapped.updated_at.slice(0, 10),
+    education: "—",
+    notes:
+      mapped.interview_notes ||
+      mapped.resume_summary ||
+      `Employer submittal (${stage}).`,
+    resumeUrl: null,
+    interviewAt,
+    interviewType,
+    interviewNotes: mapped.interview_notes,
+    interviewHistory: interviewAt
+      ? [
+          {
+            id: `iv-sub-${mapped.id}`,
+            date: interviewAt.slice(0, 10),
+            type: interviewType ?? "Virtual",
+            outcome: stage === "interview" ? "Scheduled" : "Recorded",
+          },
+        ]
+      : [],
+    source: "employer_submittal",
+  };
 }
 
 export async function listCandidates(
@@ -142,10 +314,15 @@ export async function listCandidates(
             },
           ]
         : [],
+      source: "application" as const,
     };
   });
 
-  return filterCandidates(rows, filters);
+  const employerRows = (await fetchEmployerSubmittals()).map((row) =>
+    mapEmployerSubmittalToCandidate(row as Record<string, unknown>),
+  );
+
+  return filterCandidates([...rows, ...employerRows], filters);
 }
 
 export async function getCandidate(
@@ -159,9 +336,14 @@ export async function listApprovedCandidates(): Promise<RecruiterCandidate[]> {
   const all = await listCandidates();
   return all.filter(
     (c) =>
-      c.applicationStatus === "reviewing" ||
-      c.applicationStatus === "interview" ||
-      c.applicationStatus === "offered",
+      c.source === "application"
+        ? c.applicationStatus === "reviewing" ||
+          c.applicationStatus === "interview" ||
+          c.applicationStatus === "offered"
+        : c.status === "Client Review" ||
+          c.status === "Interview Scheduled" ||
+          c.status === "Offer Sent" ||
+          c.status === "Approved",
   );
 }
 
@@ -232,10 +414,30 @@ export async function listJobOrders(
       interviewProgress: `${jobApps.length} application(s)`,
       notes: "",
       recruiterNotes: parseNotes(job.recruiter_notes),
+      source: "public_job" as const,
     };
   });
 
-  return filterJobOrders(rows, filters);
+  const employerOrders = (await fetchEmployerJobRequests()).map((row) =>
+    mapEmployerRequestToJobOrder(row as Record<string, unknown>),
+  );
+
+  // Link submittals onto employer job requests for assignedCandidateIds
+  const submittals = await fetchEmployerSubmittals();
+  const byRequest = new Map<string, string[]>();
+  for (const s of submittals) {
+    const jrId = String(s.job_request_id);
+    const empId = s.employee_id ? String(s.employee_id) : String(s.id);
+    const list = byRequest.get(jrId) ?? [];
+    list.push(empId);
+    byRequest.set(jrId, list);
+  }
+  for (const order of employerOrders) {
+    order.assignedCandidateIds = byRequest.get(order.id) ?? [];
+    order.interviewProgress = `${order.assignedCandidateIds.length} submittal(s) · Employer request`;
+  }
+
+  return filterJobOrders([...rows, ...employerOrders], filters);
 }
 
 export async function getJobOrder(
@@ -257,7 +459,7 @@ export async function getCandidatesByIds(
 
 export async function listClients(): Promise<RecruiterClient[]> {
   const supabase = await createClient();
-  const [{ data: clients }, { data: jobs }, { data: placements }] =
+  const [{ data: clients }, { data: jobs }, { data: placements }, requests] =
     await Promise.all([
       supabase
         .from("clients")
@@ -265,14 +467,22 @@ export async function listClients(): Promise<RecruiterClient[]> {
         .order("name"),
       supabase.from("jobs").select("client_id, employer_name, status"),
       supabase.from("placements").select("client_id, status"),
+      fetchEmployerJobRequests(),
     ]);
 
   return (clients ?? []).map((c) => {
-    const openJobs = (jobs ?? []).filter(
+    const openBoardJobs = (jobs ?? []).filter(
       (j) =>
         (j.client_id === c.id || j.employer_name === c.name) &&
         j.status === "open",
     ).length;
+    const openEmployerRequests = requests.filter((r) => {
+      const mapped = mapJobRequest(r as Record<string, unknown>);
+      return (
+        mapped.client_id === c.id &&
+        (mapped.status === "open" || mapped.status === "in_progress")
+      );
+    }).length;
     const activePlacements = (placements ?? []).filter(
       (p) =>
         p.client_id === c.id &&
@@ -284,7 +494,7 @@ export async function listClients(): Promise<RecruiterClient[]> {
       primaryContact: (c.billing_email as string) || "—",
       phone: "—",
       email: (c.billing_email as string) || "—",
-      openJobs,
+      openJobs: openBoardJobs + openEmployerRequests,
       activePlacements,
       lastContact: String(c.updated_at).slice(0, 10),
       industry: (c.industry as string | null) ?? null,
@@ -363,7 +573,9 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     listPlacementsThisMonth(),
   ]);
   return {
-    openJobOrders: jobs.filter((j) => j.dbStatus === "open").length,
+    openJobOrders: jobs.filter(
+      (j) => j.status === "Open" || j.status === "Interviewing",
+    ).length,
     candidatesInPipeline: candidates.filter(
       (c) => c.status !== "Rejected" && c.status !== "Hired",
     ).length,
@@ -376,13 +588,24 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
 }
 
 export async function listRecentJobOrders(limit = 5) {
-  return (await listJobOrders()).slice(0, limit);
+  const all = await listJobOrders();
+  const open = all.filter(
+    (j) => j.status === "Open" || j.status === "Interviewing",
+  );
+  const rest = all.filter(
+    (j) => j.status !== "Open" && j.status !== "Interviewing",
+  );
+  return [...open, ...rest].slice(0, limit);
 }
 
 export async function listInterviews(): Promise<RecruiterInterview[]> {
   const candidates = await listCandidates();
   return candidates
-    .filter((c) => c.interviewAt)
+    .filter((c) => {
+      if (!c.interviewAt) return false;
+      const t = new Date(c.interviewAt).getTime();
+      return !Number.isNaN(t);
+    })
     .map((c) => {
       const dt = new Date(c.interviewAt!);
       return {
@@ -390,7 +613,14 @@ export async function listInterviews(): Promise<RecruiterInterview[]> {
         applicationId: c.applicationId ?? c.id,
         candidate: c.name,
         candidateId: c.employeeId,
-        company: c.location !== "—" ? c.location : "Employer",
+        company:
+          c.source === "employer_submittal"
+            ? c.location !== "—"
+              ? c.location
+              : "Employer"
+            : c.location !== "—"
+              ? c.location
+              : "Employer",
         position: c.positionApplied,
         jobOrderId: c.jobId ?? "",
         date: dt.toISOString().slice(0, 10),
@@ -422,25 +652,31 @@ export async function listRecentActivity(limit = 8): Promise<ActivityEvent[]> {
   ]);
   const events: ActivityEvent[] = [];
 
-  for (const c of candidates.slice(0, 10)) {
+  for (const c of candidates.slice(0, 12)) {
+    const fromEmployer = c.source === "employer_submittal";
     events.push({
       id: `cand-${c.id}`,
       kind:
         c.status === "Interview Scheduled"
           ? "interview_scheduled"
-          : c.status === "Approved"
+          : c.status === "Hired" || c.status === "Offer Sent"
             ? "offer_accepted"
             : "stage_moved",
       timestamp: `${c.lastUpdated}T12:00:00`,
-      description: `${c.name} — ${c.status} for ${c.positionApplied}`,
+      description: fromEmployer
+        ? `${c.name} — employer submittal (${c.status}) for ${c.positionApplied}`
+        : `${c.name} — ${c.status} for ${c.positionApplied}`,
     });
   }
-  for (const j of jobs.slice(0, 5)) {
+  for (const j of jobs.slice(0, 8)) {
     events.push({
       id: `job-${j.id}`,
       kind: "job_order_created",
       timestamp: new Date().toISOString(),
-      description: `Job order "${j.title}" at ${j.company} is ${j.status}.`,
+      description:
+        j.source === "employer_request"
+          ? `Employer job request "${j.title}" at ${j.company} is ${j.status}.`
+          : `Job order "${j.title}" at ${j.company} is ${j.status}.`,
     });
   }
 
@@ -500,36 +736,62 @@ export async function listMessageThreads(): Promise<RecruiterMessageThread[]> {
     t.messages.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
-  // Structured employer placeholder threads (no employer messages table yet).
-  const clients = await listClients();
-  const employerThreads: RecruiterMessageThread[] = clients.slice(0, 3).map((c) => ({
-    id: `emp-${c.id}`,
-    participantType: "employer" as const,
-    participantName: c.company,
-    participantId: c.id,
-    subject: `Account check-in · ${c.company}`,
-    preview: "Placeholder employer conversation — ready for DB integration.",
-    updatedAt: c.lastContact,
-    unread: 0,
-    messages: [
-      {
-        id: `seed-${c.id}`,
-        sender: "Morgan Recruiter",
-        senderRole: "recruiter",
-        body: `Hi ${c.primaryContact}, following up on open roles at ${c.company}.`,
-        createdAt: `${c.lastContact}T10:00:00`,
-        mine: true,
-      },
-      {
-        id: `seed2-${c.id}`,
-        sender: c.primaryContact,
-        senderRole: "employer",
-        body: "Thanks — please send any approved candidates this week.",
-        createdAt: `${c.lastContact}T11:00:00`,
-        mine: false,
-      },
-    ],
-  }));
+  // Live employer threads from Client Portal (same table employers use).
+  const [{ data: threads }, clients] = await Promise.all([
+    supabase
+      .from("client_message_threads")
+      .select("*")
+      .order("updated_at", { ascending: false }),
+    listClients(),
+  ]);
+  const clientName = new Map(clients.map((c) => [c.id, c.company]));
+
+  const threadIds = (threads ?? []).map((t) => String(t.id));
+  const { data: clientMsgs } =
+    threadIds.length === 0
+      ? { data: [] as Record<string, unknown>[] }
+      : await supabase
+          .from("client_messages")
+          .select("*")
+          .in("thread_id", threadIds)
+          .order("created_at", { ascending: true });
+
+  const msgsByThread = new Map<string, typeof clientMsgs>();
+  for (const m of clientMsgs ?? []) {
+    const tid = String(m.thread_id);
+    const list = msgsByThread.get(tid) ?? [];
+    list.push(m);
+    msgsByThread.set(tid, list);
+  }
+
+  const employerThreads: RecruiterMessageThread[] = (threads ?? []).map((t) => {
+    const id = String(t.id);
+    const msgs = msgsByThread.get(id) ?? [];
+    const last = msgs[msgs.length - 1];
+    const company =
+      clientName.get(String(t.client_id)) ?? "Employer";
+    return {
+      id,
+      participantType: "employer" as const,
+      participantName: company,
+      participantId: String(t.client_id),
+      subject: String(t.subject ?? "Conversation"),
+      preview: last ? String(last.body).slice(0, 80) : "No messages yet",
+      updatedAt: String(t.updated_at),
+      unread: 0,
+      messages: msgs.map((m) => ({
+        id: String(m.id),
+        sender:
+          m.sender_role === "recruiter" || m.sender_role === "staff"
+            ? String(t.recruiter_name || "Recruiter")
+            : company,
+        senderRole: String(m.sender_role),
+        body: String(m.body),
+        createdAt: String(m.created_at),
+        mine: m.sender_role === "recruiter" || m.sender_role === "staff",
+      })),
+    };
+  });
 
   return [...byEmployee.values(), ...employerThreads].sort((a, b) =>
     b.updatedAt.localeCompare(a.updatedAt),

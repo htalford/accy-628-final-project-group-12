@@ -48,6 +48,9 @@ export type JobNote = {
   createdAt: string;
 };
 
+export type CandidateSource = "application" | "employer_submittal";
+export type JobOrderSource = "public_job" | "employer_request";
+
 export type RecruiterCandidate = {
   id: string;
   /** Application id when sourced from applications table */
@@ -78,6 +81,8 @@ export type RecruiterCandidate = {
     type: InterviewType;
     outcome: string;
   }[];
+  /** application = Candidate Portal; employer_submittal = Client Portal submittals */
+  source: CandidateSource;
 };
 
 export type RecruiterJobOrder = {
@@ -105,6 +110,8 @@ export type RecruiterJobOrder = {
   interviewProgress: string;
   notes: string;
   recruiterNotes: JobNote[];
+  /** public_job = jobs board; employer_request = Client Portal job_requests */
+  source: JobOrderSource;
 };
 
 export type RecruiterInterview = {
@@ -260,6 +267,52 @@ export function jobStatusToUi(status: JobStatus): JobOrderStatus {
       return "Closed";
     default:
       return "Open";
+  }
+}
+
+export function jobRequestStatusToUi(
+  status: "open" | "in_progress" | "filled" | "closed",
+): JobOrderStatus {
+  switch (status) {
+    case "open":
+      return "Open";
+    case "in_progress":
+      return "Interviewing";
+    case "filled":
+      return "Filled";
+    case "closed":
+      return "Closed";
+    default:
+      return "Open";
+  }
+}
+
+export function jobRequestStatusToDb(
+  status: "open" | "in_progress" | "filled" | "closed",
+): JobStatus {
+  if (status === "filled") return "filled";
+  if (status === "closed") return "closed";
+  return "open";
+}
+
+export function submittalStageToPipeline(
+  stage: string,
+): PipelineStatus {
+  switch (stage) {
+    case "submitted":
+      return "Applied";
+    case "under_review":
+      return "Client Review";
+    case "interview":
+      return "Interview Scheduled";
+    case "offer":
+      return "Offer Sent";
+    case "accepted":
+      return "Hired";
+    case "rejected":
+      return "Rejected";
+    default:
+      return "Applied";
   }
 }
 

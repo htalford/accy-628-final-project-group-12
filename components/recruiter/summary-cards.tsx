@@ -13,14 +13,14 @@ export function RecruiterSummaryCards({ metrics }: { metrics: DashboardMetrics }
       <StatCard
         label="Open Job Orders"
         value={String(metrics.openJobOrders)}
-        description="Roles actively recruiting"
+        description="Roles from the job board and employer requests"
         icon={<Briefcase className="h-4 w-4" />}
         href="/recruiter/job-orders"
       />
       <StatCard
         label="Candidates in Pipeline"
         value={String(metrics.candidatesInPipeline)}
-        description="Active hiring stages"
+        description="Applications and employer submittals"
         icon={<Users className="h-4 w-4" />}
         href="/recruiter/candidates"
       />

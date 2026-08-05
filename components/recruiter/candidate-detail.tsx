@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   CalendarPlus,
   CheckCircle2,
@@ -27,6 +28,7 @@ export function CandidateDetail({
 }: {
   candidate: RecruiterCandidate;
 }) {
+  const router = useRouter();
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -34,7 +36,13 @@ export function CandidateDetail({
   const [showStatus, setShowStatus] = useState(false);
   const [showMessage, setShowMessage] = useState(false);
 
-  const approved = candidate.applicationStatus === "reviewing" || candidate.status === "Approved";
+  const approved =
+    candidate.applicationStatus === "reviewing" ||
+    candidate.status === "Approved" ||
+    candidate.status === "Client Review" ||
+    candidate.status === "Interview Scheduled" ||
+    candidate.status === "Offer Sent" ||
+    candidate.status === "Hired";
   const applicationId = candidate.applicationId ?? candidate.id;
 
   function run(
@@ -45,7 +53,10 @@ export function CandidateDetail({
     startTransition(async () => {
       const result = await action();
       if (!result.ok) setError(result.error ?? "Something went wrong");
-      else setNotice(result.message ?? "Saved");
+      else {
+        setNotice(result.message ?? "Saved");
+        router.refresh();
+      }
     });
   }
 
@@ -83,6 +94,11 @@ export function CandidateDetail({
             </div>
             <p className="mt-2 text-sm text-[var(--cf-muted)]">
               {candidate.email} · {candidate.phone}
+              {candidate.source === "employer_submittal" ? (
+                <span className="ml-2 rounded-full bg-[var(--cf-accent)]/15 px-2 py-0.5 text-xs font-medium text-[var(--cf-navy)]">
+                  Employer submittal
+                </span>
+              ) : null}
             </p>
           </div>
         </div>
@@ -109,7 +125,11 @@ export function CandidateDetail({
             icon={<UserX className="h-4 w-4" />}
             label="Reject Candidate"
             danger
-            disabled={pending || candidate.applicationStatus === "rejected"}
+            disabled={
+              pending ||
+              candidate.applicationStatus === "rejected" ||
+              candidate.status === "Rejected"
+            }
             onClick={() => run(() => rejectApplication(applicationId))}
           />
           {!approved ? (
