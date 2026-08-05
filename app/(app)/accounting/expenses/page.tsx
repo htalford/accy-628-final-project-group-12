@@ -7,106 +7,155 @@ import {
   ClientArLink,
   ContractLink,
 } from "@/components/accounting/entity-links";
-import { getExpenses } from "@/lib/accounting/queries";
 import {
-  EXPENSE_CATEGORIES,
-  expenseCategoryLabel,
+  getExpenses,
+  getOperatingExpenses,
+} from "@/lib/accounting/queries";
+import {
   expenseStatusLabel,
+  expenseTypeLabel,
   money,
   moneyExact,
+  operatingExpenseCategoryLabel,
 } from "@/lib/accounting/format";
 
 export default async function ExpensesPage() {
-  const expenses = await getExpenses();
+  const [placementExpenses, operatingExpenses] = await Promise.all([
+    getExpenses(),
+    getOperatingExpenses(),
+  ]);
 
-  const byCategory = EXPENSE_CATEGORIES.map((cat) => ({
-    category: cat,
-    total: expenses
-      .filter((e) => e.category === cat)
-      .reduce((s, e) => s + e.amount, 0),
-    count: expenses.filter((e) => e.category === cat).length,
-  }));
+  const placementTotal = placementExpenses.reduce((s, e) => s + e.amount, 0);
+  const operatingTotal = operatingExpenses.reduce((s, e) => s + e.amount, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader title="Expenses" />
+        <PageHeader
+          title="Expenses"
+          description="Direct placement costs and company overhead, tracked separately."
+        />
         <Button disabled>Add Expense</Button>
       </div>
 
-      <Panel title="Categories" description="Agency cost categories">
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {byCategory.map((c) => (
-            <div
-              key={c.category}
-              className="rounded-lg border border-[var(--cf-border)] bg-[var(--cf-surface)] px-3 py-2"
-            >
-              <p className="text-xs font-medium text-[var(--cf-muted)]">
-                {expenseCategoryLabel(c.category)}
-              </p>
-              <p className="text-sm font-semibold text-[var(--cf-ink)]">
-                {money(c.total)}
-                <span className="ml-2 text-xs font-normal text-[var(--cf-muted)]">
-                  ({c.count})
-                </span>
-              </p>
-            </div>
-          ))}
-        </div>
-      </Panel>
+      <section className="space-y-4">
+        <Panel
+          title="Placement Expenses"
+          description="Direct costs tied to a placement (payroll tax, benefits, recruiting, travel, etc.)."
+          action={
+            <span className="text-sm font-semibold text-[var(--cf-ink)]">
+              {money(placementTotal)}
+            </span>
+          }
+        >
+          <DataTable
+            rows={placementExpenses}
+            emptyTitle="No placement expenses yet"
+            emptyDescription="When placement-linked expenses are recorded in Supabase, they appear here."
+            columns={[
+              {
+                key: "date",
+                header: "Expense Date",
+                render: (row) => row.expenseDate,
+              },
+              {
+                key: "type",
+                header: "Type",
+                render: (row) => expenseTypeLabel(row.expenseType),
+              },
+              {
+                key: "description",
+                header: "Description",
+                render: (row) => row.description,
+              },
+              {
+                key: "client",
+                header: "Client",
+                render: (row) =>
+                  row.clientName !== "—" ? (
+                    <ClientArLink
+                      clientId={row.clientId}
+                      name={row.clientName}
+                    />
+                  ) : (
+                    "—"
+                  ),
+              },
+              {
+                key: "placement",
+                header: "Placement",
+                render: (row) =>
+                  row.placementId ? (
+                    <ContractLink id={row.placementId} />
+                  ) : (
+                    "—"
+                  ),
+              },
+              {
+                key: "amount",
+                header: "Amount",
+                render: (row) => moneyExact(row.amount),
+              },
+              {
+                key: "status",
+                header: "Status",
+                render: (row) => (
+                  <StatusBadge
+                    label={expenseStatusLabel(row.status)}
+                    tone={statusTone(row.status)}
+                  />
+                ),
+              },
+            ]}
+          />
+        </Panel>
+      </section>
 
-      <DataTable
-        rows={expenses}
-        emptyTitle="No expenses yet"
-        emptyDescription="The expenses table is connected. When your team inserts expenses in Supabase, they will show up here on refresh."
-        columns={[
-          {
-            key: "date",
-            header: "Expense Date",
-            render: (row) => row.expenseDate,
-          },
-          {
-            key: "category",
-            header: "Category",
-            render: (row) => expenseCategoryLabel(row.category),
-          },
-          {
-            key: "client",
-            header: "Client",
-            render: (row) =>
-              row.clientName !== "—" ? (
-                <ClientArLink clientId={row.clientId} name={row.clientName} />
-              ) : (
-                "—"
-              ),
-          },
-          {
-            key: "placement",
-            header: "Placement",
-            render: (row) =>
-              row.placementId ? (
-                <ContractLink id={row.placementId} />
-              ) : (
-                "—"
-              ),
-          },
-          {
-            key: "amount",
-            header: "Amount",
-            render: (row) => moneyExact(row.amount),
-          },
-          {
-            key: "status",
-            header: "Status",
-            render: (row) => (
-              <StatusBadge
-                label={expenseStatusLabel(row.status)}
-                tone={statusTone(row.status)}
-              />
-            ),
-          },
-        ]}
-      />
+      <section className="space-y-4">
+        <Panel
+          title="Operating Expenses"
+          description="Company overhead (salaries, rent, software, advertising, screening, training, etc.)."
+          action={
+            <span className="text-sm font-semibold text-[var(--cf-ink)]">
+              {money(operatingTotal)}
+            </span>
+          }
+        >
+          <DataTable
+            rows={operatingExpenses}
+            emptyTitle="No operating expenses yet"
+            emptyDescription="When operating expenses are recorded in Supabase, they appear here."
+            columns={[
+              {
+                key: "date",
+                header: "Expense Date",
+                render: (row) => row.expenseDate,
+              },
+              {
+                key: "month",
+                header: "Month",
+                render: (row) => row.month,
+              },
+              {
+                key: "category",
+                header: "Category",
+                render: (row) =>
+                  operatingExpenseCategoryLabel(row.category),
+              },
+              {
+                key: "description",
+                header: "Description",
+                render: (row) => row.description,
+              },
+              {
+                key: "amount",
+                header: "Amount",
+                render: (row) => moneyExact(row.amount),
+              },
+            ]}
+          />
+        </Panel>
+      </section>
     </div>
   );
 }

@@ -17,27 +17,33 @@ export async function searchAccounting(query: string): Promise<SearchHit[]> {
   const like = `%${q}%`;
   const hits: SearchHit[] = [];
 
-  const [clients, employees, invoices, placements, expenses] = await Promise.all([
-    supabase.from("clients").select("id, name").ilike("name", like).limit(5),
-    supabase
-      .from("employees")
-      .select("id, first_name, last_name")
-      .or(`first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like}`)
-      .limit(5),
-    supabase
-      .from("invoices")
-      .select("id, amount, status, clients(name)")
-      .limit(8),
-    supabase
-      .from("placements")
-      .select("id, placement_type, status, clients(name), employees(first_name, last_name)")
-      .limit(8),
-    supabase
-      .from("expenses")
-      .select("id, category, amount, expense_date")
-      .ilike("category", like)
-      .limit(5),
-  ]);
+  const [clients, employees, invoices, placements, expenses, operatingExpenses] =
+    await Promise.all([
+      supabase.from("clients").select("id, name").ilike("name", like).limit(5),
+      supabase
+        .from("employees")
+        .select("id, first_name, last_name")
+        .or(`first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like}`)
+        .limit(5),
+      supabase
+        .from("invoices")
+        .select("id, amount, status, clients(name)")
+        .limit(8),
+      supabase
+        .from("placements")
+        .select("id, placement_type, status, clients(name), employees(first_name, last_name)")
+        .limit(8),
+      supabase
+        .from("expenses")
+        .select("id, expense_type, description, amount, expense_date")
+        .or(`description.ilike.${like},expense_type::text.ilike.${like}`)
+        .limit(5),
+      supabase
+        .from("operating_expenses")
+        .select("id, category, description, amount, expense_date")
+        .or(`description.ilike.${like},category::text.ilike.${like}`)
+        .limit(5),
+    ]);
 
   for (const row of clients.data ?? []) {
     hits.push({
@@ -101,9 +107,18 @@ export async function searchAccounting(query: string): Promise<SearchHit[]> {
 
   for (const row of expenses.data ?? []) {
     hits.push({
-      type: "Expense",
+      type: "Placement expense",
       id: row.id,
-      label: `${row.category} · $${Number(row.amount).toLocaleString()} · ${row.expense_date}`,
+      label: `${row.expense_type} · ${row.description} · $${Number(row.amount).toLocaleString()} · ${row.expense_date}`,
+      href: "/accounting/expenses",
+    });
+  }
+
+  for (const row of operatingExpenses.data ?? []) {
+    hits.push({
+      type: "Operating expense",
+      id: row.id,
+      label: `${row.category} · ${row.description} · $${Number(row.amount).toLocaleString()} · ${row.expense_date}`,
       href: "/accounting/expenses",
     });
   }
