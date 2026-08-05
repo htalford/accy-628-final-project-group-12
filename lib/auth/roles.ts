@@ -61,10 +61,25 @@ export function pathRequiresAuth(pathname: string): boolean {
   );
 }
 
+export type NavIcon =
+  | "layout-dashboard"
+  | "clipboard-check"
+  | "briefcase"
+  | "file-text"
+  | "clock"
+  | "wallet"
+  | "receipt"
+  | "file-signature"
+  | "circle-dollar-sign"
+  | "trending-up"
+  | "bar-chart-3"
+  | "messages-square"
+  | "user";
+
 export type NavItem = {
   href: string;
   label: string;
-  icon: "layout-dashboard" | "clipboard-check" | "briefcase" | "file-text" | "clock";
+  icon: NavIcon;
 };
 
 export function getNavForRole(role: UserRole): NavItem[] {
@@ -86,8 +101,42 @@ export function getNavForRole(role: UserRole): NavItem[] {
       ];
     case "accounting":
       return [
-        { href: "/accounting/dashboard", label: "Dashboard", icon: "layout-dashboard" },
+        { href: "/accounting/dashboard", label: "Home", icon: "layout-dashboard" },
         { href: "/accounting/invoices", label: "Invoices", icon: "file-text" },
+        { href: "/accounting/payroll", label: "Payroll", icon: "wallet" },
+        { href: "/accounting/accounts-receivable", label: "Accounts Receivable", icon: "receipt" },
+        { href: "/accounting/contracts", label: "Contracts", icon: "file-signature" },
+        { href: "/accounting/expenses", label: "Expenses", icon: "circle-dollar-sign" },
+        { href: "/accounting/profitability", label: "Profitability", icon: "trending-up" },
+        { href: "/accounting/reports", label: "Financial Reports", icon: "bar-chart-3" },
+        { href: "/accounting/messages", label: "Messages", icon: "messages-square" },
+        { href: "/accounting/profile", label: "Profile", icon: "user" },
       ];
   }
+}
+
+export function getPageTitle(pathname: string): string {
+  const map: Record<string, string> = {
+    "/accounting/dashboard": "Home",
+    "/accounting/invoices": "Invoices",
+    "/accounting/payroll": "Payroll",
+    "/accounting/accounts-receivable": "Accounts Receivable",
+    "/accounting/contracts": "Contracts",
+    "/accounting/expenses": "Expenses",
+    "/accounting/profitability": "Profitability",
+    "/accounting/reports": "Financial Reports",
+    "/accounting/messages": "Messages",
+    "/accounting/profile": "Profile",
+    "/employer/dashboard": "Dashboard",
+    "/employer/timesheets": "Timesheet approval",
+    "/candidate/dashboard": "Dashboard",
+    "/candidate/timesheets": "Submit timesheet",
+    "/recruiter/dashboard": "Dashboard",
+    "/recruiter/placements": "Placements",
+  };
+
+  if (map[pathname]) return map[pathname];
+  if (pathname.startsWith("/accounting/invoices/")) return "Invoice detail";
+  if (pathname.startsWith("/accounting/contracts/")) return "Contract detail";
+  return "ContractFlow";
 }
