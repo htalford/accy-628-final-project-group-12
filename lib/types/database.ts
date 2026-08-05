@@ -34,6 +34,10 @@ export type Employee = {
   phone: string | null;
   employment_type: EmploymentType;
   status: EntityStatus;
+  certifications: string | null;
+  resume_url: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
   created_at: string;
   updated_at: string;
 };

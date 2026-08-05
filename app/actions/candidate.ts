@@ -133,6 +133,10 @@ export async function updateCandidateProfile(formData: {
   lastName: string;
   phone: string;
   displayName: string;
+  certifications: string;
+  resumeUrl: string;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
 }): Promise<ActionResult> {
   const user = await requireCandidateContext();
   if (!user) return { ok: false, error: "Candidate session required." };
@@ -151,6 +155,10 @@ export async function updateCandidateProfile(formData: {
       first_name: firstName,
       last_name: lastName,
       phone: formData.phone.trim() || null,
+      certifications: formData.certifications?.trim() || null,
+      resume_url: formData.resumeUrl?.trim() || null,
+      emergency_contact_name: formData.emergencyContactName?.trim() || null,
+      emergency_contact_phone: formData.emergencyContactPhone?.trim() || null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", user.linked_employee_id!);

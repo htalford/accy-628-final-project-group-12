@@ -88,15 +88,15 @@ export function getNavForRole(role: UserRole): NavItem[] {
       ];
     case "candidate":
       return [
-        { href: "/candidate/dashboard", label: "Dashboard", icon: "layout-dashboard" },
-        { href: "/candidate/jobs", label: "Available jobs", icon: "search" },
-        { href: "/candidate/contracts", label: "Contracts", icon: "file-signature" },
-        { href: "/candidate/timesheets", label: "Timesheets", icon: "clock" },
         { href: "/candidate/applications", label: "Applications", icon: "send" },
-        { href: "/candidate/pay", label: "Pay", icon: "wallet" },
+        { href: "/candidate/jobs", label: "Available jobs", icon: "search" },
         { href: "/candidate/completions", label: "Completions", icon: "circle-check" },
+        { href: "/candidate/contracts", label: "Contracts", icon: "file-signature" },
+        { href: "/candidate/dashboard", label: "Dashboard", icon: "layout-dashboard" },
         { href: "/candidate/messages", label: "Messages", icon: "message-square" },
+        { href: "/candidate/pay", label: "Pay", icon: "wallet" },
         { href: "/candidate/profile", label: "Profile", icon: "user" },
+        { href: "/candidate/timesheets", label: "Timesheets", icon: "clock" },
       ];
     case "recruiter":
       return [
