@@ -1,6 +1,6 @@
 import type { ExpenseStatus, InvoiceStatus } from "@/lib/types/database";
 
-/** Product + ASC 606 aligned helpers for ContractFlow staffing math. */
+/** Product + ASC 606 aligned helpers for TalentQuest staffing math. */
 
 /** Client bill amount for a timesheet week (OT at 1.5× bill_rate). */
 export function computeTimesheetBillAmount(

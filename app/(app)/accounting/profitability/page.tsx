@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { Panel } from "@/components/accounting/panel";
@@ -6,6 +7,7 @@ import {
   HorizontalProfitBars,
   ProfitTrendChart,
 } from "@/components/accounting/charts";
+import { ContractLink } from "@/components/accounting/entity-links";
 import { getProfitabilityData } from "@/lib/accounting/queries";
 import { money } from "@/lib/accounting/format";
 
@@ -14,27 +16,32 @@ export default async function ProfitabilityPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Profitability"
-        description="Margin analytics computed from placements, invoices, payroll, and expenses."
-      />
+      <PageHeader title="Profitability" />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Billed Revenue" value={money(data.totals.revenue)} hint="Excludes draft invoices" />
+        <StatCard
+          label="Billed Revenue"
+          value={money(data.totals.revenue)}
+          hint="Excludes draft invoices"
+          href="/accounting/invoices"
+        />
         <StatCard
           label="Direct Labor (COS)"
           value={money(data.totals.directLabor)}
           hint="Approved timesheets only"
+          href="/accounting/payroll"
         />
         <StatCard
           label="Gross Margin"
           value={`${data.totals.grossMargin.toFixed(1)}%`}
           hint="Gross profit ÷ billed revenue"
+          href="/accounting/audit-trail"
         />
         <StatCard
           label="Operating Income"
           value={money(data.totals.operatingIncome)}
           hint="After recognized operating expenses"
+          href="/accounting/expenses"
         />
       </div>
 
@@ -71,6 +78,7 @@ export default async function ProfitabilityPage() {
             <thead className="text-xs tracking-wide text-[var(--cf-muted)] uppercase">
               <tr>
                 <th className="py-2 pr-4">Placement</th>
+                <th className="py-2 pr-4">Contract</th>
                 <th className="py-2 pr-4">Revenue</th>
                 <th className="py-2 pr-4">Margin / hr</th>
                 <th className="py-2 pr-4">Margin %</th>
@@ -81,7 +89,17 @@ export default async function ProfitabilityPage() {
             <tbody>
               {data.profitByPlacement.map((p) => (
                 <tr key={p.id} className="border-t border-[var(--cf-border)]">
-                  <td className="py-2 pr-4">{p.label}</td>
+                  <td className="py-2 pr-4">
+                    <Link
+                      href={`/accounting/contracts/${p.id}`}
+                      className="font-medium text-[var(--cf-ink)] hover:underline"
+                    >
+                      {p.label}
+                    </Link>
+                  </td>
+                  <td className="py-2 pr-4">
+                    <ContractLink id={p.id} />
+                  </td>
                   <td className="py-2 pr-4">{money(p.revenue)}</td>
                   <td className="py-2 pr-4">{money(p.marginPerHour)}</td>
                   <td className="py-2 pr-4">

@@ -49,11 +49,12 @@ export async function searchAccounting(query: string): Promise<SearchHit[]> {
   }
 
   for (const row of employees.data ?? []) {
+    const name = `${row.first_name} ${row.last_name}`;
     hits.push({
       type: "Employee",
       id: row.id,
-      label: `${row.first_name} ${row.last_name}`,
-      href: `/accounting/payroll?employee=${row.id}`,
+      label: name,
+      href: `/accounting/payroll?employee=${encodeURIComponent(name)}`,
     });
   }
 

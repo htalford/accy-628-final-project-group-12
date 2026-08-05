@@ -11,10 +11,7 @@ export default async function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Profile"
-        description="Your accounting user profile from Supabase users."
-      />
+      <PageHeader title="Profile" />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Employee Information">

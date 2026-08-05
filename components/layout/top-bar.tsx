@@ -97,7 +97,7 @@ export function TopBar({ user }: { user: AppUser }) {
           {title}
         </p>
         <p className="hidden text-xs text-[var(--cf-muted)] sm:block">
-          ContractFlow
+          TalentQuest
         </p>
       </div>
 

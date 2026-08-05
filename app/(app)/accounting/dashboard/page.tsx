@@ -12,17 +12,10 @@ import { money } from "@/lib/accounting/format";
 
 export default async function AccountingHomePage() {
   const data = await getDashboardData();
-  const statusData = Object.entries(data.statusCounts).map(([name, value]) => ({
-    name,
-    value,
-  }));
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Home"
-        description="Accrual overview — click any metric or section to open the related accounting page."
-      />
+      <PageHeader title="Home" />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
@@ -91,7 +84,7 @@ export default async function AccountingHomePage() {
           action={
             <Link
               href="/accounting/invoices"
-              className="text-sm font-medium text-[var(--cf-accent)] hover:underline"
+              className="text-sm font-medium text-[var(--cf-ink)] hover:underline"
             >
               Open Invoices →
             </Link>
@@ -103,18 +96,18 @@ export default async function AccountingHomePage() {
         </Panel>
         <Panel
           title="Invoice Status"
-          description="Recognized invoices only (drafts excluded)"
+          description="Same statuses as the Invoices list (drafts excluded)"
           action={
             <Link
               href="/accounting/invoices"
-              className="text-sm font-medium text-[var(--cf-accent)] hover:underline"
+              className="text-sm font-medium text-[var(--cf-ink)] hover:underline"
             >
               Open Invoices →
             </Link>
           }
         >
           <Link href="/accounting/invoices" className="block">
-            <InvoiceStatusChart data={statusData} />
+            <InvoiceStatusChart data={data.invoiceStatusChart} />
           </Link>
         </Panel>
       </div>
@@ -124,10 +117,10 @@ export default async function AccountingHomePage() {
           title="Recent Financial Activity"
           action={
             <Link
-              href="/accounting/accounts-receivable"
+              href="/accounting/audit-trail"
               className="text-sm font-medium text-[var(--cf-accent)] hover:underline"
             >
-              Open AR →
+              Full audit trail →
             </Link>
           }
         >
@@ -135,29 +128,24 @@ export default async function AccountingHomePage() {
             {data.activity.length === 0 ? (
               <li className="py-6 text-sm text-[var(--cf-muted)]">No recent activity.</li>
             ) : (
-              data.activity.map((item) => {
-                const href = item.id.startsWith("inv-")
-                  ? `/accounting/invoices/${item.id.replace("inv-", "")}`
-                  : "/accounting/accounts-receivable";
-                return (
-                  <li key={item.id}>
-                    <Link
-                      href={href}
-                      className="flex items-center justify-between gap-3 py-3 transition hover:bg-[var(--cf-surface)]"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-[var(--cf-ink)]">
-                          {item.label}
-                        </p>
-                        <p className="text-xs text-[var(--cf-muted)]">{item.at}</p>
-                      </div>
-                      <p className="text-sm font-semibold text-[var(--cf-ink)]">
-                        {item.detail}
+              data.activity.map((item) => (
+                <li key={item.id}>
+                  <Link
+                    href={item.href}
+                    className="flex items-center justify-between gap-3 py-3 transition hover:bg-[var(--cf-surface)]"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-[var(--cf-ink)]">
+                        {item.label}
                       </p>
-                    </Link>
-                  </li>
-                );
-              })
+                      <p className="text-xs text-[var(--cf-muted)]">{item.at}</p>
+                    </div>
+                    <p className="text-sm font-semibold text-[var(--cf-ink)]">
+                      {item.detail}
+                    </p>
+                  </Link>
+                </li>
+              ))
             )}
           </ul>
         </Panel>
@@ -172,6 +160,9 @@ export default async function AccountingHomePage() {
             </Button>
             <Button href="/accounting/expenses" variant="secondary">
               Expenses
+            </Button>
+            <Button href="/accounting/audit-trail" variant="secondary">
+              Audit Trail
             </Button>
             <Button href="/accounting/reports" variant="secondary">
               Financial Reports

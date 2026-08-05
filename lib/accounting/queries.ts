@@ -1,3 +1,11 @@
+import {
+  buildContractAuditEvent,
+  buildExpenseAuditEvent,
+  buildInvoiceAuditEvent,
+  buildPaymentAuditEvent,
+  buildTimesheetAuditEvent,
+  mergeAuditEvents,
+} from "@/lib/accounting/audit";
 import { createClient } from "@/lib/supabase/server";
 import {
   daysBetween,
@@ -101,7 +109,7 @@ export async function getInvoiceById(id: string) {
       .order("created_at"),
     supabase
       .from("payments")
-      .select("id, amount, payment_date, status")
+      .select("id, amount, payment_date, status, created_at")
       .eq("invoice_id", id)
       .order("payment_date", { ascending: false }),
   ]);
@@ -123,8 +131,27 @@ export async function getInvoiceById(id: string) {
       | null,
   );
 
+  const placement = asOne(
+    invoice.placements as
+      | {
+          id: string;
+          placement_type: PlacementType;
+          bill_rate: number | null;
+          pay_rate: number | null;
+        }
+      | {
+          id: string;
+          placement_type: PlacementType;
+          bill_rate: number | null;
+          pay_rate: number | null;
+        }[]
+      | null,
+  );
+
   return {
     id: invoice.id as string,
+    clientId: invoice.client_id as string,
+    placementId: (invoice.placement_id as string | null) ?? placement?.id ?? null,
     amount: Number(invoice.amount),
     status: invoice.status as InvoiceStatus,
     displayStatus: invoiceDisplayStatus(
@@ -134,36 +161,24 @@ export async function getInvoiceById(id: string) {
     periodStart: invoice.period_start as string,
     periodEnd: invoice.period_end as string,
     invoiceDate: (invoice.created_at as string).slice(0, 10),
+    createdAt: invoice.created_at as string,
     dueDate: dueDateFromPeriodEnd(invoice.period_end as string),
     client,
-    placement: asOne(
-      invoice.placements as
-        | {
-            id: string;
-            placement_type: PlacementType;
-            bill_rate: number | null;
-            pay_rate: number | null;
-          }
-        | {
-            id: string;
-            placement_type: PlacementType;
-            bill_rate: number | null;
-            pay_rate: number | null;
-          }[]
-        | null,
-    ),
+    placement,
     lineItems: (lines ?? []).map((l) => ({
       id: l.id as string,
       description: l.description as string,
       quantity: Number(l.quantity),
       rate: Number(l.rate),
       amount: Number(l.amount),
+      timesheetId: (l.timesheet_id as string | null) ?? null,
     })),
     payments: (payments ?? []).map((p) => ({
       id: p.id as string,
       amount: Number(p.amount),
       paymentDate: p.payment_date as string,
       status: p.status as string,
+      createdAt: (p.created_at as string | null) ?? null,
     })),
     lineBalance: lineItemsBalance(
       Number(invoice.amount),
@@ -225,6 +240,7 @@ export async function getPayrollRows() {
 
     return {
       id: row.id as string,
+      placementId: placement?.id ?? null,
       employeeName: employee
         ? `${employee.first_name} ${employee.last_name}`
         : "Unknown",
@@ -247,15 +263,21 @@ export async function getContracts() {
   const { data } = await supabase
     .from("placements")
     .select(
-      "id, placement_type, bill_rate, pay_rate, placement_fee, guarantee_end_date, start_date, end_date, status, clients(name), employees(first_name, last_name)",
+      "id, placement_type, bill_rate, pay_rate, placement_fee, guarantee_end_date, start_date, end_date, status, clients(id, name), employees(first_name, last_name)",
     )
     .order("start_date", { ascending: false });
 
   return (data ?? []).map((row) => {
-    const client = asOne(row.clients as Named | Named[] | null);
+    const client = asOne(
+      row.clients as
+        | { id: string; name: string }
+        | { id: string; name: string }[]
+        | null,
+    );
     const employee = asOne(row.employees as EmpName | EmpName[] | null);
     return {
       id: row.id as string,
+      clientId: client?.id ?? null,
       clientName: client?.name ?? "Unknown",
       employeeName: employee
         ? `${employee.first_name} ${employee.last_name}`
@@ -285,17 +307,43 @@ export async function getContractById(id: string) {
 
   if (!placement) return null;
 
-  const { data: invoices } = await supabase
-    .from("invoices")
-    .select("id, amount, status, period_start, period_end")
-    .eq("placement_id", id)
-    .order("period_end", { ascending: false });
+  const [{ data: invoices }, { data: timesheets }, { data: expenses }, { data: recruiters }] =
+    await Promise.all([
+      supabase
+        .from("invoices")
+        .select("id, amount, status, period_start, period_end, created_at")
+        .eq("placement_id", id)
+        .order("period_end", { ascending: false }),
+      supabase
+        .from("timesheets")
+        .select(
+          "id, week_ending_date, hours_regular, hours_overtime, status, placements(pay_rate)",
+        )
+        .eq("placement_id", id)
+        .order("week_ending_date", { ascending: false }),
+      supabase
+        .from("expenses")
+        .select("id, expense_date, category, amount, status")
+        .eq("placement_id", id)
+        .order("expense_date", { ascending: false }),
+      supabase
+        .from("users")
+        .select("name, email")
+        .eq("role", "recruiter")
+        .limit(1),
+    ]);
 
-  const { data: recruiters } = await supabase
-    .from("users")
-    .select("name, email")
-    .eq("role", "recruiter")
-    .limit(1);
+  const invoiceIds = (invoices ?? []).map((i) => i.id as string);
+  const { data: payments } =
+    invoiceIds.length > 0
+      ? await supabase
+          .from("payments")
+          .select("id, invoice_id, amount, status, payment_date, created_at")
+          .in("invoice_id", invoiceIds)
+          .order("payment_date", { ascending: false })
+      : { data: [] as never[] };
+
+  const payRate = placement.pay_rate != null ? Number(placement.pay_rate) : 0;
 
   return {
     id: placement.id as string,
@@ -339,6 +387,41 @@ export async function getContractById(id: string) {
       status: i.status as InvoiceStatus,
       periodStart: i.period_start as string,
       periodEnd: i.period_end as string,
+      createdAt: i.created_at as string,
+    })),
+    timesheets: (timesheets ?? []).map((t) => {
+      const hoursRegular = Number(t.hours_regular);
+      const hoursOvertime = Number(t.hours_overtime);
+      const placementPay = asOne(
+        t.placements as
+          | { pay_rate: number | null }
+          | { pay_rate: number | null }[]
+          | null,
+      );
+      const rate = Number(placementPay?.pay_rate ?? payRate);
+      return {
+        id: t.id as string,
+        weekEnding: t.week_ending_date as string,
+        hoursRegular,
+        hoursOvertime,
+        status: t.status as string,
+        grossPay: computeTimesheetGrossPay(hoursRegular, hoursOvertime, rate),
+      };
+    }),
+    expenses: (expenses ?? []).map((e) => ({
+      id: e.id as string,
+      expenseDate: e.expense_date as string,
+      category: e.category as ExpenseCategory,
+      amount: Number(e.amount),
+      status: e.status as ExpenseStatus,
+    })),
+    payments: (payments ?? []).map((p) => ({
+      id: p.id as string,
+      invoiceId: p.invoice_id as string,
+      amount: Number(p.amount),
+      status: p.status as string,
+      paymentDate: p.payment_date as string | null,
+      createdAt: (p.created_at as string | null) ?? null,
     })),
     recruiter: recruiters?.[0] ?? null,
   };
@@ -493,20 +576,27 @@ export async function getDashboardData() {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, amount]) => ({ month, amount }));
 
-  const statusCounts: Record<string, number> = {
-    Paid: 0,
-    Pending: 0,
-    Overdue: 0,
-    Disputed: 0,
-  };
+  const statusCounts: Record<string, number> = {};
   for (const inv of invoices) {
-    if (inv.status === "draft") continue;
-    if (inv.status === "paid") statusCounts.Paid += 1;
-    else if (inv.status === "disputed") statusCounts.Disputed += 1;
-    else if (inv.displayStatus === "Overdue") statusCounts.Overdue += 1;
-    else if (inv.status === "sent" || inv.status === "partial")
-      statusCounts.Pending += 1;
+    if (!isRecognizedInvoice(inv.status)) continue;
+    const key = inv.displayStatus;
+    statusCounts[key] = (statusCounts[key] ?? 0) + 1;
   }
+
+  const invoiceStatusOrder = [
+    "Paid",
+    "Sent",
+    "Partially Paid",
+    "Overdue",
+    "Disputed",
+  ] as const;
+
+  const invoiceStatusChart = invoiceStatusOrder
+    .map((name) => ({
+      name,
+      value: statusCounts[name] ?? 0,
+    }))
+    .filter((row) => row.value > 0);
 
   const activity = [
     ...recognizedInvoices.slice(0, 4).map((i) => ({
@@ -514,14 +604,16 @@ export async function getDashboardData() {
       label: `Invoice ${i.displayStatus.toLowerCase()} · ${i.clientName}`,
       detail: money(i.amount),
       at: i.invoiceDate,
+      href: `/accounting/invoices/${i.id}`,
     })),
-    ...(payments.data ?? []).slice(0, 3).map((p, idx) => ({
-      id: `pay-${idx}`,
+    ...(payments.data ?? []).slice(0, 3).map((p) => ({
+      id: `pay-${p.invoice_id}-${p.payment_date}`,
       label: isCompletedPayment(p.status as string)
         ? "Payment collected"
         : "Payment pending",
       detail: money(Number(p.amount)),
       at: (p.payment_date as string) ?? "",
+      href: `/accounting/invoices/${p.invoice_id as string}`,
     })),
   ].slice(0, 8);
 
@@ -542,6 +634,7 @@ export async function getDashboardData() {
     },
     revenueByMonth,
     statusCounts,
+    invoiceStatusChart,
     activity,
   };
 }
@@ -677,4 +770,125 @@ export async function getProfitabilityData() {
     },
     monthly,
   };
+}
+
+export async function getAuditTrail(options?: {
+  invoiceId?: string;
+  placementId?: string;
+  clientId?: string;
+  limit?: number;
+}) {
+  const [invoices, paymentsRes, payroll, expenses, contracts] =
+    await Promise.all([
+      getInvoices(),
+      (await createClient())
+        .from("payments")
+        .select("id, invoice_id, amount, status, payment_date, created_at"),
+      getPayrollRows(),
+      getExpenses(),
+      getContracts(),
+    ]);
+
+  const invoiceById = new Map(invoices.map((i) => [i.id, i]));
+  const placementClient = new Map(
+    contracts.map((c) => [c.id, c.clientId] as const),
+  );
+
+  let events = [
+    ...invoices.map((i) =>
+      buildInvoiceAuditEvent({
+        id: i.id,
+        clientId: i.clientId,
+        clientName: i.clientName,
+        amount: i.amount,
+        status: i.status,
+        periodEnd: i.periodEnd,
+        createdAt: `${i.invoiceDate}T00:00:00.000Z`,
+        placementId: i.placementId,
+      }),
+    ),
+    ...(paymentsRes.data ?? []).map((p) => {
+      const invoiceId = p.invoice_id as string;
+      const inv = invoiceById.get(invoiceId);
+      return {
+        ...buildPaymentAuditEvent({
+          id: p.id as string,
+          invoiceId,
+          amount: Number(p.amount),
+          status: p.status as string,
+          paymentDate: p.payment_date as string | null,
+          createdAt: (p.created_at as string | null) ?? null,
+        }),
+        clientId: inv?.clientId ?? null,
+        placementId: inv?.placementId ?? null,
+      };
+    }),
+    ...payroll.map((r) => ({
+      ...buildTimesheetAuditEvent({
+        id: r.id,
+        employeeName: r.employeeName,
+        clientName: r.assignment,
+        weekEnding: r.weekEnding,
+        status: r.status,
+        grossPay: r.grossPay,
+        placementId: r.placementId,
+      }),
+      clientId: r.placementId
+        ? (placementClient.get(r.placementId) ?? null)
+        : null,
+    })),
+    ...expenses.map((e) =>
+      buildExpenseAuditEvent({
+        id: e.id,
+        category: e.category,
+        clientName: e.clientName,
+        amount: e.amount,
+        status: e.status,
+        expenseDate: e.expenseDate,
+        placementId: e.placementId,
+        clientId: e.clientId,
+      }),
+    ),
+    ...contracts.map((c) =>
+      buildContractAuditEvent({
+        id: c.id,
+        clientId: c.clientId,
+        clientName: c.clientName,
+        employeeName: c.employeeName,
+        status: c.status,
+        startDate: c.startDate,
+      }),
+    ),
+  ].map((e) => {
+    if (e.invoiceId && invoiceById.has(e.invoiceId)) {
+      const inv = invoiceById.get(e.invoiceId)!;
+      return {
+        ...e,
+        clientId: e.clientId ?? inv.clientId,
+        placementId: e.placementId ?? inv.placementId,
+      };
+    }
+    return e;
+  });
+
+  if (options?.invoiceId) {
+    events = events.filter((e) => e.invoiceId === options.invoiceId);
+  }
+  if (options?.placementId) {
+    const relatedInvoiceIds = new Set(
+      invoices
+        .filter((i) => i.placementId === options.placementId)
+        .map((i) => i.id),
+    );
+    events = events.filter(
+      (e) =>
+        e.placementId === options.placementId ||
+        (e.invoiceId != null && relatedInvoiceIds.has(e.invoiceId)),
+    );
+  }
+  if (options?.clientId) {
+    events = events.filter((e) => e.clientId === options.clientId);
+  }
+
+  return mergeAuditEvents(events, options?.limit ?? 100);
 }

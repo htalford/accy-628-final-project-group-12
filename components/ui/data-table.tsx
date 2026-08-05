@@ -4,6 +4,8 @@ export type Column<T> = {
   key: string;
   header: string;
   className?: string;
+  /** When true, cell content is not wrapped in the row Link (for nested links). */
+  interactive?: boolean;
   render: (row: T) => React.ReactNode;
 };
 
@@ -55,11 +57,15 @@ export function DataTable<T extends { id: string }>({
                   key={row.id}
                   className="border-b border-[var(--cf-border)] last:border-0 hover:bg-[var(--cf-surface)]/70"
                 >
-                  {columns.map((col, i) => (
+                  {columns.map((col) => (
                     <td key={col.key} className={`px-4 py-3 ${col.className ?? ""}`}>
-                      <Link href={href} className="block text-[var(--cf-ink)]">
-                        {col.render(row)}
-                      </Link>
+                      {col.interactive ? (
+                        col.render(row)
+                      ) : (
+                        <Link href={href} className="block text-[var(--cf-ink)]">
+                          {col.render(row)}
+                        </Link>
+                      )}
                     </td>
                   ))}
                 </tr>

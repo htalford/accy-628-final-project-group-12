@@ -111,10 +111,7 @@ export default function MessagesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Messages"
-        description="Sample conversations with recruiters and clients (local UI until a messages table exists)."
-      />
+      <PageHeader title="Messages" />
 
       <div className="grid min-h-[28rem] overflow-hidden rounded-xl border border-[var(--cf-border)] bg-white shadow-sm lg:grid-cols-[16rem_1fr]">
         <aside className="border-b border-[var(--cf-border)] lg:border-r lg:border-b-0">

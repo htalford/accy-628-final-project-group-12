@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -16,6 +17,7 @@ import {
   TrendingUp,
   User,
   Wallet,
+  History,
   X,
 } from "lucide-react";
 import { getNavForRole, ROLE_LABELS } from "@/lib/auth/roles";
@@ -37,6 +39,7 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   "bar-chart-3": BarChart3,
   "messages-square": MessagesSquare,
   user: User,
+  history: History,
 };
 
 function NavLink({
@@ -82,15 +85,26 @@ export function Sidebar({ role }: { role: UserRole }) {
   const nav = (
     <>
       <div
-        className={`border-b border-white/10 ${collapsed ? "px-3 py-4" : "px-5 py-5"}`}
+        className={`border-b border-white/10 ${collapsed ? "px-2 py-3" : "px-4 py-4"}`}
       >
         <div className="flex items-start justify-between gap-2">
-          <div className={collapsed ? "w-full text-center" : ""}>
-            <p className="text-xs font-semibold tracking-[0.16em] text-[var(--cf-accent)] uppercase">
-              {collapsed ? "CF" : "ContractFlow"}
-            </p>
+          <div className={collapsed ? "w-full" : "min-w-0 flex-1"}>
+            <Link
+              href={`/${role}/dashboard`}
+              className={`block rounded-md bg-white ${collapsed ? "p-1.5" : "p-2"}`}
+              title="TalentQuest"
+            >
+              <Image
+                src="/talentquest-logo.png"
+                alt="TalentQuest"
+                width={168}
+                height={118}
+                className={`w-auto ${collapsed ? "mx-auto h-8" : "h-11"}`}
+                priority
+              />
+            </Link>
             {!collapsed ? (
-              <p className="mt-1 text-sm text-white/60">
+              <p className="mt-2 text-sm text-white/60">
                 {ROLE_LABELS[role]} portal
               </p>
             ) : null}

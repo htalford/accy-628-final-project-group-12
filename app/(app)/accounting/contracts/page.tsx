@@ -1,12 +1,16 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge, statusTone } from "@/components/ui/status-badge";
+import {
+  ClientArLink,
+  ContractLink,
+  PayrollEmployeeLink,
+} from "@/components/accounting/entity-links";
 import { getContracts } from "@/lib/accounting/queries";
 import {
   moneyExact,
   placementStatusLabel,
   placementTypeLabel,
-  shortId,
 } from "@/lib/accounting/format";
 import { ContractsToolbar } from "@/components/accounting/contracts-toolbar";
 
@@ -31,10 +35,7 @@ export default async function ContractsPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Contracts"
-        description="Staffing placements treated as billing contracts (live from placements)."
-      />
+      <PageHeader title="Contracts" />
       <ContractsToolbar />
       <DataTable
         rows={filtered}
@@ -45,19 +46,24 @@ export default async function ContractsPage({
           {
             key: "number",
             header: "Contract Number",
-            render: (row) => (
-              <span className="font-mono text-xs">{shortId(row.id)}</span>
-            ),
+            interactive: true,
+            render: (row) => <ContractLink id={row.id} />,
           },
           {
             key: "candidate",
             header: "Candidate",
-            render: (row) => row.employeeName,
+            interactive: true,
+            render: (row) => (
+              <PayrollEmployeeLink name={row.employeeName} />
+            ),
           },
           {
             key: "client",
             header: "Client",
-            render: (row) => row.clientName,
+            interactive: true,
+            render: (row) => (
+              <ClientArLink clientId={row.clientId} name={row.clientName} />
+            ),
           },
           {
             key: "start",

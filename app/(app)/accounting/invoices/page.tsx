@@ -3,8 +3,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge, statusTone } from "@/components/ui/status-badge";
+import {
+  ClientArLink,
+  ContractLink,
+  InvoiceLink,
+} from "@/components/accounting/entity-links";
 import { getClients, getInvoices } from "@/lib/accounting/queries";
-import { moneyExact, shortId } from "@/lib/accounting/format";
+import { moneyExact } from "@/lib/accounting/format";
 import { InvoicesToolbar } from "@/components/accounting/invoices-toolbar";
 
 export default async function InvoicesPage({
@@ -34,11 +39,8 @@ export default async function InvoicesPage({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader
-          title="Invoices"
-          description="Manage client invoices synced from Supabase."
-        />
-        <Button disabled>Create Invoice</Button>
+        <PageHeader title="Invoices" />
+        <Button href="/accounting/invoices/new">Create Invoice</Button>
       </div>
 
       <InvoicesToolbar clients={clients} />
@@ -52,14 +54,27 @@ export default async function InvoicesPage({
           {
             key: "number",
             header: "Invoice Number",
-            render: (row) => (
-              <span className="font-mono text-xs">{shortId(row.id)}</span>
-            ),
+            interactive: true,
+            render: (row) => <InvoiceLink id={row.id} />,
           },
           {
             key: "client",
             header: "Client",
-            render: (row) => row.clientName,
+            interactive: true,
+            render: (row) => (
+              <ClientArLink clientId={row.clientId} name={row.clientName} />
+            ),
+          },
+          {
+            key: "contract",
+            header: "Contract",
+            interactive: true,
+            render: (row) =>
+              row.placementId ? (
+                <ContractLink id={row.placementId} />
+              ) : (
+                <span className="text-[var(--cf-muted)]">—</span>
+              ),
           },
           {
             key: "period",
@@ -94,9 +109,9 @@ export default async function InvoicesPage({
         ]}
       />
       <p className="text-xs text-[var(--cf-muted)]">
-        Tip: open a row for client info, line items, and payment history.{" "}
-        <Link className="underline" href="/accounting/dashboard">
-          Back to dashboard
+        Tip: invoice numbers, clients, and contracts are linked for drill-down.{" "}
+        <Link className="underline" href="/accounting/audit-trail">
+          Open audit trail
         </Link>
       </p>
     </div>

@@ -47,10 +47,7 @@ export default async function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Financial Reports"
-        description="Report catalog with live preview metrics. Export buttons are visual only."
-      />
+      <PageHeader title="Financial Reports" />
 
       <ReportsFilters clients={clients} />
 

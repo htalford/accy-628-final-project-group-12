@@ -19,6 +19,15 @@ import { money } from "@/lib/accounting/format";
 
 const COLORS = ["#0b3a53", "#1f8a70", "#5b6b76", "#c45c26", "#3b82f6"];
 
+const INVOICE_STATUS_COLORS: Record<string, string> = {
+  Paid: "#1f8a70",
+  Sent: "#3b82f6",
+  "Partially Paid": "#0b3a53",
+  Overdue: "#c45c26",
+  Disputed: "#5b6b76",
+  Draft: "#94a3b8",
+};
+
 export function RevenueChart({
   data,
 }: {
@@ -59,6 +68,9 @@ export function InvoiceStatusChart({
       </p>
     );
   }
+
+  const total = filtered.reduce((sum, d) => sum + d.value, 0);
+
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -70,13 +82,30 @@ export function InvoiceStatusChart({
             innerRadius={50}
             outerRadius={80}
             paddingAngle={2}
+            label={({ name, value }) => `${name} (${value})`}
           >
-            {filtered.map((_, i) => (
-              <Cell key={i} fill={COLORS[i % COLORS.length]} />
+            {filtered.map((entry, i) => (
+              <Cell
+                key={entry.name}
+                fill={
+                  INVOICE_STATUS_COLORS[entry.name] ?? COLORS[i % COLORS.length]
+                }
+              />
             ))}
           </Pie>
-          <Tooltip />
-          <Legend />
+          <Tooltip
+            formatter={(value, name) => {
+              const count = Number(value);
+              const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+              return [`${count} (${pct}%)`, String(name)];
+            }}
+          />
+          <Legend
+            formatter={(value) => {
+              const row = filtered.find((d) => d.name === value);
+              return row ? `${value} (${row.value})` : String(value);
+            }}
+          />
         </PieChart>
       </ResponsiveContainer>
     </div>

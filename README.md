@@ -1,4 +1,4 @@
-# ContractFlow · ACCY 628 Final Project — Group 12
+# TalentQuest · ACCY 628 Final Project — Group 12
 
 Next.js (App Router + TypeScript) contract-to-cash app for a staffing agency, wired to Supabase and ready for Vercel.
 
@@ -10,7 +10,7 @@ Next.js (App Router + TypeScript) contract-to-cash app for a staffing agency, wi
 
 ## Product
 
-**ContractFlow** tracks placements (temp + permanent), timesheets, invoices, and payments across four roles: employer, candidate, recruiter, accounting.
+**TalentQuest** tracks placements (temp + permanent), timesheets, invoices, and payments across four roles: employer, candidate, recruiter, accounting.
 
 ### Billing rules (for invoice generation)
 

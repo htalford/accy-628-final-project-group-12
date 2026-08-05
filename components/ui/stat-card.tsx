@@ -20,11 +20,6 @@ export function StatCard({
       {hint ? (
         <p className="mt-1 text-xs text-[var(--cf-muted)]">{hint}</p>
       ) : null}
-      {href ? (
-        <p className="mt-2 text-xs font-medium text-[var(--cf-accent)]">
-          View details →
-        </p>
-      ) : null}
     </>
   );
 

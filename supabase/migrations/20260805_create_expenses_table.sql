@@ -1,4 +1,4 @@
--- Expenses table for accounting portal (ContractFlow)
+-- Expenses table for accounting portal (TalentQuest)
 -- Applied remotely as create_expenses_table
 
 CREATE TYPE public.expense_category AS ENUM (

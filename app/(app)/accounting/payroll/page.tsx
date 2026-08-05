@@ -2,6 +2,11 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge, statusTone } from "@/components/ui/status-badge";
+import {
+  ContractLink,
+  EntityLink,
+  PayrollEmployeeLink,
+} from "@/components/accounting/entity-links";
 import { getPayrollRows } from "@/lib/accounting/queries";
 import { moneyExact } from "@/lib/accounting/format";
 import { PayrollToolbar } from "@/components/accounting/payroll-toolbar";
@@ -16,14 +21,19 @@ export default async function PayrollPage({
   const employees = [...new Set(rows.map((r) => r.employeeName))].sort();
   const periods = [...new Set(rows.map((r) => r.weekEnding))].sort().reverse();
 
+  const employeeParam = params.employee
+    ? decodeURIComponent(params.employee)
+    : undefined;
+
   const filtered = rows.filter((r) => {
     if (params.period && params.period !== "all" && r.weekEnding !== params.period)
       return false;
     if (
-      params.employee &&
-      params.employee !== "all" &&
-      r.employeeName !== params.employee &&
-      !r.id.includes(params.employee)
+      employeeParam &&
+      employeeParam !== "all" &&
+      r.employeeName !== employeeParam &&
+      !r.employeeName.toLowerCase().includes(employeeParam.toLowerCase()) &&
+      !r.id.includes(employeeParam)
     )
       return false;
     if (params.status && params.status !== "all" && r.status !== params.status)
@@ -34,10 +44,7 @@ export default async function PayrollPage({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader
-          title="Payroll"
-          description="Candidate gross pay = (regular + OT hours) × pay_rate. Cost of services uses approved timesheets only for P&L; this list shows all timesheet statuses for operations."
-        />
+        <PageHeader title="Payroll" />
         <div className="flex gap-2">
           <Button variant="secondary" disabled>
             View Payroll
@@ -56,12 +63,29 @@ export default async function PayrollPage({
           {
             key: "employee",
             header: "Employee Name",
-            render: (row) => row.employeeName,
+            render: (row) => (
+              <PayrollEmployeeLink name={row.employeeName} />
+            ),
           },
           {
             key: "assignment",
             header: "Assignment",
-            render: (row) => row.assignment,
+            render: (row) =>
+              row.placementId ? (
+                <ContractLink id={row.placementId} label={row.assignment} />
+              ) : (
+                row.assignment
+              ),
+          },
+          {
+            key: "contract",
+            header: "Contract",
+            render: (row) =>
+              row.placementId ? (
+                <ContractLink id={row.placementId} />
+              ) : (
+                <span className="text-[var(--cf-muted)]">—</span>
+              ),
           },
           {
             key: "hours",
@@ -78,6 +102,15 @@ export default async function PayrollPage({
             key: "gross",
             header: "Gross Pay",
             render: (row) => moneyExact(row.grossPay),
+          },
+          {
+            key: "earned",
+            header: "Bill Amount",
+            render: (row) => (
+              <EntityLink href="/accounting/invoices">
+                {moneyExact(row.billAmount)}
+              </EntityLink>
+            ),
           },
           {
             key: "status",

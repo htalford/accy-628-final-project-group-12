@@ -3,6 +3,10 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge, statusTone } from "@/components/ui/status-badge";
 import { Panel } from "@/components/accounting/panel";
+import {
+  ClientArLink,
+  ContractLink,
+} from "@/components/accounting/entity-links";
 import { getExpenses } from "@/lib/accounting/queries";
 import {
   EXPENSE_CATEGORIES,
@@ -10,7 +14,6 @@ import {
   expenseStatusLabel,
   money,
   moneyExact,
-  shortId,
 } from "@/lib/accounting/format";
 
 export default async function ExpensesPage() {
@@ -27,10 +30,7 @@ export default async function ExpensesPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader
-          title="Expenses"
-          description="Live query against public.expenses. P&L recognizes approved and reimbursed expenses only; pending/rejected are listed here for review but excluded from operating income."
-        />
+        <PageHeader title="Expenses" />
         <Button disabled>Add Expense</Button>
       </div>
 
@@ -73,13 +73,22 @@ export default async function ExpensesPage() {
           {
             key: "client",
             header: "Client",
-            render: (row) => row.clientName,
+            render: (row) =>
+              row.clientName !== "—" ? (
+                <ClientArLink clientId={row.clientId} name={row.clientName} />
+              ) : (
+                "—"
+              ),
           },
           {
             key: "placement",
             header: "Placement",
             render: (row) =>
-              row.placementId ? shortId(row.placementId) : "—",
+              row.placementId ? (
+                <ContractLink id={row.placementId} />
+              ) : (
+                "—"
+              ),
           },
           {
             key: "amount",

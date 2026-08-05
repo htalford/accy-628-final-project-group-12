@@ -87,7 +87,8 @@ export type NavIcon =
   | "trending-up"
   | "bar-chart-3"
   | "messages-square"
-  | "user";
+  | "user"
+  | "history";
 
 export type NavItem = {
   href: string;
@@ -122,6 +123,7 @@ export function getNavForRole(role: UserRole): NavItem[] {
         { href: "/accounting/expenses", label: "Expenses", icon: "circle-dollar-sign" },
         { href: "/accounting/profitability", label: "Profitability", icon: "trending-up" },
         { href: "/accounting/reports", label: "Financial Reports", icon: "bar-chart-3" },
+        { href: "/accounting/audit-trail", label: "Audit Trail", icon: "history" },
         { href: "/accounting/messages", label: "Messages", icon: "messages-square" },
         { href: "/accounting/profile", label: "Profile", icon: "user" },
       ];
@@ -138,6 +140,7 @@ export function getPageTitle(pathname: string): string {
     "/accounting/expenses": "Expenses",
     "/accounting/profitability": "Profitability",
     "/accounting/reports": "Financial Reports",
+    "/accounting/audit-trail": "Audit Trail",
     "/accounting/messages": "Messages",
     "/accounting/profile": "Profile",
     "/employer/dashboard": "Dashboard",
@@ -149,7 +152,8 @@ export function getPageTitle(pathname: string): string {
   };
 
   if (map[pathname]) return map[pathname];
+  if (pathname === "/accounting/invoices/new") return "Create Invoice";
   if (pathname.startsWith("/accounting/invoices/")) return "Invoice detail";
   if (pathname.startsWith("/accounting/contracts/")) return "Contract detail";
-  return "ContractFlow";
+  return "TalentQuest";
 }
