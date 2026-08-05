@@ -1,26 +1,38 @@
+import Image from "next/image";
+import Link from "next/link";
 import { LoginForm } from "./login-form";
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-full flex-1 items-center justify-center bg-[var(--cf-surface)] px-4 py-16">
+    <div className="flex min-h-full flex-1 items-center justify-center bg-[var(--ot-surface)] px-4 py-16">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <p className="text-sm font-semibold tracking-[0.14em] text-[var(--cf-accent)] uppercase">
-            ContractFlow
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--cf-ink)]">
+          <Link href="/" className="inline-flex justify-center">
+            <Image
+              src="/talentquest-logo.png"
+              alt="TalentQuest"
+              width={180}
+              height={126}
+              className="h-20 w-auto"
+              priority
+            />
+          </Link>
+          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-[var(--ot-navy)]">
             Sign in
           </h1>
-          <p className="mt-2 text-sm text-[var(--cf-muted)]">
-            Contract-to-cash for staffing agencies. Use a demo account or the
-            role switcher after login.
+          <p className="mt-2 text-sm text-[var(--ot-muted)]">
+            Existing clients, employees, managers, and accounting users can log
+            in here.
           </p>
         </div>
-        <div className="rounded-xl border border-[var(--cf-border)] bg-white p-6 shadow-sm">
+        <div className="rounded-xl border border-[var(--ot-border)] bg-white p-6 shadow-sm">
           <LoginForm />
         </div>
-        <p className="mt-4 text-center text-xs text-[var(--cf-muted)]">
-          Demo password: <code className="font-mono">DemoPass123!</code>
+        <p className="mt-4 text-center text-sm text-[var(--ot-muted)]">
+          New here?{" "}
+          <Link href="/signup" className="font-semibold text-[var(--ot-ocean)]">
+            Get started
+          </Link>
         </p>
       </div>
     </div>
