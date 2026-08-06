@@ -6,7 +6,6 @@ import { Panel } from "@/components/accounting/panel";
 import { StatusBadge, statusTone } from "@/components/ui/status-badge";
 import { AuditTrailList } from "@/components/accounting/audit-trail";
 import { CreateInvoiceForm } from "@/components/accounting/create-invoice-form";
-import { DeleteInvoiceButton } from "@/components/accounting/delete-invoice-button";
 import {
   ClientArLink,
   ContractLink,
@@ -109,7 +108,6 @@ export default async function InvoiceDetailPage({
               <Button href={`/accounting/invoices/${invoice.id}?edit=1`}>
                 Edit
               </Button>
-              <DeleteInvoiceButton id={invoice.id} />
             </div>
           ) : null}
         </div>

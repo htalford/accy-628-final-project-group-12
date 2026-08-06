@@ -35,12 +35,14 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Password for all: `DemoPass123!`
 
-| Role | Email |
-|---|---|
-| Employer | `employer@talentquest.demo` |
-| Candidate | `candidate@talentquest.demo` |
-| Recruiter | `recruiter@talentquest.demo` |
-| Accounting | `accounting@talentquest.demo` |
+| Role | Person | Email |
+|---|---|---|
+| Employer | Casey Employer | `employer@talentquest.demo` |
+| Candidate | Chad Stefaniak | `candidate@talentquest.demo` |
+| Recruiter | Morgan Recruiter | `recruiter@talentquest.demo` |
+| Accounting | Avery Accounting | `accounting@talentquest.demo` |
+
+Jordan Lee remains a Northwind placed employee (contracts / timesheets / invoices) and can still appear in recruiter/employer candidate pipelines; he is not the Candidate portal login.
 
 After login, use the **Demo role switcher** (bottom-right) to jump between roles without typing credentials again.
 

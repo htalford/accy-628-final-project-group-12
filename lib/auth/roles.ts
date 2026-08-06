@@ -66,7 +66,7 @@ export const DEMO_ACCOUNTS: Record<
   { email: string; label: string }
 > = {
   employer: { email: "employer@talentquest.demo", label: "Casey Employer" },
-  candidate: { email: "candidate@talentquest.demo", label: "Jordan Lee" },
+  candidate: { email: "candidate@talentquest.demo", label: "Chad Stefaniak" },
   recruiter: { email: "recruiter@talentquest.demo", label: "Morgan Recruiter" },
   accounting: {
     email: "accounting@talentquest.demo",

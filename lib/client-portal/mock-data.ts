@@ -50,6 +50,8 @@ export const SEED = {
     ninaVolkov: "22222222-2222-2222-2222-222222222216",
     carlosMendez: "22222222-2222-2222-2222-222222222217",
     ianFoster: "22222222-2222-2222-2222-222222222218",
+    /** Demo Candidate portal identity (no Northwind placement). */
+    chadStefaniak: "22222222-2222-2222-2222-222222222219",
   },
   placements: {
     jordanNorthwind: "33333333-3333-3333-3333-333333333301",
@@ -288,7 +290,7 @@ export const employees: Employee[] = [
       { weekEnding: "2026-08-01", total: 40, status: "Pending" },
     ],
     notes:
-      "Seed placement 3333…301 · temp · bill $48 / pay $28. Linked candidate demo user.",
+      "Seed placement 3333…301 · temp · bill $48 / pay $28. Northwind placed employee (Candidate portal login is Chad Stefaniak).",
   },
   {
     id: SEED.employees.alexNguyen,
@@ -572,6 +574,45 @@ export const invoiceSummary = {
  * “candidates submitted by agency” for the Candidates page.
  */
 export const candidates: Candidate[] = [
+  {
+    id: SEED.employees.chadStefaniak,
+    name: "Chad Stefaniak",
+    position: "Accounts Payable Analyst",
+    recruiter: RECRUITER,
+    yearsExperience: 10,
+    resumeStatus: "On File",
+    stage: "Submitted",
+    email: "chad.stefaniak@example.com",
+    phone: "555-0219",
+    skills: [
+      "Microsoft Office",
+      "Inventory tracking",
+      "Schedule coordination",
+      "Customer service",
+      "Team leadership",
+    ],
+    certifications: ["OSHA 10", "First Aid / CPR", "Forklift certification"],
+    experience: [
+      {
+        company: "University of Mississippi",
+        title: "Associate Professor",
+        years: "2025–Present",
+      },
+      {
+        company: "U.S. Navy",
+        title: "Cryptologic / Signals Specialist",
+        years: "2014–2021",
+      },
+      {
+        company: "Blackwater Drift Co.",
+        title: "River Outfitter & Operations Lead",
+        years: "2011–2014",
+      },
+    ],
+    interviewNotes: "Demo Candidate portal identity (candidate@talentquest.demo).",
+    resumeSummary:
+      "Demo candidate Chad Stefaniak — Ole Miss + Navy signals + river ops background.",
+  },
   {
     id: SEED.employees.rileyQuinn,
     name: "Riley Quinn",
