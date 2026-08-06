@@ -18,6 +18,52 @@ function revalidateRecruiter() {
   revalidatePath("/recruiter", "layout");
   revalidatePath("/accounting/messages");
   revalidatePath("/candidate/messages");
+  revalidatePath("/client/messages");
+}
+
+type RecruiterThreadRef = {
+  participantType: "candidate" | "employer" | "accounting";
+  threadId: string;
+};
+
+function isRecruiterParticipantType(
+  value: string,
+): value is RecruiterThreadRef["participantType"] {
+  return (
+    value === "candidate" || value === "employer" || value === "accounting"
+  );
+}
+
+function normalizeRecruiterThreadRefs(
+  threads: RecruiterThreadRef[],
+): RecruiterThreadRef[] {
+  const seen = new Set<string>();
+  const out: RecruiterThreadRef[] = [];
+  for (const t of threads) {
+    if (!isRecruiterParticipantType(t.participantType) || !t.threadId.trim()) {
+      continue;
+    }
+    const key = `${t.participantType}:${t.threadId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      participantType: t.participantType,
+      threadId: t.threadId.trim(),
+    });
+  }
+  return out;
+}
+
+async function clearRecruiterDeleted(
+  participantType: RecruiterThreadRef["participantType"],
+  threadId: string,
+) {
+  const supabase = await createClient();
+  await supabase
+    .from("recruiter_deleted_threads")
+    .delete()
+    .eq("participant_type", participantType)
+    .eq("thread_id", threadId);
 }
 
 export async function approveApplication(applicationId: string) {
@@ -289,6 +335,7 @@ export async function sendRecruiterMessage(input: {
   });
 
   if (error) return { ok: false as const, error: error.message };
+  await clearRecruiterDeleted("candidate", input.employeeId);
   revalidateRecruiter();
   return { ok: true as const, message: "Message sent." };
 }
@@ -486,6 +533,7 @@ export async function sendEmployerMessage(input: {
     .update({ updated_at: new Date().toISOString() })
     .eq("id", input.threadId);
 
+  await clearRecruiterDeleted("employer", input.threadId);
   revalidateRecruiter();
   return { ok: true as const, message: "Message sent to employer." };
 }
@@ -518,6 +566,7 @@ export async function sendAccountingStaffMessage(input: {
     .update({ updated_at: new Date().toISOString() })
     .eq("id", input.threadId);
 
+  await clearRecruiterDeleted("accounting", input.threadId);
   revalidateRecruiter();
   return { ok: true as const, message: "Message sent to accounting." };
 }
@@ -551,4 +600,64 @@ export async function deleteRecruiterMessage(input: {
   if (error) return { ok: false as const, error: error.message };
   revalidateRecruiter();
   return { ok: true as const, message: "Message deleted." };
+}
+
+export async function deleteRecruiterThread(input: RecruiterThreadRef) {
+  return deleteRecruiterThreads([input]);
+}
+
+export async function deleteRecruiterThreads(threads: RecruiterThreadRef[]) {
+  const { error: authError, user } = await requireRecruiter();
+  if (authError || !user) {
+    return { ok: false as const, error: authError ?? "Unauthorized" };
+  }
+
+  const refs = normalizeRecruiterThreadRefs(threads);
+  if (refs.length === 0) {
+    return { ok: false as const, error: "Select at least one conversation." };
+  }
+
+  const supabase = await createClient();
+  const deletedAt = new Date().toISOString();
+  const { error } = await supabase.from("recruiter_deleted_threads").upsert(
+    refs.map((t) => ({
+      participant_type: t.participantType,
+      thread_id: t.threadId,
+      deleted_at: deletedAt,
+      deleted_by: user.id,
+    })),
+    { onConflict: "participant_type,thread_id" },
+  );
+
+  if (error) return { ok: false as const, error: error.message };
+
+  revalidateRecruiter();
+  return { ok: true as const };
+}
+
+export async function restoreRecruiterThread(input: RecruiterThreadRef) {
+  return restoreRecruiterThreads([input]);
+}
+
+export async function restoreRecruiterThreads(threads: RecruiterThreadRef[]) {
+  const { error: authError } = await requireRecruiter();
+  if (authError) return { ok: false as const, error: authError };
+
+  const refs = normalizeRecruiterThreadRefs(threads);
+  if (refs.length === 0) {
+    return { ok: false as const, error: "Select at least one conversation." };
+  }
+
+  const supabase = await createClient();
+  for (const ref of refs) {
+    const { error } = await supabase
+      .from("recruiter_deleted_threads")
+      .delete()
+      .eq("participant_type", ref.participantType)
+      .eq("thread_id", ref.threadId);
+    if (error) return { ok: false as const, error: error.message };
+  }
+
+  revalidateRecruiter();
+  return { ok: true as const };
 }

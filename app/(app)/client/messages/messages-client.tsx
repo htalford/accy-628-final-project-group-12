@@ -2,17 +2,14 @@
 
 import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArchiveRestore, FolderOpen, Inbox, Trash2 } from "lucide-react";
+import { ArchiveRestore, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Label } from "@/components/ui/form";
-import { ConfirmActionDialog } from "@/components/client-portal/confirm-action-dialog";
 import { useToast } from "@/components/client-portal/toast";
 import {
   createClientMessageThreadAction,
   deleteClientMessageThreadAction,
-  permanentlyDeleteClientMessageThreadAction,
   restoreClientMessageThreadAction,
   sendClientMessageAction,
 } from "@/app/actions/client-portal";
@@ -38,59 +35,102 @@ function formatWhen(iso: string): string {
 export function MessagesClient({
   initialInbox,
   initialDeleted,
+  folder,
 }: {
   initialInbox: ClientMessageThread[];
   initialDeleted: ClientMessageThread[];
+  folder: Folder;
 }) {
   const router = useRouter();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
-  const [folder, setFolder] = useState<Folder>("inbox");
   const [inbox, setInbox] = useState(initialInbox);
   const [deleted, setDeleted] = useState(initialDeleted);
-  const [activeId, setActiveId] = useState(initialInbox[0]?.id ?? "");
+  const [activeId, setActiveId] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [listQuery, setListQuery] = useState("");
   const [draft, setDraft] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [newContact, setNewContact] = useState("Morgan Recruiter");
   const [newBody, setNewBody] = useState("");
-  const [confirmKind, setConfirmKind] = useState<"soft" | "permanent" | null>(
-    null,
-  );
 
   useEffect(() => {
     setInbox(initialInbox);
     setDeleted(initialDeleted);
   }, [initialInbox, initialDeleted]);
 
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setDraft("");
+    setShowNew(false);
+    setListQuery("");
+  }, [folder]);
+
   const threads = folder === "inbox" ? inbox : deleted;
 
+  const filteredList = useMemo(() => {
+    const q = listQuery.trim().toLowerCase();
+    if (!q) return threads;
+    return threads.filter((t) => {
+      const hay = [
+        t.recruiter_name,
+        t.preview,
+        t.subject,
+        ...(t.messages ?? []).map((m) => m.body),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [threads, listQuery]);
+
   useEffect(() => {
-    if (threads.length === 0) {
+    if (filteredList.length === 0) {
       setActiveId("");
       return;
     }
-    if (!threads.some((t) => t.id === activeId)) {
-      setActiveId(threads[0].id);
-    }
-  }, [folder, threads, activeId]);
+    setActiveId((prev) =>
+      filteredList.some((t) => t.id === prev) ? prev : filteredList[0]!.id,
+    );
+  }, [filteredList]);
 
   const active = useMemo(
-    () => threads.find((t) => t.id === activeId) ?? threads[0],
-    [threads, activeId],
+    () => filteredList.find((t) => t.id === activeId) ?? filteredList[0],
+    [filteredList, activeId],
   );
 
-  function switchFolder(next: Folder) {
-    setFolder(next);
-    setShowNew(false);
-    setDraft("");
-    setConfirmKind(null);
-    const list = next === "inbox" ? inbox : deleted;
-    setActiveId(list[0]?.id ?? "");
+  function setFolder(next: Folder) {
+    const params = new URLSearchParams();
+    if (next === "deleted") params.set("folder", "deleted");
+    router.replace(
+      params.toString() ? `/client/messages?${params}` : "/client/messages",
+      { scroll: false },
+    );
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    const visible = filteredList.map((t) => t.id);
+    const allSelected =
+      visible.length > 0 && visible.every((id) => selectedIds.has(id));
+    if (allSelected) {
+      setSelectedIds(new Set());
+      return;
+    }
+    setSelectedIds(new Set(visible));
   }
 
   async function send(e: FormEvent) {
     e.preventDefault();
-    if (!draft.trim() || !active) return;
+    if (!draft.trim() || !active || folder === "deleted") return;
     const body = draft.trim();
     const result = await sendClientMessageAction(
       active.id,
@@ -103,44 +143,6 @@ export function MessagesClient({
     }
     toast.push(result.message, "success");
     setDraft("");
-    const now = new Date().toISOString();
-    const sentMsg = {
-      id: `local-${Date.now()}`,
-      thread_id: active.id,
-      sender_role: "client" as const,
-      body,
-      created_at: now,
-    };
-    if (folder === "deleted") {
-      // Reply restores to inbox
-      setDeleted((prev) => prev.filter((t) => t.id !== active.id));
-      setInbox((prev) => {
-        const rest = prev.filter((t) => t.id !== active.id);
-        const updated: ClientMessageThread = {
-          ...active,
-          deleted_at: null,
-          preview: body.slice(0, 64),
-          updated_at: now,
-          messages: [...(active.messages ?? []), sentMsg],
-        };
-        return [updated, ...rest];
-      });
-      setFolder("inbox");
-      setActiveId(active.id);
-    } else {
-      setInbox((prev) =>
-        prev.map((t) =>
-          t.id === active.id
-            ? {
-                ...t,
-                preview: body.slice(0, 64),
-                updated_at: now,
-                messages: [...(t.messages ?? []), sentMsg],
-              }
-            : t,
-        ),
-      );
-    }
     startTransition(() => router.refresh());
   }
 
@@ -156,150 +158,99 @@ export function MessagesClient({
       return;
     }
     toast.push(result.message, "success");
-    const now = new Date().toISOString();
-    const id = result.id ?? `local-${Date.now()}`;
-    const existing = inbox.find(
-      (t) => t.recruiter_name.toLowerCase() === contact.toLowerCase(),
-    );
-    if (existing) {
-      const sentMsg = {
-        id: `local-msg-${Date.now()}`,
-        thread_id: existing.id,
-        sender_role: "client" as const,
-        body: newBody.trim(),
-        created_at: now,
-      };
-      setInbox((prev) => {
-        const rest = prev.filter((t) => t.id !== existing.id);
-        return [
-          {
-            ...existing,
-            preview: newBody.trim().slice(0, 64),
-            updated_at: now,
-            messages: [...(existing.messages ?? []), sentMsg],
-          },
-          ...rest,
-        ];
-      });
-      setActiveId(existing.id);
-    } else {
-      const thread: ClientMessageThread = {
-        id,
-        client_id: "",
-        subject: "",
-        recruiter_name: contact,
-        created_at: now,
-        updated_at: now,
-        deleted_at: null,
-        preview: newBody.trim().slice(0, 64),
-        related_thread_ids: [id],
-        messages: [
-          {
-            id: `local-msg-${Date.now()}`,
-            thread_id: id,
-            sender_role: "client",
-            body: newBody.trim(),
-            created_at: now,
-          },
-        ],
-      };
-      setInbox((prev) => [thread, ...prev]);
-      setActiveId(id);
-    }
-    setFolder("inbox");
     setNewBody("");
     setShowNew(false);
     startTransition(() => router.refresh());
   }
 
-  async function confirmSoftDelete() {
-    if (!active) return;
-    const deletedId = active.id;
+  function onDeleteThread() {
+    if (!active || folder !== "inbox") return;
     startTransition(async () => {
-      const result = await deleteClientMessageThreadAction(deletedId);
+      const result = await deleteClientMessageThreadAction(active.id);
       if (!result.ok) {
         toast.push(result.message, "error");
         return;
       }
       toast.push(result.message, "success");
-      setConfirmKind(null);
-      setDraft("");
-      const now = new Date().toISOString();
-      const thread = inbox.find((t) => t.id === deletedId);
-      setInbox((prev) => {
-        const next = prev.filter((t) => t.id !== deletedId);
-        return next;
-      });
-      if (thread) {
-        setDeleted((prev) => [
-          { ...thread, deleted_at: now, updated_at: now },
-          ...prev.filter((t) => t.id !== deletedId),
-        ]);
-      }
-      setActiveId((id) => {
-        if (id !== deletedId) return id;
-        const rest = inbox.filter((t) => t.id !== deletedId);
-        return rest[0]?.id ?? "";
-      });
-      router.refresh();
-    });
-  }
-
-  async function confirmRestore() {
-    if (!active) return;
-    const id = active.id;
-    startTransition(async () => {
-      const result = await restoreClientMessageThreadAction(id);
-      if (!result.ok) {
-        toast.push(result.message, "error");
-        return;
-      }
-      toast.push(result.message, "success");
-      setConfirmKind(null);
-      const thread = deleted.find((t) => t.id === id);
-      setDeleted((prev) => prev.filter((t) => t.id !== id));
-      if (thread) {
-        setInbox((prev) => [
-          { ...thread, deleted_at: null },
-          ...prev.filter((t) => t.id !== id),
-        ]);
-      }
-      setFolder("inbox");
-      setActiveId(id);
-      router.refresh();
-    });
-  }
-
-  async function confirmPermanentDelete() {
-    if (!active) return;
-    const deletedId = active.id;
-    startTransition(async () => {
-      const result =
-        await permanentlyDeleteClientMessageThreadAction(deletedId);
-      if (!result.ok) {
-        toast.push(result.message, "error");
-        return;
-      }
-      toast.push(result.message, "success");
-      setConfirmKind(null);
-      setDeleted((prev) => {
-        const next = prev.filter((t) => t.id !== deletedId);
-        setActiveId(next[0]?.id ?? "");
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(active.id);
         return next;
       });
       router.refresh();
     });
   }
 
-  const emptyInbox = folder === "inbox" && inbox.length === 0 && !showNew;
-  const emptyDeleted = folder === "deleted" && deleted.length === 0;
+  function onDeleteSelected() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    startTransition(async () => {
+      for (const id of ids) {
+        const result = await deleteClientMessageThreadAction(id);
+        if (!result.ok) {
+          toast.push(result.message, "error");
+          return;
+        }
+      }
+      toast.push(
+        ids.length === 1
+          ? "Moved conversation to Deleted."
+          : `Moved ${ids.length} conversations to Deleted.`,
+        "success",
+      );
+      setSelectedIds(new Set());
+      router.refresh();
+    });
+  }
+
+  function onRestoreThread() {
+    if (!active || folder !== "deleted") return;
+    startTransition(async () => {
+      const result = await restoreClientMessageThreadAction(active.id);
+      if (!result.ok) {
+        toast.push(result.message, "error");
+        return;
+      }
+      toast.push(result.message, "success");
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(active.id);
+        return next;
+      });
+      router.replace("/client/messages", { scroll: false });
+      router.refresh();
+    });
+  }
+
+  function onRestoreSelected() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    startTransition(async () => {
+      for (const id of ids) {
+        const result = await restoreClientMessageThreadAction(id);
+        if (!result.ok) {
+          toast.push(result.message, "error");
+          return;
+        }
+      }
+      toast.push(
+        ids.length === 1
+          ? "Restored conversation to Inbox."
+          : `Restored ${ids.length} conversations to Inbox.`,
+        "success",
+      );
+      setSelectedIds(new Set());
+      router.replace("/client/messages", { scroll: false });
+      router.refresh();
+    });
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <PageHeader
           title="Messages"
-          description="Conversations with each person who messages you. Recruiter and accounting stay separate."
+          description="Conversations with Recruiter and Accounting. Deleted items stay in Deleted for 30 days."
         />
         {folder === "inbox" ? (
           <Button type="button" onClick={() => setShowNew((v) => !v)}>
@@ -324,10 +275,6 @@ export function MessagesClient({
               <option value="Morgan Recruiter">Morgan Recruiter</option>
               <option value="Avery Accounting">Avery Accounting</option>
             </select>
-            <p className="mt-1 text-xs text-[var(--cf-muted)]">
-              If you already message this person, your note is added to that
-              conversation.
-            </p>
           </div>
           <div>
             <Label htmlFor="new-body">Message</Label>
@@ -347,138 +294,180 @@ export function MessagesClient({
         </form>
       ) : null}
 
-      {emptyInbox || emptyDeleted ? (
-        <div className="space-y-4">
-          <div className="max-w-sm">
-            <FolderToggle
-              folder={folder}
-              deletedCount={deleted.length}
-              onChange={switchFolder}
-            />
-          </div>
-          {emptyInbox ? (
-            <EmptyState
-              title="No conversations yet"
-              description="Message your recruiter or accounting contact. Each person gets their own conversation thread."
-            />
-          ) : (
-            <EmptyState
-              title="Deleted is empty"
-              description="Conversations you remove are kept here for 30 days so you can restore them."
-            />
-          )}
-        </div>
-      ) : null}
-
-      {!emptyInbox && !emptyDeleted && threads.length > 0 ? (
-        <div className="grid min-h-[28rem] overflow-hidden rounded-xl border border-[var(--cf-border)] bg-white shadow-sm lg:grid-cols-[280px_1fr]">
-          <aside className="flex flex-col border-b border-[var(--cf-border)] lg:border-r lg:border-b-0">
-            <div className="border-b border-[var(--cf-border)] px-3 py-3">
-              <FolderToggle
-                folder={folder}
-                deletedCount={deleted.length}
-                onChange={switchFolder}
-              />
-              <p className="mt-3 text-xs font-semibold tracking-wide text-[var(--cf-muted)] uppercase">
+      <div className="overflow-hidden rounded-xl border border-[var(--cf-border)] bg-white shadow-sm">
+        <div className="grid min-h-[28rem] lg:grid-cols-[18rem_1fr]">
+          <aside className="border-b border-[var(--cf-border)] lg:border-r lg:border-b-0">
+            <div className="space-y-2 border-b border-[var(--cf-border)] p-3">
+              <div className="flex rounded-lg border border-[var(--cf-border)] bg-[var(--cf-surface)] p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setFolder("inbox")}
+                  className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${
+                    folder === "inbox"
+                      ? "bg-white text-[var(--cf-ink)] shadow-sm"
+                      : "text-[var(--cf-muted)] hover:text-[var(--cf-ink)]"
+                  }`}
+                >
+                  Inbox
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFolder("deleted")}
+                  className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${
+                    folder === "deleted"
+                      ? "bg-white text-[var(--cf-ink)] shadow-sm"
+                      : "text-[var(--cf-muted)] hover:text-[var(--cf-ink)]"
+                  }`}
+                >
+                  Deleted
+                  {deleted.length > 0 ? (
+                    <span className="ml-1 text-[10px] text-[var(--cf-muted)]">
+                      ({deleted.length})
+                    </span>
+                  ) : null}
+                </button>
+              </div>
+              <p className="text-[11px] font-semibold tracking-[0.08em] text-[var(--cf-muted)] uppercase">
                 {folder === "deleted" ? "Deleted (30 days)" : "Conversations"}
               </p>
+              <input
+                type="search"
+                value={listQuery}
+                onChange={(e) => setListQuery(e.target.value)}
+                placeholder={
+                  folder === "deleted"
+                    ? "Search deleted…"
+                    : "Search recruiter or accounting…"
+                }
+                aria-label="Search conversations"
+                className="w-full rounded-lg border border-[var(--cf-border)] bg-[var(--cf-surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--cf-accent)] focus:bg-white focus:ring-2 focus:ring-[var(--cf-accent)]/20"
+              />
+              {filteredList.length > 0 ? (
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-[var(--cf-muted)]">
+                    <input
+                      type="checkbox"
+                      checked={
+                        filteredList.length > 0 &&
+                        filteredList.every((t) => selectedIds.has(t.id))
+                      }
+                      onChange={toggleSelectAll}
+                      className="h-3.5 w-3.5 rounded border-[var(--cf-border)]"
+                    />
+                    Select all
+                  </label>
+                  {selectedIds.size > 0 ? (
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={
+                        folder === "deleted"
+                          ? onRestoreSelected
+                          : onDeleteSelected
+                      }
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold transition disabled:opacity-50 ${
+                        folder === "deleted"
+                          ? "text-[var(--cf-ink)] hover:bg-[var(--cf-accent)]/10"
+                          : "text-red-700 hover:bg-red-50"
+                      }`}
+                    >
+                      {folder === "deleted" ? (
+                        <ArchiveRestore className="h-3.5 w-3.5" aria-hidden />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                      )}
+                      {folder === "deleted" ? "Restore" : "Delete"} (
+                      {selectedIds.size})
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
-            <ul className="flex-1 overflow-y-auto">
-              {threads.map((t) => (
-                <li key={t.id}>
-                  <button
-                    type="button"
-                    onClick={() => setActiveId(t.id)}
-                    className={`flex w-full flex-col gap-0.5 border-b border-[var(--cf-border)] px-4 py-3 text-left transition hover:bg-[var(--cf-surface)] ${
-                      t.id === active?.id ? "bg-[var(--cf-surface)]" : ""
-                    }`}
-                  >
-                    <span className="text-sm font-medium text-[var(--cf-ink)]">
-                      {t.recruiter_name}
-                    </span>
-                    <span className="truncate text-xs text-[var(--cf-muted)]">
-                      {t.preview || "No messages yet"}
-                    </span>
-                    {folder === "deleted" && t.deleted_at ? (
-                      <span className="text-[10px] text-[var(--cf-muted)]">
-                        {daysLeftInDeletedFolder(t.deleted_at)} day
-                        {daysLeftInDeletedFolder(t.deleted_at) === 1 ? "" : "s"}{" "}
-                        left
-                      </span>
-                    ) : null}
-                  </button>
+            <ul className="max-h-[24rem] overflow-y-auto">
+              {filteredList.map((t) => {
+                const isActive = active?.id === t.id;
+                return (
+                  <li key={t.id}>
+                    <div
+                      className={`flex w-full items-start gap-2 border-b border-[var(--cf-border)] px-2 py-2.5 hover:bg-[var(--cf-surface)] ${
+                        isActive ? "bg-[var(--cf-accent)]/10" : ""
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(t.id)}
+                        onChange={() => toggleSelected(t.id)}
+                        aria-label={`Select ${t.recruiter_name}`}
+                        className="mt-2.5 h-3.5 w-3.5 shrink-0 rounded border-[var(--cf-border)]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setActiveId(t.id)}
+                        className="min-w-0 flex-1 py-0.5 text-left"
+                      >
+                        <p className="text-sm font-medium text-[var(--cf-ink)]">
+                          {t.recruiter_name}
+                        </p>
+                        <p className="truncate text-xs text-[var(--cf-muted)]">
+                          {t.preview || "No messages yet"}
+                        </p>
+                        {folder === "deleted" && t.deleted_at ? (
+                          <p className="mt-1 text-[10px] text-[var(--cf-muted)]">
+                            {daysLeftInDeletedFolder(t.deleted_at)}d left
+                          </p>
+                        ) : null}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+              {filteredList.length === 0 ? (
+                <li className="px-3 py-8 text-center text-sm text-[var(--cf-muted)]">
+                  {folder === "deleted"
+                    ? "No deleted conversations in the last 30 days."
+                    : "No conversations yet."}
                 </li>
-              ))}
+              ) : null}
             </ul>
           </aside>
 
-          <section className="flex min-h-[20rem] flex-col">
+          <div className="flex flex-col">
             {active ? (
               <>
-                <div className="flex items-start justify-between gap-3 border-b border-[var(--cf-border)] px-4 py-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[var(--cf-ink)]">
+                <div className="flex items-start gap-3 border-b border-[var(--cf-border)] px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-[var(--cf-ink)]">
                       {active.recruiter_name}
                     </p>
                     <p className="text-xs text-[var(--cf-muted)]">
-                      Chat with {active.recruiter_name} only ·{" "}
-                      {(active.messages ?? []).length} message
-                      {(active.messages ?? []).length === 1 ? "" : "s"}
+                      {folder === "deleted" && active.deleted_at
+                        ? `Deleted · ${daysLeftInDeletedFolder(active.deleted_at)} day${daysLeftInDeletedFolder(active.deleted_at) === 1 ? "" : "s"} remaining`
+                        : `Chat with ${active.recruiter_name}`}
                     </p>
-                    {folder === "deleted" && active.deleted_at ? (
-                      <p className="mt-0.5 text-[11px] text-amber-800">
-                        Deleted · {daysLeftInDeletedFolder(active.deleted_at)}{" "}
-                        day
-                        {daysLeftInDeletedFolder(active.deleted_at) === 1
-                          ? ""
-                          : "s"}{" "}
-                        remaining
-                      </p>
-                    ) : null}
                   </div>
-                  <div className="flex shrink-0 flex-wrap items-center gap-2">
-                    {folder === "inbox" ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="danger"
-                        disabled={pending}
-                        onClick={() => setConfirmKind("soft")}
-                        title="Move to Deleted"
-                      >
-                        <Trash2 className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                        Delete
-                      </Button>
-                    ) : (
-                      <>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          disabled={pending}
-                          onClick={() => void confirmRestore()}
-                          title="Restore to Inbox"
-                        >
-                          <ArchiveRestore
-                            className="mr-1.5 h-3.5 w-3.5"
-                            aria-hidden
-                          />
-                          Restore
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="danger"
-                          disabled={pending}
-                          onClick={() => setConfirmKind("permanent")}
-                          title="Delete permanently"
-                        >
-                          <Trash2 className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                          Delete forever
-                        </Button>
-                      </>
-                    )}
-                  </div>
+                  {folder === "inbox" ? (
+                    <button
+                      type="button"
+                      onClick={onDeleteThread}
+                      disabled={pending}
+                      title="Move to Deleted"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--cf-border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--cf-muted)] transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                      Delete
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={onRestoreThread}
+                      disabled={pending}
+                      title="Restore to Inbox"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--cf-border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--cf-ink)] transition hover:bg-[var(--cf-accent)]/10 disabled:opacity-50"
+                    >
+                      <ArchiveRestore className="h-3.5 w-3.5" aria-hidden />
+                      Restore
+                    </button>
+                  )}
                 </div>
                 <div className="flex-1 space-y-3 overflow-y-auto p-4">
                   {(active.messages ?? [])
@@ -490,45 +479,43 @@ export function MessagesClient({
                       return m.sender_role === "recruiter";
                     })
                     .map((m) => (
-                    <div
-                      key={m.id}
-                      className={`flex ${m.sender_role === "client" ? "justify-end" : "justify-start"}`}
-                    >
                       <div
-                        className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
-                          m.sender_role === "client"
-                            ? "bg-[var(--cf-navy)] text-white"
-                            : "bg-[var(--cf-surface)] text-[var(--cf-ink)]"
-                        }`}
+                        key={m.id}
+                        className={`flex ${m.sender_role === "client" ? "justify-end" : "justify-start"}`}
                       >
-                        <p
-                          className={`mb-1 text-[10px] font-medium ${
+                        <div
+                          className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
                             m.sender_role === "client"
-                              ? "text-white/80"
-                              : "text-[var(--cf-muted)]"
+                              ? "bg-[var(--cf-navy)] text-white"
+                              : "bg-[var(--cf-surface)] text-[var(--cf-ink)]"
                           }`}
                         >
-                          {m.sender_role === "client"
-                            ? "You"
-                            : m.sender_role === "staff"
-                              ? "Avery Accounting"
-                              : m.sender_role === "recruiter"
-                                ? "Morgan Recruiter"
-                                : active.recruiter_name}
-                        </p>
-                        <p>{m.body}</p>
-                        <p
-                          className={`mt-1 text-[10px] ${
-                            m.sender_role === "client"
-                              ? "text-white/70"
-                              : "text-[var(--cf-muted)]"
-                          }`}
-                        >
-                          {formatWhen(m.created_at)}
-                        </p>
+                          <p
+                            className={`mb-1 text-[10px] font-medium ${
+                              m.sender_role === "client"
+                                ? "text-white/80"
+                                : "text-[var(--cf-muted)]"
+                            }`}
+                          >
+                            {m.sender_role === "client"
+                              ? "You"
+                              : m.sender_role === "staff"
+                                ? "Avery Accounting"
+                                : "Morgan Recruiter"}
+                          </p>
+                          <p className="whitespace-pre-wrap">{m.body}</p>
+                          <p
+                            className={`mt-1 text-[10px] ${
+                              m.sender_role === "client"
+                                ? "text-white/70"
+                                : "text-[var(--cf-muted)]"
+                            }`}
+                          >
+                            {formatWhen(m.created_at)}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
                 {folder === "inbox" ? (
                   <form
@@ -538,7 +525,7 @@ export function MessagesClient({
                     <input
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
-                      placeholder="Type a message…"
+                      placeholder={`Message ${active.recruiter_name}…`}
                       disabled={pending}
                       className="min-w-0 flex-1 rounded-lg border border-[var(--cf-border)] px-3 py-2 text-sm focus:border-[var(--cf-navy)] focus:ring-2 focus:ring-[var(--cf-navy)]/15 focus:outline-none"
                     />
@@ -548,97 +535,21 @@ export function MessagesClient({
                   </form>
                 ) : (
                   <div className="border-t border-[var(--cf-border)] px-4 py-3 text-xs text-[var(--cf-muted)]">
-                    Restore this conversation to reply, or delete it forever.
-                    After 30 days it leaves Deleted automatically.
+                    Restore this conversation to reply, or it will leave Deleted
+                    after 30 days.
                   </div>
                 )}
               </>
             ) : (
-              <p className="p-6 text-sm text-[var(--cf-muted)]">
-                Select a conversation.
-              </p>
+              <div className="flex flex-1 items-center justify-center text-sm text-[var(--cf-muted)]">
+                {folder === "deleted"
+                  ? "No deleted conversations"
+                  : "Select a conversation"}
+              </div>
             )}
-          </section>
+          </div>
         </div>
-      ) : null}
-
-      <ConfirmActionDialog
-        open={confirmKind === "soft" && active != null}
-        onClose={() => setConfirmKind(null)}
-        title="Move to Deleted?"
-        description={
-          active
-            ? `Your conversation with ${active.recruiter_name} will move to the Deleted folder for 30 days. You can restore it anytime during that window.`
-            : ""
-        }
-        confirmLabel="Move to Deleted"
-        confirmVariant="danger"
-        requireReason={false}
-        showReason={false}
-        busy={pending}
-        onConfirm={() => void confirmSoftDelete()}
-      />
-
-      <ConfirmActionDialog
-        open={confirmKind === "permanent" && active != null}
-        onClose={() => setConfirmKind(null)}
-        title="Delete permanently?"
-        description={
-          active
-            ? `Permanently remove your conversation with ${active.recruiter_name} and all messages. This cannot be undone.`
-            : ""
-        }
-        confirmLabel="Delete forever"
-        confirmVariant="danger"
-        requireReason={false}
-        showReason={false}
-        busy={pending}
-        onConfirm={() => void confirmPermanentDelete()}
-      />
-    </div>
-  );
-}
-
-function FolderToggle({
-  folder,
-  deletedCount,
-  onChange,
-}: {
-  folder: Folder;
-  deletedCount: number;
-  onChange: (folder: Folder) => void;
-}) {
-  return (
-    <div className="flex rounded-lg border border-[var(--cf-border)] bg-[var(--cf-surface)] p-0.5">
-      <button
-        type="button"
-        onClick={() => onChange("inbox")}
-        className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold transition ${
-          folder === "inbox"
-            ? "bg-white text-[var(--cf-ink)] shadow-sm"
-            : "text-[var(--cf-muted)] hover:text-[var(--cf-ink)]"
-        }`}
-      >
-        <Inbox className="h-3.5 w-3.5" aria-hidden />
-        Inbox
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("deleted")}
-        className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold transition ${
-          folder === "deleted"
-            ? "bg-white text-[var(--cf-ink)] shadow-sm"
-            : "text-[var(--cf-muted)] hover:text-[var(--cf-ink)]"
-        }`}
-      >
-        <FolderOpen className="h-3.5 w-3.5" aria-hidden />
-        Deleted
-        {deletedCount > 0 ? (
-          <span className="text-[10px] font-medium text-[var(--cf-muted)]">
-            ({deletedCount})
-          </span>
-        ) : null}
-      </button>
+      </div>
     </div>
   );
 }
