@@ -2,6 +2,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/top-bar";
 import { ClientPortalShell } from "@/components/client-portal/client-portal-shell";
 import { RoleSwitcher } from "@/components/demo/role-switcher";
+import { FaqWidget } from "@/components/help/faq-widget";
 import { ShellProvider } from "@/components/layout/shell-context";
 import { loadClientPortalChrome } from "@/lib/client-portal/chrome";
 import { loadCandidateNotifications } from "@/lib/candidate/notifications";
@@ -25,6 +26,7 @@ export async function AppShell({
         >
           {children}
         </ClientPortalShell>
+        <FaqWidget role={user.role} />
         <RoleSwitcher currentRole={user.role} />
       </>
     );
@@ -50,6 +52,7 @@ export async function AppShell({
           </main>
         </div>
       </div>
+      <FaqWidget role={user.role} />
       {user.role !== "candidate" ? (
         <RoleSwitcher currentRole={user.role} />
       ) : null}
