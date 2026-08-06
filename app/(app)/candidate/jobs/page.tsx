@@ -11,12 +11,12 @@ import {
   getCandidateJobInterests,
   getOpenJobs,
 } from "@/lib/candidate/data";
+import { jobFitsCandidateIndustry } from "@/lib/candidate/industry-profile";
 import {
   candidateInputFromEmployee,
   jobInputFromPublicJob,
   rankJobsForCandidate,
   requirementsForPublicJobs,
-  MATCH_RECRUITER_THRESHOLD,
 } from "@/lib/matching";
 
 export default async function CandidateJobsPage() {
@@ -29,29 +29,45 @@ export default async function CandidateJobsPage() {
   const appliedJobIds = new Set(applications.map((a) => a.job_id));
   const interestedJobIds = new Set(interests);
   const profileResumeUrl = employee?.resume_url ?? null;
+  const candidateIndustry = employee?.industry?.trim() || null;
 
   const reqMap = await requirementsForPublicJobs(jobs.map((j) => j.id));
+
+  const industryJobs = candidateIndustry
+    ? jobs.filter((job) =>
+        jobFitsCandidateIndustry(candidateIndustry, {
+          requestIndustry: reqMap.get(job.id)?.industry ?? null,
+          clientIndustry: job.client_industry,
+          title: job.title,
+          description: job.description,
+        }),
+      )
+    : [];
+
   const candidateProfile = candidateInputFromEmployee(employee, {
-    titles: jobs
+    titles: industryJobs
       .filter((j) => appliedJobIds.has(j.id))
       .map((j) => j.title)
       .slice(0, 5),
   });
 
   const ranked = rankJobsForCandidate(
-    jobs.map((j) => {
-      const req = reqMap.get(j.id) ?? { skills: [], certifications: [] };
+    industryJobs.map((j) => {
+      const req = reqMap.get(j.id) ?? {
+        skills: [],
+        certifications: [],
+        industry: null,
+      };
       return jobInputFromPublicJob(j, req.skills, req.certifications);
     }),
-    jobs.map((j) => j.id),
+    industryJobs.map((j) => j.id),
     candidateProfile,
   );
   const scoreByJob = new Map(
     ranked.map((r) => [r.jobId, r.result] as const),
   );
 
-  // Best matches first; already-applied sink lower within equal sorting via secondary key.
-  const jobsSorted = [...jobs].sort((a, b) => {
+  const jobsSorted = [...industryJobs].sort((a, b) => {
     const sa = scoreByJob.get(a.id)?.score ?? 0;
     const sb = scoreByJob.get(b.id)?.score ?? 0;
     if (sb !== sa) return sb - sa;
@@ -93,21 +109,13 @@ export default async function CandidateJobsPage() {
     };
   });
 
-  const strongCount = rows.filter(
-    (r) => !r.applied && (r.matchScore ?? 0) >= MATCH_RECRUITER_THRESHOLD,
-  ).length;
-
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Available jobs"
-        description={
-          strongCount > 0
-            ? `${strongCount} role${strongCount === 1 ? "" : "s"} matched to your profile. Apply or remove listings you don’t want to see.`
-            : "Roles that fit your profile appear here. Add certifications, education, previous roles, and a resume to improve matches."
-        }
+      <PageHeader title="Available jobs" />
+      <CandidateJobsBoard
+        jobs={rows}
+        hasIndustry={Boolean(candidateIndustry)}
       />
-      <CandidateJobsBoard jobs={rows} />
     </div>
   );
 }

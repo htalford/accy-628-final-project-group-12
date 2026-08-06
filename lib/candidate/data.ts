@@ -161,12 +161,25 @@ export async function getOpenJobs() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("jobs")
-    .select("*")
+    .select("*, clients(industry)")
     .eq("status", "open")
     .order("posted_at", { ascending: false });
 
-  return (data as Job[] | null) ?? [];
+  return ((data as (Job & {
+    clients?: { industry: string | null } | { industry: string | null }[] | null;
+  })[] | null) ?? []).map((row) => {
+    const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
+    const { clients: _clients, ...job } = row;
+    return {
+      ...(job as Job),
+      client_industry: client?.industry ?? null,
+    };
+  });
 }
+
+export type OpenJobWithClientIndustry = Job & {
+  client_industry: string | null;
+};
 
 export async function getCandidateApplications() {
   const user = await requireCandidateContext();
