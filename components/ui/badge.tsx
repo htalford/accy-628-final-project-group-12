@@ -29,11 +29,14 @@ export function Badge({
 }
 
 export function statusTone(status: string): keyof typeof tones {
-  const s = status.toLowerCase();
+  const s = status.toLowerCase().trim();
+  // App-wide: Active/Low = green, Inactive/High = red, Medium = yellow
+  if (s === "inactive" || s === "high" || s === "high priority") return "danger";
+  if (s === "medium" || s === "medium priority") return "warning";
+  if (s === "low" || s === "low priority" || s === "active") return "success";
   if (
     [
       "open",
-      "active",
       "paid",
       "approved",
       "accepted",
@@ -67,6 +70,7 @@ export function statusTone(status: string): keyof typeof tones {
       "closed",
       "on hold",
       "disputed",
+      "inactive",
     ].includes(s)
   )
     return "danger";

@@ -12,7 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination } from "@/components/ui/form";
 import { ConfirmActionDialog } from "@/components/client-portal/confirm-action-dialog";
 import { ToastProvider, useToast } from "@/components/client-portal/toast";
-import { updateApplicationStatus } from "@/app/actions/recruiter";
+import { updateApplicationStatus, removeRejectedCandidate } from "@/app/actions/recruiter";
 import type { ClientCandidate, SubmittalStage } from "@/lib/types/database";
 import {
   seedStatusTone,
@@ -46,6 +46,10 @@ function MatchedCandidatesBoard({
     id: string;
     name: string;
     next: Extract<SubmittalStage, "accepted" | "rejected">;
+  } | null>(null);
+  const [removeDialog, setRemoveDialog] = useState<{
+    id: string;
+    name: string;
   } | null>(null);
 
   const candidatesOnly = useMemo(
@@ -140,11 +144,26 @@ function MatchedCandidatesBoard({
     }
   }
 
+  async function confirmRemove() {
+    if (!removeDialog) return;
+    const result = await removeRejectedCandidate(removeDialog.id);
+    if (result.ok) {
+      toast.push(
+        result.message ?? `${removeDialog.name} removed.`,
+        "success",
+      );
+      setRemoveDialog(null);
+      setSelected((prev) => prev.filter((id) => id !== removeDialog.id));
+      startTransition(() => router.refresh());
+    } else {
+      toast.push(result.error ?? "Failed to remove candidate.", "error");
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Matched candidates"
-        description={`People who applied to open jobs. Fit scores use required skills and certifications. Accepting a candidate at ${MATCH_RECRUITER_THRESHOLD}%+ creates a contract for the employer, candidate, and accounting so the role can be filled.`}
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -343,6 +362,22 @@ function MatchedCandidatesBoard({
                     <Button size="sm" variant="secondary" href={c.detail_href}>
                       View Profile
                     </Button>
+                    {c.stage === "rejected" ? (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        type="button"
+                        disabled={pending}
+                        onClick={() =>
+                          setRemoveDialog({
+                            id: c.id,
+                            name: c.candidate_name,
+                          })
+                        }
+                      >
+                        Remove
+                      </Button>
+                    ) : null}
                     {c.stage !== "accepted" &&
                     c.stage !== "rejected" &&
                     c.stage !== "offer" ? (
@@ -423,6 +458,22 @@ function MatchedCandidatesBoard({
         }
         busy={pending}
         onConfirm={(reason) => void confirmDecision(reason)}
+      />
+
+      <ConfirmActionDialog
+        open={removeDialog != null}
+        onClose={() => setRemoveDialog(null)}
+        title="Permanently remove rejected candidate?"
+        description={
+          removeDialog
+            ? `${removeDialog.name} will be deleted from matched candidates, job-order lists, and dashboard counts. This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Remove permanently"
+        confirmVariant="danger"
+        busy={pending}
+        onConfirm={() => void confirmRemove()}
+        showReason={false}
       />
     </div>
   );

@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ChevronDown, CircleHelp, X } from "lucide-react";
-import { FAQ_BY_ROLE } from "@/lib/help/faq-content";
+import { getFaqsForRole } from "@/lib/help/faq-content";
 import { ROLE_LABELS } from "@/lib/auth/roles";
 import type { UserRole } from "@/lib/types/database";
 
 export function FaqWidget({ role }: { role: UserRole }) {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const titleId = useId();
-  const items = FAQ_BY_ROLE[role] ?? [];
+  const items = getFaqsForRole(role, pathname);
 
   useEffect(() => {
     if (!open) return;
@@ -23,7 +25,7 @@ export function FaqWidget({ role }: { role: UserRole }) {
 
   useEffect(() => {
     setExpandedId(null);
-  }, [role]);
+  }, [role, pathname]);
 
   return (
     <div className="pointer-events-none fixed right-4 bottom-4 z-40 flex flex-col items-end gap-2">

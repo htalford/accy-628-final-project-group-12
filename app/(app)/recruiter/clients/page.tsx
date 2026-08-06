@@ -9,10 +9,7 @@ export default async function ClientsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Clients"
-        description="Employers linked to job orders and placements."
-      />
+      <PageHeader title="Clients" />
       <DataTable
         rows={rows}
         emptyMessage="No clients found."
