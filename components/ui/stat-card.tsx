@@ -49,7 +49,7 @@ export function StatCard({
   );
 
   const className = compact
-    ? "aspect-square w-full rounded-xl border border-[var(--cf-border)] bg-white shadow-sm transition hover:border-[var(--cf-accent)] hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cf-accent)]"
+    ? "flex h-full min-h-[7.5rem] w-full flex-col rounded-xl border border-[var(--cf-border)] bg-white shadow-sm transition hover:border-[var(--cf-accent)] hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cf-accent)]"
     : "rounded-xl border border-[var(--cf-border)] bg-white p-4 shadow-sm transition hover:border-[var(--cf-accent)] hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cf-accent)]";
 
   if (href) {

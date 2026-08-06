@@ -730,6 +730,9 @@ export async function getDashboardData() {
   const timesheetsAwaitingApproval = timesheets.filter(
     (t) => t.status === "submitted",
   ).length;
+  const overdueInvoices = invoices.filter(
+    (inv) => inv.displayStatus === "Overdue",
+  ).length;
 
   const byMonth = new Map<string, number>();
   for (const inv of recognizedInvoices) {
@@ -791,6 +794,7 @@ export async function getDashboardData() {
       directLabor,
       activeContracts,
       timesheetsAwaitingApproval,
+      overdueInvoices,
       totalExpenses: operatingExpenses,
       grossProfit,
       operatingIncome,
