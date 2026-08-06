@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -31,22 +31,38 @@ function CheckboxGrid({
   options,
   selected,
   onToggle,
+  onSelectAll,
 }: {
   legend: string;
   hint?: string;
   options: readonly string[];
   selected: string[];
   onToggle: (value: string) => void;
+  onSelectAll: () => void;
 }) {
+  const allOn =
+    options.length > 0 && options.every((option) => selected.includes(option));
+
   return (
     <fieldset className="space-y-3">
-      <div>
-        <legend className="text-base font-semibold text-[var(--cf-ink)]">
-          {legend}
-        </legend>
-        {hint ? (
-          <p className="mt-1 text-xs text-[var(--cf-muted)]">{hint}</p>
-        ) : null}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <legend className="text-base font-semibold text-[var(--cf-ink)]">
+            {legend}
+          </legend>
+          {hint ? (
+            <p className="mt-1 text-xs text-[var(--cf-muted)]">{hint}</p>
+          ) : null}
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="shrink-0"
+          onClick={onSelectAll}
+        >
+          {allOn ? "Clear all" : "Select all"}
+        </Button>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         {options.map((option) => {
@@ -179,7 +195,7 @@ export default function NewJobRequestPage() {
               value={form.industry}
               onChange={(e) => onIndustryChange(e.target.value)}
             >
-              <option value="">Select an industry…</option>
+              <option value="">Select an industryΓÇª</option>
               {INDUSTRY_PROFILE_OPTIONS.map((item) => (
                 <option key={item.slug} value={item.slug}>
                   {item.name}
@@ -265,7 +281,7 @@ export default function NewJobRequestPage() {
               onChange={(e) =>
                 setForm((f) => ({ ...f, payRate: e.target.value }))
               }
-              placeholder="$20–$25 / hr"
+              placeholder="$20ΓÇô$25 / hr"
             />
           </div>
           <div>
@@ -326,6 +342,12 @@ export default function NewJobRequestPage() {
                 onToggle={(value) =>
                   setSkills((prev) => toggleValue(prev, value))
                 }
+                onSelectAll={() => {
+                  const all =
+                    industryOptions.skills.length > 0 &&
+                    industryOptions.skills.every((s) => skills.includes(s));
+                  setSkills(all ? [] : [...industryOptions.skills]);
+                }}
               />
 
               <CheckboxGrid
@@ -336,6 +358,16 @@ export default function NewJobRequestPage() {
                 onToggle={(value) =>
                   setCertifications((prev) => toggleValue(prev, value))
                 }
+                onSelectAll={() => {
+                  const all =
+                    industryOptions.certifications.length > 0 &&
+                    industryOptions.certifications.every((c) =>
+                      certifications.includes(c),
+                    );
+                  setCertifications(
+                    all ? [] : [...industryOptions.certifications],
+                  );
+                }}
               />
             </div>
           ) : (

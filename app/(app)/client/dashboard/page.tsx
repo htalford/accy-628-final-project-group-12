@@ -3,8 +3,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PinActionTaskButton } from "@/components/portal-pins/pin-action-task-button";
-import { PinContractButton } from "@/components/portal-pins/pin-contract-button";
 import {
   StaffingHealthStrip,
   type StaffingHealthItem,
@@ -25,29 +23,17 @@ function actionStatusLabel(kind: string, status: string): string {
   return placementStatusLabel(status);
 }
 
-function marginPercent(
-  bill: number | null,
-  pay: number | null,
-): number | null {
-  if (bill == null || pay == null || bill <= 0) return null;
-  return ((bill - pay) / bill) * 100;
-}
-
 export default async function ClientDashboardPage() {
   const data = await loadClientPortalData();
-  const openPlacements = data.placements.filter(
-    (p) => p.status === "active" || p.status === "at_risk",
-  );
-  const atRiskPlacements = data.placements.filter((p) => p.status === "at_risk");
+  const openPlacements = data.placements.filter((p) => p.status === "active");
 
   const openRoles = data.metrics.openPositions;
   const timesheetsDue = data.metrics.timesheetsAwaitingApproval;
   const outstandingInvoices = data.metrics.outstandingInvoices;
-  const atRiskCount = atRiskPlacements.length;
 
   const healthItems: Array<
     StaffingHealthItem & {
-      icon?: "roles" | "candidates" | "timesheets" | "invoices" | "atrisk";
+      icon?: "roles" | "candidates" | "timesheets" | "invoices";
     }
   > = [
     {
@@ -83,15 +69,6 @@ export default async function ClientDashboardPage() {
             : "info",
       icon: "invoices",
     },
-    {
-      id: "at-risk",
-      label: "At-risk contracts",
-      value: atRiskCount,
-      detail: "",
-      href: "/client/contracts?status=at_risk",
-      tone: atRiskCount === 0 ? "ok" : "critical",
-      icon: "atrisk",
-    },
   ];
 
   return (
@@ -125,22 +102,6 @@ export default async function ClientDashboardPage() {
                   <Badge tone={seedStatusTone(item.status)}>
                     {actionStatusLabel(item.kind, item.status)}
                   </Badge>
-                  <PinActionTaskButton
-                    scope="client"
-                    id={item.id}
-                    title={item.title}
-                    detail={item.detail}
-                    href={item.href}
-                    kind={
-                      item.kind === "placement"
-                        ? "contract"
-                        : item.kind === "timesheet"
-                          ? "timesheet"
-                          : item.kind === "invoice"
-                            ? "invoice"
-                            : "task"
-                    }
-                  />
                   <Link href={item.href}>
                     <Button size="sm" variant="secondary">
                       Open
@@ -208,7 +169,6 @@ export default async function ClientDashboardPage() {
               ? `${p.employee.first_name} ${p.employee.last_name}`
               : "Employee";
             const title = placementPositionTitle(p.title, p.placement_type);
-            const m = marginPercent(p.bill_rate, p.pay_rate);
             return (
               <li
                 key={p.id}
@@ -224,24 +184,12 @@ export default async function ClientDashboardPage() {
                     {p.end_date
                       ? ` · Ends ${p.end_date.slice(0, 10)}`
                       : " · Open-ended"}
-                    {p.status === "at_risk"
-                      ? m != null
-                        ? ` · ~${m.toFixed(0)}% margin (at risk)`
-                        : " · at risk"
-                      : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
                   <Badge tone={seedStatusTone(p.status)}>
                     {placementStatusLabel(p.status)}
                   </Badge>
-                  <PinContractButton
-                    scope="client"
-                    contractId={p.id}
-                    contractNumber={shortPlacementNumber(p.id)}
-                    employeeName={name}
-                    positionTitle={title}
-                  />
                   <Button
                     size="sm"
                     variant="ghost"

@@ -184,9 +184,18 @@ export const loadClientPortalData = cache(async (): Promise<ClientPortalData> =>
     updated_at: String(row.updated_at),
   }));
 
-  const openPlacements = placements.filter(
-    (p) => p.status === "active" || p.status === "at_risk",
-  );
+  // At-risk is internal staffing/margin status — employers must not see those contracts.
+  const employerPlacements = placements.filter((p) => p.status !== "at_risk");
+  const openPlacements = employerPlacements.filter((p) => p.status === "active");
+
+  // Do not leak at_risk status on timesheet nested placements.
+  timesheets = timesheets.map((t) => {
+    if (!t.placement || t.placement.status !== "at_risk") return t;
+    return {
+      ...t,
+      placement: { ...t.placement, status: "active" },
+    };
+  });
 
   // Jobs board applications for this employer's open postings
   const [portalJobRequests, portalApplications] = await Promise.all([
@@ -230,20 +239,6 @@ export const loadClientPortalData = cache(async (): Promise<ClientPortalData> =>
       detail: `${t.employee_name} · week ending ${t.week_ending_date.slice(0, 10)}`,
       status: t.status,
       href: `/client/timesheets/${t.id}`,
-    });
-  }
-
-  for (const p of placements.filter((x) => x.status === "at_risk")) {
-    const name = p.employee
-      ? `${p.employee.first_name} ${p.employee.last_name}`
-      : "Assignee";
-    actionQueue.push({
-      id: `pl-${p.id}`,
-      kind: "placement",
-      title: "Placement at risk",
-      detail: `${name} · ${p.title ?? "Assignment"} · thin margin / review needed`,
-      status: p.status,
-      href: `/client/contracts/${p.id}`,
     });
   }
 
@@ -292,7 +287,7 @@ export const loadClientPortalData = cache(async (): Promise<ClientPortalData> =>
   return {
     user,
     client: (clientRow as Client | null) ?? null,
-    placements,
+    placements: employerPlacements,
     timesheets,
     invoices,
     metrics,
