@@ -10,10 +10,9 @@ import {
   LogOut,
   Menu,
   Search,
-  User,
 } from "lucide-react";
 import { signOut } from "@/app/actions/demo-switch-role";
-import { getDashboardPath, getPageTitle, ROLE_LABELS } from "@/lib/auth/roles";
+import { getDashboardPath, ROLE_LABELS } from "@/lib/auth/roles";
 import {
   SAMPLE_NOTIFICATIONS,
   type AppNotification,
@@ -119,21 +118,6 @@ export function TopBar({
     return () => clearTimeout(handle);
   }, [query, user.role]);
 
-  const profileHref = useMemo(() => {
-    switch (user.role) {
-      case "accounting":
-        return "/accounting/profile";
-      case "candidate":
-        return "/candidate/profile";
-      case "recruiter":
-        return "/recruiter/profile";
-      case "employer":
-        return "/client/profile";
-      default:
-        return "#";
-    }
-  }, [user.role]);
-
   const hideSearch =
     pathname === "/candidate" ||
     pathname === "/candidate/dashboard" ||
@@ -197,8 +181,8 @@ export function TopBar({
                   : pathname.startsWith("/candidate/contracts") ||
                       pathname.startsWith("/candidate/completions")
                     ? "Search by employer"
-                    : "Search by recruiter…"
-                : "Search clients, invoices, contracts…"
+                    : "Search by recruiterΓÇª"
+                : "Search clients, invoices, contractsΓÇª"
             }
             className="w-full rounded-md border border-[var(--cf-border)] bg-[var(--cf-surface)] py-2 pr-3 pl-9 text-sm outline-none ring-[var(--cf-accent)] focus:bg-white focus:ring-2"
           />
@@ -206,7 +190,7 @@ export function TopBar({
             <div className="absolute top-full right-0 left-0 z-50 mt-1 max-h-72 overflow-auto rounded-lg border border-[var(--cf-border)] bg-white shadow-lg">
               {pending && hits.length === 0 ? (
                 <p className="px-3 py-2 text-xs text-[var(--cf-muted)]">
-                  Searching…
+                  SearchingΓÇª
                 </p>
               ) : null}
               {hits.map((hit) => (
@@ -328,16 +312,6 @@ export function TopBar({
                 {user.email}
               </p>
             </div>
-            {profileHref !== "#" ? (
-              <Link
-                href={profileHref}
-                onClick={() => setProfileOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--cf-ink)] hover:bg-[var(--cf-surface)]"
-              >
-                <User className="h-4 w-4" />
-                Profile
-              </Link>
-            ) : null}
             <form action={signOut}>
               <button
                 type="submit"
