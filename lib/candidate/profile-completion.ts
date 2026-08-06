@@ -1,4 +1,4 @@
-import type { Employee } from "@/lib/types/database";
+import type { Employee, PreviousEmployment } from "@/lib/types/database";
 
 export type ProfileChecklistItem = {
   id: string;
@@ -11,6 +11,12 @@ export type ProfileCompletion = {
   items: ProfileChecklistItem[];
   missing: ProfileChecklistItem[];
 };
+
+function hasEmploymentEntry(jobs: PreviousEmployment[] | null | undefined) {
+  return Boolean(
+    jobs?.some((job) => job.company?.trim() && job.title?.trim()),
+  );
+}
 
 export function getProfileCompletion(
   employee: Employee | null | undefined,
@@ -32,6 +38,16 @@ export function getProfileCompletion(
       id: "certifications",
       label: "Certifications",
       complete: Boolean(employee?.certifications?.trim()),
+    },
+    {
+      id: "education",
+      label: "Education background",
+      complete: Boolean(employee?.education_background?.trim()),
+    },
+    {
+      id: "employments",
+      label: "Previous employment",
+      complete: hasEmploymentEntry(employee?.previous_employments),
     },
     {
       id: "resume",
