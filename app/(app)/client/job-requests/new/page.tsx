@@ -195,7 +195,7 @@ export default function NewJobRequestPage() {
               value={form.industry}
               onChange={(e) => onIndustryChange(e.target.value)}
             >
-              <option value="">Select an industryΓÇª</option>
+              <option value="">Select an industry…</option>
               {INDUSTRY_PROFILE_OPTIONS.map((item) => (
                 <option key={item.slug} value={item.slug}>
                   {item.name}
@@ -281,7 +281,7 @@ export default function NewJobRequestPage() {
               onChange={(e) =>
                 setForm((f) => ({ ...f, payRate: e.target.value }))
               }
-              placeholder="$20ΓÇô$25 / hr"
+              placeholder="$20–$25 / hr"
             />
           </div>
           <div>
