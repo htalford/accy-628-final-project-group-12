@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { signOut } from "@/app/actions/demo-switch-role";
 import { ROLE_LABELS } from "@/lib/auth/roles";
+import { DemoRoleMenu } from "@/components/demo/demo-role-menu";
 import {
   filterSearchIndex,
   type ClientNotification,
@@ -341,7 +342,7 @@ export function ClientTopBar({
             <ChevronDown className="hidden h-3.5 w-3.5 text-[var(--cf-muted)] sm:block" />
           </button>
           {profileOpen ? (
-            <div className="absolute top-full right-0 z-40 mt-1 w-56 rounded-xl border border-[var(--cf-border)] bg-white py-1 shadow-lg">
+            <div className="absolute top-full right-0 z-40 mt-1 w-60 rounded-xl border border-[var(--cf-border)] bg-white py-1 shadow-lg">
               <div className="border-b border-[var(--cf-border)] px-3 py-2">
                 <p className="text-sm font-medium text-[var(--cf-ink)]">
                   {user.name}
@@ -350,6 +351,10 @@ export function ClientTopBar({
                   {user.email}
                 </p>
               </div>
+              <DemoRoleMenu
+                currentRole={user.role}
+                onSelect={() => setProfileOpen(false)}
+              />
               <Link
                 href="/client/profile"
                 onClick={() => setProfileOpen(false)}

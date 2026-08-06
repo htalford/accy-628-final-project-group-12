@@ -13,11 +13,12 @@ import {
   User,
 } from "lucide-react";
 import { signOut } from "@/app/actions/demo-switch-role";
-import { getDashboardPath, getPageTitle, ROLE_LABELS } from "@/lib/auth/roles";
+import { getDashboardPath, ROLE_LABELS } from "@/lib/auth/roles";
 import {
   SAMPLE_NOTIFICATIONS,
   type AppNotification,
 } from "@/lib/accounting/notifications";
+import { DemoRoleMenu } from "@/components/demo/demo-role-menu";
 import { useShell } from "@/components/layout/shell-context";
 import type { AppUser } from "@/lib/types/database";
 import { searchAccounting } from "@/app/actions/accounting-search";
@@ -80,6 +81,7 @@ export function TopBar({
   const [pending, startTransition] = useTransition();
   const searchRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   const notifications = useMemo(
     () => toTopBarNotifications(liveNotifications),
@@ -90,11 +92,15 @@ export function TopBar({
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
-      if (!searchRef.current?.contains(e.target as Node)) {
+      const t = e.target as Node;
+      if (!searchRef.current?.contains(t)) {
         setSearchOpen(false);
       }
-      if (!notifRef.current?.contains(e.target as Node)) {
+      if (!notifRef.current?.contains(t)) {
         setNotifOpen(false);
+      }
+      if (!profileRef.current?.contains(t)) {
+        setProfileOpen(false);
       }
     }
     document.addEventListener("mousedown", onDocClick);
@@ -290,7 +296,7 @@ export function TopBar({
         ) : null}
       </div>
 
-      <div className="relative">
+      <div className="relative" ref={profileRef}>
         <button
           type="button"
           className="flex max-w-[12rem] items-center gap-2 rounded-md border border-[var(--cf-border)] px-2 py-1.5 text-left hover:bg-[var(--cf-surface)] sm:max-w-none sm:px-3"
@@ -298,6 +304,8 @@ export function TopBar({
             setProfileOpen((v) => !v);
             setNotifOpen(false);
           }}
+          aria-expanded={profileOpen}
+          aria-haspopup="menu"
         >
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--cf-navy)] text-xs font-semibold text-white">
             {user.name
@@ -317,7 +325,7 @@ export function TopBar({
           <ChevronDown className="hidden h-4 w-4 text-[var(--cf-muted)] sm:block" />
         </button>
         {profileOpen ? (
-          <div className="absolute top-full right-0 z-50 mt-1 w-56 rounded-lg border border-[var(--cf-border)] bg-white py-1 shadow-lg">
+          <div className="absolute top-full right-0 z-50 mt-1 w-60 rounded-lg border border-[var(--cf-border)] bg-white py-1 shadow-lg">
             <div className="border-b border-[var(--cf-border)] px-3 py-2">
               <p className="text-sm font-medium text-[var(--cf-ink)]">
                 {user.name}
@@ -326,6 +334,10 @@ export function TopBar({
                 {user.email}
               </p>
             </div>
+            <DemoRoleMenu
+              currentRole={user.role}
+              onSelect={() => setProfileOpen(false)}
+            />
             {profileHref !== "#" ? (
               <Link
                 href={profileHref}

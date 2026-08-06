@@ -45,7 +45,6 @@ export default async function ExpensesPage({
       <CollapsiblePanel
         id="placement"
         title="Placement Expenses"
-        description="Direct costs tied to a placement (payroll tax, benefits, recruiting, travel, etc.)."
         defaultOpen={placementExpenses.length > 0}
         action={
           <span className="text-sm font-semibold text-[var(--cf-ink)]">
@@ -124,7 +123,6 @@ export default async function ExpensesPage({
       <CollapsiblePanel
         id="operating"
         title="Operating Expenses"
-        description="Company overhead (salaries, rent, software, advertising, screening, training, etc.)."
         defaultOpen={operatingExpenses.length > 0}
         action={
           <span className="text-sm font-semibold text-[var(--cf-ink)]">
@@ -147,11 +145,6 @@ export default async function ExpensesPage({
               key: "date",
               header: "Expense Date",
               render: (row) => row.expenseDate,
-            },
-            {
-              key: "month",
-              header: "Month",
-              render: (row) => row.month,
             },
             {
               key: "category",
