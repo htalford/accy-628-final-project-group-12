@@ -27,13 +27,15 @@ const SLIDES = [
   },
 ];
 
+const INTERVAL_MS = 6000;
+
 export function HeroSlideshow() {
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
       setIndex((current) => (current + 1) % SLIDES.length);
-    }, 10000);
+    }, INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -41,29 +43,43 @@ export function HeroSlideshow() {
     setIndex((next + SLIDES.length) % SLIDES.length);
   }
 
+  const slide = SLIDES[index];
+  const nextSlide = SLIDES[(index + 1) % SLIDES.length];
+
   return (
     <div className="relative w-full overflow-hidden border-y border-[var(--ot-border)] bg-white">
       <div className="relative aspect-[21/9] min-h-[280px] w-full sm:min-h-[360px] lg:min-h-[440px]">
-        {SLIDES.map((slide, slideIndex) => (
-          <div
+        <div
+          className={`absolute inset-0 ${
+            slide.fit === "contain"
+              ? "bg-white p-8 sm:p-12"
+              : "bg-[var(--ot-navy)]"
+          }`}
+        >
+          <Image
             key={slide.src}
-            className={`absolute inset-0 transition-opacity duration-1000 ${
-              slideIndex === index ? "opacity-100" : "opacity-0"
-            } ${slide.fit === "contain" ? "bg-white p-8 sm:p-12" : "bg-[var(--ot-navy)]"}`}
-            aria-hidden={slideIndex !== index}
-          >
-            <Image
-              src={slide.src}
-              alt={slideIndex === index ? slide.alt : ""}
-              fill
-              sizes="100vw"
-              className={
-                slide.fit === "contain" ? "object-contain" : "object-cover"
-              }
-              priority={slideIndex === 0}
-            />
-          </div>
-        ))}
+            src={slide.src}
+            alt={slide.alt}
+            fill
+            sizes="100vw"
+            quality={70}
+            className={
+              slide.fit === "contain" ? "object-contain" : "object-cover"
+            }
+            priority={index === 0}
+          />
+        </div>
+        {/* Prefetch the next slide without showing it */}
+        <div className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0" aria-hidden>
+          <Image
+            key={nextSlide.src}
+            src={nextSlide.src}
+            alt=""
+            width={1}
+            height={1}
+            quality={70}
+          />
+        </div>
       </div>
 
       <button
@@ -84,9 +100,9 @@ export function HeroSlideshow() {
       </button>
 
       <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-2">
-        {SLIDES.map((slide, slideIndex) => (
+        {SLIDES.map((item, slideIndex) => (
           <button
-            key={slide.src}
+            key={item.src}
             type="button"
             aria-label={`Go to slide ${slideIndex + 1}`}
             onClick={() => goTo(slideIndex)}

@@ -29,8 +29,16 @@ export async function updateSession(request: NextRequest) {
     pathname === "/signup" ||
     pathname === "/careers/login";
 
-  // Public marketing pages skip auth work.
-  if (isPublicPath(pathname) && !isAuthFormRoute) {
+  const hasSessionCookie = request.cookies
+    .getAll()
+    .some(
+      (cookie) =>
+        cookie.name.includes("auth-token") || cookie.name.startsWith("sb-"),
+    );
+
+  // Public marketing pages skip auth work. Auth forms also skip when logged out
+  // so Get Started / login stay fast for first-time visitors.
+  if (isPublicPath(pathname) && (!isAuthFormRoute || !hasSessionCookie)) {
     return NextResponse.next({ request });
   }
 
