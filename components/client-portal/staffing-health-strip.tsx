@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   ClipboardCheck,
   FileWarning,
+  Receipt,
   Users,
 } from "lucide-react";
 
@@ -49,10 +50,11 @@ const ICONS = {
   roles: FileWarning,
   candidates: Users,
   timesheets: ClipboardCheck,
+  invoices: Receipt,
   atrisk: AlertTriangle,
 } as const;
 
-/** Horizontal “staffing health” strip for the client dashboard. */
+/** Horizontal snapshot strip for the client dashboard. */
 export function StaffingHealthStrip({
   items,
 }: {
@@ -63,14 +65,14 @@ export function StaffingHealthStrip({
       <div className="mb-2 flex items-end justify-between gap-2">
         <div>
           <h2 className="text-base font-semibold text-[var(--cf-ink)]">
-            Staffing health
+            Snapshot
           </h2>
           <p className="text-sm text-[var(--cf-muted)]">
-            Live snapshot of open work, reviews, and risk for your company.
+            Counts that typically need a decision soon.
           </p>
         </div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {items.map((item) => {
           const styles = toneStyles[item.tone];
           const Icon = ICONS[item.icon ?? "roles"] ?? FileWarning;

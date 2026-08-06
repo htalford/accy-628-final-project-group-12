@@ -15,8 +15,13 @@ export type {
   ClientNotification,
   ClientPortalChrome,
   ClientSearchHit,
+  ClientSearchCategory,
+  ClientSearchScope,
 } from "@/lib/client-portal/chrome-shared";
-export { filterSearchIndex } from "@/lib/client-portal/chrome-shared";
+export {
+  filterSearchIndex,
+  searchScopeForPath,
+} from "@/lib/client-portal/chrome-shared";
 
 /** Live bell feed + search index for employer top bar (portal data only). */
 export async function loadClientPortalChrome(): Promise<ClientPortalChrome> {
@@ -118,7 +123,8 @@ export async function loadClientPortalChrome(): Promise<ClientPortalChrome> {
       category: "Invoices",
       label: `Invoice ${inv.id.slice(0, 8)}`,
       sublabel: `$${Number(inv.amount).toFixed(2)} · ${inv.status}`,
-      href: `/client/invoices/${inv.id}`,
+      // Opens the invoices list preview popup (detail page still available from the dialog).
+      href: `/client/invoices?open=${encodeURIComponent(inv.id)}`,
     });
   }
 

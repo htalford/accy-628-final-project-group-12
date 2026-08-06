@@ -15,12 +15,39 @@ import { getDashboardPath, ROLE_LABELS } from "@/lib/auth/roles";
 import { DemoRoleMenu } from "@/components/demo/demo-role-menu";
 import {
   filterSearchIndex,
+  searchScopeForPath,
   type ClientNotification,
   type ClientSearchHit,
 } from "@/lib/client-portal/chrome-shared";
 import type { AppUser } from "@/lib/types/database";
 import { MobileMenuButton } from "@/components/client-portal/client-sidebar";
 import { SearchInput } from "@/components/ui/search-input";
+
+function pageTitleFromPath(pathname: string): string {
+  if (pathname.startsWith("/client/job-requests/new")) return "New Job Request";
+  if (pathname.startsWith("/client/job-requests/")) return "Job Request";
+  if (pathname.startsWith("/client/job-requests")) return "Job Requests";
+  if (pathname.startsWith("/client/candidates/interested"))
+    return "Interested candidates";
+  if (pathname.startsWith("/client/candidates/compare"))
+    return "Compare candidates";
+  if (pathname.startsWith("/client/candidates/applications/"))
+    return "Candidate Profile";
+  if (pathname.startsWith("/client/candidates/")) return "Candidate Profile";
+  if (pathname.startsWith("/client/candidates")) return "Candidates";
+  if (pathname.startsWith("/client/employees/")) return "Employee";
+  if (pathname.startsWith("/client/employees")) return "Employees";
+  if (pathname.startsWith("/client/contracts/")) return "Contract";
+  if (pathname.startsWith("/client/contracts")) return "Contracts";
+  if (pathname.startsWith("/client/timesheets/")) return "Timesheet";
+  if (pathname.startsWith("/client/timesheets")) return "Timesheets";
+  if (pathname.startsWith("/client/invoices/")) return "Invoice";
+  if (pathname.startsWith("/client/invoices")) return "Invoices";
+  if (pathname.startsWith("/client/messages")) return "Messages";
+  if (pathname.startsWith("/client/profile")) return "Profile";
+  if (pathname.startsWith("/client/dashboard")) return "Dashboard";
+  return "Employer Portal";
+}
 
 function SearchHitButton({
   item,
@@ -127,6 +154,12 @@ export function ClientTopBar({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const title = useMemo(() => pageTitleFromPath(pathname), [pathname]);
+  const searchScope = useMemo(
+    () => searchScopeForPath(pathname),
+    [pathname],
+  );
+  const searchEnabled = searchScope.categories.length > 0;
 
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -138,8 +171,9 @@ export function ClientTopBar({
   const profileRef = useRef<HTMLDivElement>(null);
 
   const hits = useMemo(
-    () => filterSearchIndex(searchIndex, query),
-    [searchIndex, query],
+    () =>
+      filterSearchIndex(searchIndex, query, searchScope.categories),
+    [searchIndex, query, searchScope.categories],
   );
   const grouped = useMemo(() => {
     const map = new Map<ClientSearchHit["category"], ClientSearchHit[]>();
@@ -208,18 +242,31 @@ export function ClientTopBar({
         />
       </Link>
 
+      <div className="hidden min-w-0 sm:block">
+        <p className="truncate text-sm font-semibold text-[var(--cf-ink)]">
+          {title}
+        </p>
+        <p className="truncate text-xs text-[var(--cf-muted)]">
+          TalentQuest · Employer Portal
+        </p>
+      </div>
+
       <div
         className="relative ml-auto hidden max-w-md min-w-0 flex-1 md:block"
         ref={desktopSearchRef}
       >
         <SearchInput
-          placeholder="Search employees, candidates, jobs…"
+          placeholder={searchScope.placeholder}
           value={query}
+          disabled={!searchEnabled}
           onChange={(e) => {
+            if (!searchEnabled) return;
             setQuery(e.target.value);
             setSearchOpen(true);
           }}
-          onFocus={() => setSearchOpen(true)}
+          onFocus={() => {
+            if (searchEnabled) setSearchOpen(true);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               setSearchOpen(false);
@@ -230,10 +277,10 @@ export function ClientTopBar({
               goToResult(hits[0].href);
             }
           }}
-          aria-label="Global search"
+          aria-label={searchScope.ariaLabel}
           autoComplete="off"
         />
-        {searchOpen && query.trim() ? (
+        {searchEnabled && searchOpen && query.trim() ? (
           <div className="absolute top-full z-40 mt-1 max-h-80 w-full overflow-y-auto rounded-xl border border-[var(--cf-border)] bg-white py-2 shadow-lg">
             <DesktopSearchResults
               query={query}
@@ -246,14 +293,16 @@ export function ClientTopBar({
       </div>
 
       <div className="ml-auto flex items-center gap-1 sm:gap-2">
-        <button
-          type="button"
-          className="inline-flex rounded-lg border border-[var(--cf-border)] p-2 text-[var(--cf-muted)] md:hidden"
-          aria-label="Search"
-          onClick={() => setSearchOpen((v) => !v)}
-        >
-          <Search className="h-4 w-4" />
-        </button>
+        {searchEnabled ? (
+          <button
+            type="button"
+            className="inline-flex rounded-lg border border-[var(--cf-border)] p-2 text-[var(--cf-muted)] md:hidden"
+            aria-label={searchScope.ariaLabel}
+            onClick={() => setSearchOpen((v) => !v)}
+          >
+            <Search className="h-4 w-4" />
+          </button>
+        ) : null}
 
         <div className="relative" ref={notifRef}>
           <button
@@ -352,7 +401,7 @@ export function ClientTopBar({
         </div>
       </div>
 
-      {searchOpen ? (
+      {searchEnabled && searchOpen ? (
         <div
           className="absolute top-14 right-4 left-4 z-40 md:hidden"
           ref={mobileSearchRef}
@@ -360,7 +409,7 @@ export function ClientTopBar({
           <div className="rounded-xl border border-[var(--cf-border)] bg-white p-3 shadow-lg">
             <SearchInput
               autoFocus
-              placeholder="Search portal…"
+              placeholder={searchScope.placeholder}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
@@ -373,6 +422,7 @@ export function ClientTopBar({
                   goToResult(hits[0].href);
                 }
               }}
+              aria-label={searchScope.ariaLabel}
               autoComplete="off"
             />
             {query.trim() ? (

@@ -9,11 +9,13 @@ export function Modal({
   onClose,
   title,
   children,
+  className = "",
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  className?: string;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -38,7 +40,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
-        className="relative z-10 w-full max-w-lg rounded-xl border border-[var(--cf-border)] bg-white p-5 shadow-xl"
+        className={`relative z-10 w-full max-w-lg rounded-xl border border-[var(--cf-border)] bg-white p-5 shadow-xl ${className}`}
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <h2 id="modal-title" className="text-lg font-semibold text-[var(--cf-ink)]">

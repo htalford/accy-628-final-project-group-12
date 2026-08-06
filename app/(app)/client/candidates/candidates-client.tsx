@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Heart } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
@@ -12,20 +13,26 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination } from "@/components/ui/form";
 import { ConfirmActionDialog } from "@/components/client-portal/confirm-action-dialog";
 import { useToast } from "@/components/client-portal/toast";
-import { updateApplicationStatusAction } from "@/app/actions/client-portal";
+import {
+  toggleEmployerCandidateLikeAction,
+  updateApplicationStatusAction,
+} from "@/app/actions/client-portal";
 import type { ClientCandidate, SubmittalStage } from "@/lib/types/database";
 import {
   seedStatusTone,
   submittalStageLabel,
 } from "@/lib/client-portal/labels";
 import { paginate } from "@/lib/client-portal/pagination";
+import { MatchScoreBadge, MatchedSkills } from "@/components/matching/match-score-badge";
 
 const MAX_COMPARE = 3;
 
 export function CandidatesClient({
   initial,
+  initialLikedIds = [],
 }: {
   initial: ClientCandidate[];
+  initialLikedIds?: string[];
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -33,13 +40,22 @@ export function CandidatesClient({
   const [q, setQ] = useState("");
   const [position, setPosition] = useState("All");
   const [status, setStatus] = useState("All");
+  const [likedOnly, setLikedOnly] = useState(false);
+  const [matchMin, setMatchMin] = useState("all");
   const [page, setPage] = useState(1);
+  const [likedIds, setLikedIds] = useState<Set<string>>(
+    () => new Set(initialLikedIds),
+  );
   const [selected, setSelected] = useState<string[]>([]);
   const [dialog, setDialog] = useState<{
     id: string;
     name: string;
     next: Extract<SubmittalStage, "accepted" | "rejected">;
   } | null>(null);
+
+  useEffect(() => {
+    setLikedIds(new Set(initialLikedIds));
+  }, [initialLikedIds]);
 
   const candidatesOnly = useMemo(
     () => initial.filter((c) => c.source === "application"),
@@ -58,20 +74,35 @@ export function CandidatesClient({
     [candidatesOnly],
   );
 
-  const filtered = candidatesOnly.filter((c) => {
-    const pos = c.position_title || c.job_title || "";
-    const matchesQ =
-      !q || c.candidate_name.toLowerCase().includes(q.toLowerCase());
-    return (
-      matchesQ &&
-      (position === "All" || pos === position) &&
-      (status === "All" || c.stage === status)
-    );
-  });
+  const filtered = useMemo(() => {
+    const list = candidatesOnly.filter((c) => {
+      const pos = c.position_title || c.job_title || "";
+      const matchesQ =
+        !q || c.candidate_name.toLowerCase().includes(q.toLowerCase());
+      const matchesLiked = !likedOnly || likedIds.has(c.id);
+      const score = c.match_score ?? 0;
+      const matchesScore =
+        matchMin === "all" ||
+        (matchMin === "50" && score >= 50) ||
+        (matchMin === "70" && score >= 70);
+      return (
+        matchesQ &&
+        matchesLiked &&
+        matchesScore &&
+        (position === "All" || pos === position) &&
+        (status === "All" || c.stage === status)
+      );
+    });
+    return [...list].sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0));
+  }, [candidatesOnly, q, likedOnly, likedIds, matchMin, position, status]);
 
   const paged = paginate(filtered, page);
   const hasFilters =
-    q.trim() !== "" || position !== "All" || status !== "All";
+    q.trim() !== "" ||
+    position !== "All" ||
+    status !== "All" ||
+    likedOnly ||
+    matchMin !== "all";
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
@@ -92,6 +123,34 @@ export function CandidatesClient({
     router.push(
       `/client/candidates/compare?ids=${encodeURIComponent(selected.join(","))}`,
     );
+  }
+
+  function toggleLike(id: string, name: string) {
+    const nextLiked = !likedIds.has(id);
+    setLikedIds((prev) => {
+      const copy = new Set(prev);
+      if (nextLiked) copy.add(id);
+      else copy.delete(id);
+      return copy;
+    });
+    startTransition(async () => {
+      const result = await toggleEmployerCandidateLikeAction(id, nextLiked);
+      if (!result.ok) {
+        setLikedIds((prev) => {
+          const copy = new Set(prev);
+          if (nextLiked) copy.delete(id);
+          else copy.add(id);
+          return copy;
+        });
+        toast.push(result.message, "error");
+        return;
+      }
+      toast.push(
+        nextLiked ? `Liked ${name}.` : `Removed like for ${name}.`,
+        "success",
+      );
+      router.refresh();
+    });
   }
 
   async function confirmDecision(reason: string) {
@@ -117,7 +176,7 @@ export function CandidatesClient({
     <div className="space-y-6">
       <PageHeader
         title="Candidates"
-        description="People who applied to your open jobs on the candidate portal. Select 2–3 to compare side by side."
+        description="People who applied to your open jobs. Automatic fit scores rank who matches each role best. Like candidates to shortlist them."
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -158,6 +217,45 @@ export function CandidatesClient({
           <option value="accepted">Accepted</option>
           <option value="rejected">Rejected</option>
         </Select>
+        <Select
+          value={matchMin}
+          onChange={(e) => {
+            setMatchMin(e.target.value);
+            setPage(1);
+          }}
+          className="sm:max-w-[11rem]"
+        >
+          <option value="all">Any match score</option>
+          <option value="50">50%+ fit</option>
+          <option value="70">70%+ strong</option>
+        </Select>
+        <Button
+          type="button"
+          variant={likedOnly ? "primary" : "secondary"}
+          size="sm"
+          onClick={() => {
+            setLikedOnly((v) => !v);
+            setPage(1);
+          }}
+          aria-pressed={likedOnly}
+          title={
+            likedOnly
+              ? "Showing liked candidates only — click to show all"
+              : "Show only candidates you liked"
+          }
+        >
+          <Heart
+            className={`mr-1.5 h-3.5 w-3.5 ${likedOnly ? "fill-current" : ""}`}
+            aria-hidden
+          />
+          Liked
+          {likedIds.size > 0 ? (
+            <span className="ml-1.5 text-xs opacity-80">({likedIds.size})</span>
+          ) : null}
+        </Button>
+        <Button href="/client/candidates/interested" variant="secondary">
+          Interested candidates
+        </Button>
         {selected.length > 0 ? (
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
             <span className="text-sm text-[var(--cf-muted)]">
@@ -187,12 +285,16 @@ export function CandidatesClient({
         <EmptyState
           title={
             hasFilters
-              ? "No candidates match your filters"
+              ? likedOnly
+                ? "No liked candidates match"
+                : "No candidates match your filters"
               : "No candidates yet"
           }
           description={
             hasFilters
-              ? "Clear filters to see all candidates."
+              ? likedOnly
+                ? "Like a candidate with the heart on their card, or clear the Liked filter."
+                : "Clear filters to see all candidates."
               : "When candidates apply to your posted jobs, they appear here."
           }
           action={
@@ -204,6 +306,8 @@ export function CandidatesClient({
                   setQ("");
                   setPosition("All");
                   setStatus("All");
+                  setLikedOnly(false);
+                  setMatchMin("all");
                   setPage(1);
                 }}
               >
@@ -221,6 +325,7 @@ export function CandidatesClient({
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {paged.items.map((c) => {
               const isSelected = selected.includes(c.id);
+              const isLiked = likedIds.has(c.id);
               return (
                 <Card
                   key={`${c.source}-${c.id}`}
@@ -248,13 +353,60 @@ export function CandidatesClient({
                         </span>
                       </span>
                     </label>
-                    <Badge tone={seedStatusTone(c.stage)}>
-                      {submittalStageLabel(c.stage)}
-                    </Badge>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() =>
+                          toggleLike(c.id, c.candidate_name)
+                        }
+                        aria-pressed={isLiked}
+                        aria-label={
+                          isLiked
+                            ? `Unlike ${c.candidate_name}`
+                            : `Like ${c.candidate_name}`
+                        }
+                        title={isLiked ? "Liked — click to remove" : "Like candidate"}
+                        className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition disabled:opacity-50 ${
+                          isLiked
+                            ? "border-rose-200 bg-rose-50 text-rose-600"
+                            : "border-[var(--cf-border)] text-[var(--cf-muted)] hover:border-rose-200 hover:bg-rose-50/50 hover:text-rose-600"
+                        }`}
+                      >
+                        <Heart
+                          className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`}
+                          aria-hidden
+                        />
+                      </button>
+                      {c.match_score != null ? (
+                        <MatchScoreBadge
+                          score={c.match_score}
+                          band={c.match_band ?? "low"}
+                          compact
+                        />
+                      ) : null}
+                      <Badge tone={seedStatusTone(c.stage)}>
+                        {submittalStageLabel(c.stage)}
+                      </Badge>
+                    </div>
                   </div>
-                  <p className="mb-3 text-xs text-[var(--cf-muted)]">
+                  <p className="mb-1 text-xs text-[var(--cf-muted)]">
                     {c.candidate_email ?? "No email on file"}
                   </p>
+                  {c.match_reasons?.[0] ? (
+                    <p className="mb-1.5 text-xs text-[var(--cf-muted)]">
+                      {c.match_reasons[0]}
+                    </p>
+                  ) : null}
+                  <MatchedSkills
+                    skills={c.match_skills}
+                    className="mb-3"
+                    emptyLabel={
+                      c.match_score != null
+                        ? "No matching skill tags on this profile yet"
+                        : ""
+                    }
+                  />
                   <div className="mt-auto flex flex-wrap gap-2">
                     <Button size="sm" variant="secondary" href={c.detail_href}>
                       View Profile

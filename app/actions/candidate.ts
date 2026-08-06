@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireCandidateContext } from "@/lib/candidate/data";
+import { extractResumeText } from "@/lib/matching/extract-resume-text";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -21,6 +22,7 @@ export async function applyToJob(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();
   const employeeId = user.linked_employee_id!;
 
+  let extractedResumeText: string | null = null;
   if (resumeFile instanceof File && resumeFile.size > 0) {
     const safeName = resumeFile.name.replace(/[^\w.\-()+ ]+/g, "_");
     const path = `${employeeId}/${Date.now()}-${safeName}`;
@@ -44,6 +46,21 @@ export async function applyToJob(formData: FormData): Promise<ActionResult> {
       };
     }
     resumeUrl = signed.signedUrl;
+    extractedResumeText = await extractResumeText(
+      bytes,
+      resumeFile.name,
+      resumeFile.type || "",
+    );
+    if (extractedResumeText) {
+      await supabase
+        .from("employees")
+        .update({
+          resume_url: resumeUrl,
+          resume_text: extractedResumeText,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", employeeId);
+    }
   }
 
   if (!includeProfile && !coverLetter && !resumeUrl) {
@@ -59,7 +76,7 @@ export async function applyToJob(formData: FormData): Promise<ActionResult> {
     const { data: employee } = await supabase
       .from("employees")
       .select(
-        "first_name, last_name, email, phone, certifications, resume_url, emergency_contact_name, emergency_contact_phone, education_background, previous_employments, employment_type, status",
+        "first_name, last_name, email, phone, certifications, resume_url, resume_text, emergency_contact_name, emergency_contact_phone, education_background, previous_employments, employment_type, status",
       )
       .eq("id", employeeId)
       .maybeSingle();
@@ -68,6 +85,7 @@ export async function applyToJob(formData: FormData): Promise<ActionResult> {
       displayName: user.name,
       accountEmail: user.email,
       ...(employee ?? {}),
+      ...(extractedResumeText ? { resume_text: extractedResumeText } : {}),
     };
   }
 
@@ -413,6 +431,7 @@ export async function updateCandidateProfile(
   const employeeId = user.linked_employee_id!;
 
   let resumeUrl: string | null | undefined;
+  let resumeText: string | null | undefined;
   if (resumeFile instanceof File && resumeFile.size > 0) {
     const safeName = resumeFile.name.replace(/[^\w.\-()+ ]+/g, "_");
     const path = `${employeeId}/profile-${Date.now()}-${safeName}`;
@@ -436,8 +455,14 @@ export async function updateCandidateProfile(
       };
     }
     resumeUrl = signed.signedUrl;
+    resumeText = await extractResumeText(
+      bytes,
+      resumeFile.name,
+      resumeFile.type || "",
+    );
   } else if (!keepExistingResume) {
     resumeUrl = null;
+    resumeText = null;
   }
 
   const employeeUpdate: Record<string, unknown> = {
@@ -453,6 +478,9 @@ export async function updateCandidateProfile(
   };
   if (resumeUrl !== undefined) {
     employeeUpdate.resume_url = resumeUrl;
+  }
+  if (resumeText !== undefined) {
+    employeeUpdate.resume_text = resumeText;
   }
 
   const { error: empError } = await supabase

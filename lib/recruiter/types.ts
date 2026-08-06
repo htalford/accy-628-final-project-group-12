@@ -72,6 +72,10 @@ export type RecruiterCandidate = {
   education: string;
   notes: string;
   resumeUrl: string | null;
+  /** Extracted resume body for automated matching (when available). */
+  resumeText?: string | null;
+  /** Previous roles from the candidate portal profile. */
+  previousEmployments?: import("@/lib/types/database").PreviousEmployment[] | null;
   interviewAt: string | null;
   interviewType: InterviewType | null;
   interviewNotes: string | null;

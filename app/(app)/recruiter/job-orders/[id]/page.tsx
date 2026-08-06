@@ -6,7 +6,13 @@ import {
   getCandidatesByIds,
   getJobOrder,
   listApprovedCandidates,
+  listCandidates,
 } from "@/lib/recruiter/data";
+import {
+  candidateInputFromRecruiter,
+  jobInputFromRecruiterOrder,
+  rankCandidatesForJob,
+} from "@/lib/matching";
 
 export default async function JobOrderDetailPage({
   params,
@@ -17,14 +23,51 @@ export default async function JobOrderDetailPage({
   const job = await getJobOrder(id);
   if (!job) notFound();
 
-  const [assignedCandidates, approvedCandidates] = await Promise.all([
-    getCandidatesByIds(
-      job.assignedEmployeeId
-        ? [...new Set([...job.assignedCandidateIds, job.assignedEmployeeId])]
-        : job.assignedCandidateIds,
-    ),
-    listApprovedCandidates(),
-  ]);
+  const [assignedCandidates, approvedCandidates, allCandidates] =
+    await Promise.all([
+      getCandidatesByIds(
+        job.assignedEmployeeId
+          ? [
+              ...new Set([
+                ...job.assignedCandidateIds,
+                job.assignedEmployeeId,
+              ]),
+            ]
+          : job.assignedCandidateIds,
+      ),
+      listApprovedCandidates(),
+      listCandidates(),
+    ]);
+
+  // Prefer pool: everyone not already hard-linked; still score full list for ranking.
+  const jobInput = jobInputFromRecruiterOrder(job);
+  const suggestedMatches = rankCandidatesForJob(
+    jobInput,
+    allCandidates.map((c) => ({
+      id: c.id,
+      name: c.name,
+      source: c.source,
+      input: candidateInputFromRecruiter(c),
+    })),
+    { minScore: 35, limit: 8 },
+  ).filter((m) => {
+    // Keep applicants for this job or high matches from the wider pool
+    const c = allCandidates.find((x) => x.id === m.candidateId);
+    if (!c) return false;
+    if (c.jobId === job.id) return true;
+    return m.result.score >= 50;
+  });
+
+  const suggestedWithProfiles = suggestedMatches
+    .map((m) => {
+      const c = allCandidates.find((x) => x.id === m.candidateId);
+      if (!c) return null;
+      return { candidate: c, result: m.result };
+    })
+    .filter(Boolean) as Array<{
+    candidate: (typeof allCandidates)[0];
+    result: (typeof suggestedMatches)[0]["result"];
+  }>;
 
   return (
     <div>
@@ -44,6 +87,7 @@ export default async function JobOrderDetailPage({
         job={job}
         assignedCandidates={assignedCandidates}
         approvedCandidates={approvedCandidates}
+        suggestedMatches={suggestedWithProfiles}
       />
     </div>
   );

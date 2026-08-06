@@ -1,22 +1,16 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
-import { StatCard } from "@/components/ui/stat-card";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, THead, Th, Td } from "@/components/ui/table";
 import { PinActionTaskButton } from "@/components/portal-pins/pin-action-task-button";
 import { PinContractButton } from "@/components/portal-pins/pin-contract-button";
 import {
   StaffingHealthStrip,
   type StaffingHealthItem,
 } from "@/components/client-portal/staffing-health-strip";
+import { loadClientPortalData } from "@/lib/client-portal/queries";
 import {
-  employeesFromPlacements,
-  loadClientPortalData,
-} from "@/lib/client-portal/queries";
-import {
-  formatMoney,
   placementPositionTitle,
   placementStatusLabel,
   seedStatusTone,
@@ -46,17 +40,11 @@ export default async function ClientDashboardPage() {
     (p) => p.status === "active" || p.status === "at_risk",
   );
   const atRiskPlacements = data.placements.filter((p) => p.status === "at_risk");
-  const employeeRows = employeesFromPlacements(data.placements).map((e) => {
-    const hours = data.timesheets
-      .filter((t) => t.placement_id === e.placementId)
-      .slice(0, 1)
-      .reduce((s, t) => s + t.hours_regular + t.hours_overtime, 0);
-    return { ...e, hoursThisPeriod: hours };
-  });
 
   const openRoles = data.metrics.openPositions;
   const candidatesWaiting = data.metrics.pendingCandidateReviews;
   const timesheetsDue = data.metrics.timesheetsAwaitingApproval;
+  const outstandingInvoices = data.metrics.outstandingInvoices;
   const atRiskCount = atRiskPlacements.length;
 
   const atRiskDetail =
@@ -75,17 +63,17 @@ export default async function ClientDashboardPage() {
 
   const healthItems: Array<
     StaffingHealthItem & {
-      icon?: "roles" | "candidates" | "timesheets" | "atrisk";
+      icon?: "roles" | "candidates" | "timesheets" | "invoices" | "atrisk";
     }
   > = [
     {
       id: "open-roles",
-      label: "Open roles unfilled",
+      label: "Open roles",
       value: openRoles,
       detail:
         openRoles === 0
-          ? "No open positions in job requests"
-          : `${openRoles} seat${openRoles === 1 ? "" : "s"} still to fill`,
+          ? "No open job requests"
+          : `${openRoles} seat${openRoles === 1 ? "" : "s"} to fill`,
       href: "/client/job-requests?status=open",
       tone: openRoles === 0 ? "ok" : openRoles >= 3 ? "warn" : "info",
       icon: "roles",
@@ -97,7 +85,7 @@ export default async function ClientDashboardPage() {
       detail:
         candidatesWaiting === 0
           ? "No applications need review"
-          : "Submitted / under review — act soon",
+          : "Submitted / under review",
       href: "/client/candidates",
       tone:
         candidatesWaiting === 0
@@ -113,12 +101,29 @@ export default async function ClientDashboardPage() {
       value: timesheetsDue,
       detail:
         timesheetsDue === 0
-          ? "Nothing waiting on your approval"
-          : "Submitted this week — approve or reject",
+          ? "Nothing waiting on approval"
+          : "Submitted — approve or reject",
       href: "/client/timesheets?status=submitted",
       tone:
         timesheetsDue === 0 ? "ok" : timesheetsDue >= 3 ? "warn" : "info",
       icon: "timesheets",
+    },
+    {
+      id: "invoices",
+      label: "Outstanding invoices",
+      value: outstandingInvoices,
+      detail:
+        outstandingInvoices === 0
+          ? "No unpaid invoices"
+          : "Sent or disputed — not paid",
+      href: "/client/invoices?status=outstanding",
+      tone:
+        outstandingInvoices === 0
+          ? "ok"
+          : outstandingInvoices >= 3
+            ? "warn"
+            : "info",
+      icon: "invoices",
     },
     {
       id: "at-risk",
@@ -135,7 +140,7 @@ export default async function ClientDashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        description={`${company} · placements, timesheets, and invoices for your company.`}
+        description={`${company} · open work and items that need your action.`}
       />
 
       <StaffingHealthStrip items={healthItems} />
@@ -146,7 +151,7 @@ export default async function ClientDashboardPage() {
             <CardTitle>Needs attention</CardTitle>
             <span className="text-xs font-medium text-amber-900">
               {data.actionQueue.length} item
-              {data.actionQueue.length === 1 ? "" : "s"} · pin to sidebar
+              {data.actionQueue.length === 1 ? "" : "s"}
             </span>
           </div>
           <ul className="divide-y divide-amber-100">
@@ -193,55 +198,16 @@ export default async function ClientDashboardPage() {
         </Card>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard
-          label="Open Positions"
-          value={String(data.metrics.openPositions)}
-          hint="Open job requests"
-          href="/client/job-requests?status=open"
-        />
-        <StatCard
-          label="Current Employees"
-          value={String(data.metrics.currentEmployees)}
-          hint="Active & at-risk placements"
-          href="/client/employees"
-        />
-        <StatCard
-          label="Pending Candidate Reviews"
-          value={String(data.metrics.pendingCandidateReviews)}
-          hint="Candidates to review"
-          href="/client/candidates"
-        />
-        <StatCard
-          label="Active Contracts"
-          value={String(data.metrics.activeContracts)}
-          hint="Open placements"
-          href="/client/contracts?status=active"
-        />
-        <StatCard
-          label="Timesheets Awaiting Approval"
-          value={String(data.metrics.timesheetsAwaitingApproval)}
-          hint="Status: submitted"
-          href="/client/timesheets?status=submitted"
-        />
-        <StatCard
-          label="Outstanding Invoices"
-          value={String(data.metrics.outstandingInvoices)}
-          hint="Not paid"
-          href="/client/invoices?status=outstanding"
-        />
-      </div>
-
       <div className="grid gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-2">
-          <CardTitle className="mb-4">Recent Activity</CardTitle>
+          <CardTitle className="mb-4">Recent activity</CardTitle>
           {data.recentActivity.length === 0 ? (
             <p className="text-sm text-[var(--cf-muted)]">
               No recent timesheet or invoice activity.
             </p>
           ) : (
             <ul className="divide-y divide-[var(--cf-border)]">
-              {data.recentActivity.map((item) => (
+              {data.recentActivity.slice(0, 6).map((item) => (
                 <li
                   key={item.id}
                   className="flex flex-col gap-0.5 py-3 sm:flex-row sm:items-center sm:justify-between"
@@ -273,110 +239,46 @@ export default async function ClientDashboardPage() {
         </Card>
 
         <Card>
-          <CardTitle className="mb-4">Quick Actions</CardTitle>
+          <CardTitle className="mb-4">Quick actions</CardTitle>
           <div className="flex flex-col gap-2">
             <Button href="/client/job-requests/new" className="w-full">
-              Submit New Job Request
+              Submit job request
             </Button>
             <Button
               href="/client/candidates"
               variant="secondary"
               className="w-full"
             >
-              Review Candidates
-            </Button>
-            <Button
-              href="/client/candidates/compare"
-              variant="secondary"
-              className="w-full"
-            >
-              Compare Candidates
+              Review candidates
             </Button>
             <Button
               href="/client/timesheets?status=submitted"
               variant="secondary"
               className="w-full"
             >
-              Approve Timesheets
+              Approve timesheets
             </Button>
             <Button
               href="/client/invoices?status=outstanding"
               variant="secondary"
               className="w-full"
             >
-              View Invoices
+              View invoices
             </Button>
           </div>
         </Card>
       </div>
 
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-[var(--cf-ink)]">
-            Current Employees
-          </h2>
+      <Card>
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <CardTitle>Active placements</CardTitle>
           <Link
             href="/client/employees"
             className="text-sm font-medium text-[var(--cf-navy)] hover:underline"
           >
-            View all
+            View employees
           </Link>
         </div>
-        <Table>
-          <THead>
-            <tr>
-              <Th>Employee Name</Th>
-              <Th>Position</Th>
-              <Th>Start Date</Th>
-              <Th>Assignment Status</Th>
-              <Th>Bill / Pay</Th>
-              <Th>Latest Hours</Th>
-              <Th> </Th>
-            </tr>
-          </THead>
-          <tbody>
-            {employeeRows.slice(0, 5).map((e) => (
-              <tr key={e.placementId} className="hover:bg-[var(--cf-surface)]/60">
-                <Td className="font-medium">{e.name}</Td>
-                <Td>{e.title}</Td>
-                <Td>{e.startDate.slice(0, 10)}</Td>
-                <Td>
-                  <Badge tone={seedStatusTone(e.status)}>
-                    {placementStatusLabel(e.status)}
-                  </Badge>
-                </Td>
-                <Td className="text-xs">
-                  {e.billRate != null ? formatMoney(e.billRate) : "—"} /{" "}
-                  {e.payRate != null ? formatMoney(e.payRate) : "—"}
-                </Td>
-                <Td>{e.hoursThisPeriod || "—"}</Td>
-                <Td>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    href={`/client/employees/${e.employeeId}`}
-                  >
-                    View Details
-                  </Button>
-                </Td>
-              </tr>
-            ))}
-            {employeeRows.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="border-t border-[var(--cf-border)] px-4 py-6 text-center text-sm text-[var(--cf-muted)]"
-                >
-                  No active placements for this client.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </Table>
-      </div>
-
-      <Card>
-        <CardTitle className="mb-4">Active Placements</CardTitle>
         <ul className="space-y-3">
           {openPlacements.map((p) => {
             const name = p.employee

@@ -31,6 +31,21 @@ export type ActionItem = {
   href: string;
 };
 
+/** Candidates who marked interest on public jobs for this employer. */
+export type InterestedCandidateRow = {
+  interestId: string;
+  jobId: string;
+  jobTitle: string;
+  jobLocation: string | null;
+  employeeId: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  interestedAt: string;
+  applicationId: string | null;
+  detailHref: string | null;
+};
+
 export type ClientPortalData = {
   user: AppUser;
   client: Client | null;
