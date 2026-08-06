@@ -154,7 +154,15 @@ export function AccountingMessagesCenter({
         return [];
       }
       if (!threadId) return [];
-      return [{ participantType, threadId }];
+      return [
+        {
+          participantType: participantType as
+            | "candidate"
+            | "employer"
+            | "recruiter",
+          threadId,
+        },
+      ];
     });
   }
 
