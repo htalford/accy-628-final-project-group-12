@@ -266,7 +266,6 @@ export function getNavForRole(role: UserRole): NavItem[] {
         { href: "/candidate/dashboard", label: "Dashboard", icon: "layout-dashboard" },
         { href: "/candidate/applications", label: "Applications", icon: "send" },
         { href: "/candidate/jobs", label: "Available jobs", icon: "search" },
-        { href: "/candidate/completions", label: "Completion status", icon: "circle-check" },
         { href: "/candidate/contracts", label: "Contracts", icon: "file-signature" },
         { href: "/candidate/interviews", label: "Interviews", icon: "calendar" },
         { href: "/candidate/messages", label: "Messages", icon: "message-square" },
@@ -340,7 +339,6 @@ export function getPageTitle(pathname: string): string {
     "/candidate/dashboard": "Dashboard",
     "/candidate/applications": "Applications",
     "/candidate/jobs": "Available jobs",
-    "/candidate/completions": "Completion status",
     "/candidate/contracts": "Contracts",
     "/candidate/interviews": "Interviews",
     "/candidate/messages": "Messages",
@@ -382,7 +380,6 @@ export function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/accounting/employees/")) return "Employee detail";
   if (pathname.startsWith("/accounting/contracts/")) return "Contract detail";
   if (pathname.startsWith("/candidate/contracts/")) return "Contract detail";
-  if (pathname.startsWith("/candidate/completions/")) return "Completion detail";
   if (pathname.startsWith("/client/job-requests/new")) return "New Job Request";
   if (pathname.startsWith("/client/job-requests/")) return "Job Request";
   if (pathname.startsWith("/client/candidates/interested"))

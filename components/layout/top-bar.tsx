@@ -137,9 +137,7 @@ export function TopBar({
     pathname === "/candidate/pay" ||
     pathname.startsWith("/candidate/pay/") ||
     pathname === "/candidate/interviews" ||
-    pathname.startsWith("/candidate/interviews/") ||
-    pathname === "/candidate/completions" ||
-    pathname.startsWith("/candidate/completions/");
+    pathname.startsWith("/candidate/interviews/");
 
   useEffect(() => {
     if (!hideSearch) return;

@@ -20,7 +20,7 @@ function todayIsoDate() {
 }
 
 /**
- * Placement lifecycle progress for the candidate Completion status view.
+ * Placement lifecycle progress shown on candidate contract detail.
  * Started → working → timesheets → approved hours → pay → closed.
  */
 export function getContractCompletion(
