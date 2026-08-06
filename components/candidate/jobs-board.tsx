@@ -5,10 +5,7 @@ import { MapPin, Trash2, Briefcase, Building2 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ApplyButton } from "@/components/candidate/apply-button";
 import { StatusPill } from "@/components/candidate/ui";
-import {
-  MatchScoreBadge,
-  MatchedSkills,
-} from "@/components/matching/match-score-badge";
+import { MatchedSkills } from "@/components/matching/match-score-badge";
 import type { MatchBand } from "@/lib/matching/score";
 import { MATCH_RECRUITER_THRESHOLD } from "@/lib/matching/threshold";
 
@@ -57,7 +54,28 @@ function writeHidden(ids: Set<string>) {
   }
 }
 
-export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
+function MatchStrengthLabel({ score }: { score: number }) {
+  const strong = score >= MATCH_RECRUITER_THRESHOLD;
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+        strong
+          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+          : "border-slate-200 bg-slate-100 text-slate-600"
+      }`}
+    >
+      {strong ? "Strong match" : "Weak match"}
+    </span>
+  );
+}
+
+export function CandidateJobsBoard({
+  jobs,
+  hasIndustry,
+}: {
+  jobs: CandidateJobRow[];
+  hasIndustry: boolean;
+}) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [ready, setReady] = useState(false);
 
@@ -75,21 +93,32 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
     });
   }
 
-  const matchedJobs = useMemo(() => {
+  const visibleJobs = useMemo(() => {
     return jobs
-      .filter((job) => {
-        if (hidden.has(job.id)) return false;
-        if (job.applied) return false;
-        return (job.matchScore ?? 0) >= MATCH_RECRUITER_THRESHOLD;
-      })
-      .sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
+      .filter((job) => !hidden.has(job.id))
+      .sort((a, b) => {
+        const sa = a.matchScore ?? 0;
+        const sb = b.matchScore ?? 0;
+        if (sb !== sa) return sb - sa;
+        if (a.applied !== b.applied) return a.applied ? 1 : -1;
+        return 0;
+      });
   }, [jobs, hidden]);
+
+  if (!hasIndustry) {
+    return (
+      <EmptyState
+        title="Choose your industry first"
+        description="Set your industry on your profile so we can show openings that fit that field."
+      />
+    );
+  }
 
   if (jobs.length === 0) {
     return (
       <EmptyState
-        title="No open jobs right now"
-        description="Check back soon — recruiters post new openings as clients request coverage."
+        title="No openings in your industry right now"
+        description="Check back soon — recruiters post new roles for your industry as clients request coverage."
       />
     );
   }
@@ -97,16 +126,16 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
   if (!ready) {
     return (
       <div className="rounded-2xl border border-[var(--cf-border)] bg-white px-5 py-10 text-sm text-[var(--cf-muted)]">
-        Loading your matches…
+        Loading jobs…
       </div>
     );
   }
 
-  if (matchedJobs.length === 0) {
+  if (visibleJobs.length === 0) {
     return (
       <EmptyState
-        title="No matches yet"
-        description="Jobs that fit your profile appear here. Add certifications, education, work history, and a resume to improve your matches."
+        title="No jobs on your list"
+        description="You removed every listing. New openings in your industry will appear here when they’re posted."
       />
     );
   }
@@ -116,13 +145,13 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
       <p className="text-sm text-[var(--cf-muted)]">
         Showing{" "}
         <span className="font-semibold text-[var(--cf-ink)]">
-          {matchedJobs.length}
+          {visibleJobs.length}
         </span>{" "}
-        role{matchedJobs.length === 1 ? "" : "s"} matched to your profile.
+        opening{visibleJobs.length === 1 ? "" : "s"} in your industry, best matches first.
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {matchedJobs.map((job) => (
+        {visibleJobs.map((job) => (
           <article
             key={job.id}
             className="flex h-full flex-col rounded-2xl border border-[var(--cf-border)] bg-white p-5 shadow-sm"
@@ -137,10 +166,7 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
                   <span className="truncate">{job.employer}</span>
                 </p>
               </div>
-              <MatchScoreBadge
-                score={job.matchScore ?? 0}
-                band={job.matchBand ?? "low"}
-              />
+              <MatchStrengthLabel score={job.matchScore ?? 0} />
             </div>
 
             <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-[var(--cf-muted)]">
@@ -157,6 +183,7 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
                 {job.payLabel}
               </span>
               <StatusPill label={job.employmentType} />
+              {job.applied ? <StatusPill label="Applied" tone="good" /> : null}
             </div>
 
             <MatchedSkills
@@ -174,12 +201,18 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
 
             <div className="mt-auto flex items-center gap-2 border-t border-[var(--cf-border)] pt-4">
               <div className="min-w-0 flex-1">
-                <ApplyButton
-                  jobId={job.id}
-                  jobTitle={job.title}
-                  profileResumeUrl={job.profileResumeUrl}
-                  fullWidth
-                />
+                {job.applied ? (
+                  <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-center text-sm font-semibold text-emerald-800">
+                    Applied
+                  </p>
+                ) : (
+                  <ApplyButton
+                    jobId={job.id}
+                    jobTitle={job.title}
+                    profileResumeUrl={job.profileResumeUrl}
+                    fullWidth
+                  />
+                )}
               </div>
               <button
                 type="button"

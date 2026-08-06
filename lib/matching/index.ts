@@ -186,6 +186,7 @@ export function rankCandidatesForJob(
 export type JobRequirements = {
   skills: string[];
   certifications: string[];
+  industry: string | null;
 };
 
 export async function requirementsForPublicJobs(
@@ -197,7 +198,7 @@ export async function requirementsForPublicJobs(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("job_requests")
-    .select("source_job_id, skills, certifications")
+    .select("source_job_id, skills, certifications, industry")
     .in("source_job_id", jobIds);
 
   if (error) {
@@ -205,7 +206,7 @@ export async function requirementsForPublicJobs(
     // Fallback: skills-only if certifications column missing
     const { data: skillOnly } = await supabase
       .from("job_requests")
-      .select("source_job_id, skills")
+      .select("source_job_id, skills, industry")
       .in("source_job_id", jobIds);
     for (const row of skillOnly ?? []) {
       const jid = row.source_job_id != null ? String(row.source_job_id) : "";
@@ -213,7 +214,14 @@ export async function requirementsForPublicJobs(
       const skills = Array.isArray(row.skills)
         ? row.skills.map(String)
         : splitSkills(row.skills as string | null);
-      map.set(jid, { skills, certifications: [] });
+      map.set(jid, {
+        skills,
+        certifications: [],
+        industry:
+          typeof row.industry === "string" && row.industry.trim()
+            ? row.industry.trim()
+            : null,
+      });
     }
     return map;
   }
@@ -227,7 +235,14 @@ export async function requirementsForPublicJobs(
     const certifications = Array.isArray(row.certifications)
       ? row.certifications.map(String)
       : splitSkills(row.certifications as string | null);
-    map.set(jid, { skills, certifications });
+    map.set(jid, {
+      skills,
+      certifications,
+      industry:
+        typeof row.industry === "string" && row.industry.trim()
+          ? row.industry.trim()
+          : null,
+    });
   }
   return map;
 }

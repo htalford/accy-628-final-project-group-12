@@ -364,6 +364,104 @@ export function joinCommaList(values: Iterable<string>): string {
   return Array.from(new Set(Array.from(values).map((s) => s.trim()).filter(Boolean))).join(", ");
 }
 
+/** Normalize client labels or slugs to an industry profile slug. */
+export function normalizeIndustrySlug(
+  raw: string | null | undefined,
+): string | null {
+  if (!raw?.trim()) return null;
+  const v = raw.trim().toLowerCase();
+  const exact = INDUSTRY_PROFILE_OPTIONS.find((o) => o.slug === v);
+  if (exact) return exact.slug;
+  const byName = INDUSTRY_PROFILE_OPTIONS.find(
+    (o) => o.name.toLowerCase() === v,
+  );
+  if (byName) return byName.slug;
+  const partial = INDUSTRY_PROFILE_OPTIONS.find(
+    (o) =>
+      o.name.toLowerCase().includes(v) ||
+      v.includes(o.name.toLowerCase().split(/\s+/)[0] ?? ""),
+  );
+  return partial?.slug ?? null;
+}
+
+/** Title/description hints used when a job has no explicit industry. */
+const INDUSTRY_JOB_HINTS: Record<string, string[]> = {
+  healthcare: [
+    "nurse",
+    "clinical",
+    "patient",
+    "medical",
+    "phlebotomy",
+    "hospital",
+    "care",
+    "health",
+  ],
+  "information-technology": [
+    "developer",
+    "software",
+    "help desk",
+    "network",
+    "cyber",
+    "cloud",
+    "it ",
+    "systems",
+    "qa",
+  ],
+  "finance-accounting": [
+    "account",
+    "payroll",
+    "tax",
+    "payable",
+    "receivable",
+    "bookkeep",
+    "controller",
+    "fp&a",
+    "audit",
+    "billing",
+    "finance",
+  ],
+  "engineering-manufacturing": [
+    "engineer",
+    "manufactur",
+    "machinist",
+    "cnc",
+    "production",
+  ],
+  "legal-compliance": ["legal", "paralegal", "compliance", "attorney", "counsel"],
+  "human-resources": ["hr ", "human resource", "recruiter", "talent", "people ops"],
+  administrative: ["admin", "receptionist", "office manager", "executive assistant"],
+  "sales-marketing": ["sales", "marketing", "account executive", "business development"],
+  logistics: ["logistics", "warehouse", "supply chain", "dispatcher", "freight"],
+  "skilled-trades": ["electrician", "plumber", "welder", "hvac", "carpenter"],
+};
+
+/**
+ * Whether a public job belongs to the candidate's selected industry.
+ * Prefers explicit job-request industry, then title hints, then client industry.
+ */
+export function jobFitsCandidateIndustry(
+  candidateIndustry: string | null | undefined,
+  signals: {
+    requestIndustry?: string | null;
+    clientIndustry?: string | null;
+    title?: string | null;
+    description?: string | null;
+  },
+): boolean {
+  const cand = candidateIndustry?.trim() ?? "";
+  if (!cand) return false;
+
+  const fromRequest = normalizeIndustrySlug(signals.requestIndustry);
+  if (fromRequest) return fromRequest === cand;
+
+  const hay = `${signals.title ?? ""} ${signals.description ?? ""}`.toLowerCase();
+  const hints = INDUSTRY_JOB_HINTS[cand] ?? [];
+  if (hints.some((hint) => hay.includes(hint))) return true;
+
+  const fromClient = normalizeIndustrySlug(signals.clientIndustry);
+  return fromClient === cand;
+}
+
 /** Map a years label to an approximate numeric value for matching. */
 export function yearsLabelToNumber(label: string | null | undefined): number | null {
   if (!label?.trim()) return null;
