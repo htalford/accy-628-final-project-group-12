@@ -184,6 +184,56 @@ export async function getCandidateApplications() {
   return (data as ApplicationWithJob[] | null) ?? [];
 }
 
+export type CandidateInterview = {
+  id: string;
+  applicationId: string;
+  datetime: string;
+  date: string;
+  time: string;
+  type: string;
+  role: string;
+  employer: string;
+  location: string | null;
+  status: string;
+  notes: string | null;
+};
+
+export async function getCandidateInterviews(): Promise<CandidateInterview[]> {
+  const apps = await getCandidateApplications();
+  return apps
+    .filter((app) => Boolean(app.interview_at))
+    .map((app) => {
+      const at = new Date(app.interview_at!);
+      const valid = !Number.isNaN(at.getTime());
+      return {
+        id: `int-${app.id}`,
+        applicationId: app.id,
+        datetime: app.interview_at!,
+        date: valid
+          ? at.toLocaleDateString(undefined, {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
+          : app.interview_at!.slice(0, 10),
+        time: valid
+          ? at.toLocaleTimeString(undefined, {
+              hour: "numeric",
+              minute: "2-digit",
+            })
+          : "",
+        type: app.interview_type?.trim() || "Interview",
+        role: app.jobs?.title ?? "Role",
+        employer: app.jobs?.employer_name ?? "Employer",
+        location: app.jobs?.location ?? null,
+        status: app.status,
+        notes: app.interview_notes ?? null,
+      };
+    })
+    .sort((a, b) => a.datetime.localeCompare(b.datetime));
+}
+
 export async function getCandidateJobInterests() {
   const user = await requireCandidateContext();
   if (!user) return [] as string[];
