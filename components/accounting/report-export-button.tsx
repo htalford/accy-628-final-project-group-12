@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { ReportPreview } from "@/lib/accounting/reports";
+import { downloadReportPdf } from "@/lib/accounting/report-pdf";
 
 function escapeCsv(value: string): string {
   if (/[",\n\r]/.test(value)) {
@@ -97,8 +98,10 @@ export function ReportExportButton({ report }: { report: ReportPreview }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const base = useMemo(() => slugify(report.title) || "report", [report.title]);
 
-  function exportAs(format: "csv" | "excel-csv" | "excel-xml") {
-    if (format === "csv") {
+  function exportAs(format: "pdf" | "csv" | "excel-csv" | "excel-xml") {
+    if (format === "pdf") {
+      downloadReportPdf(report, base);
+    } else if (format === "csv") {
       downloadBlob(
         `${base}.csv`,
         buildCsv(report),
@@ -143,6 +146,14 @@ export function ReportExportButton({ report }: { report: ReportPreview }) {
             role="menu"
             className="absolute right-0 z-20 mt-1 min-w-[220px] rounded-md border border-[var(--cf-border)] bg-white py-1 shadow-md"
           >
+            <button
+              type="button"
+              role="menuitem"
+              className="block w-full px-3 py-2 text-left text-sm text-[var(--cf-ink)] hover:bg-[var(--cf-surface)]"
+              onClick={() => exportAs("pdf")}
+            >
+              PDF (.pdf)
+            </button>
             <button
               type="button"
               role="menuitem"
