@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -11,7 +11,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Search,
-  User,
 } from "lucide-react";
 import { signOut } from "@/app/actions/demo-switch-role";
 import { getPageTitle, ROLE_LABELS } from "@/lib/auth/roles";
@@ -63,11 +62,6 @@ export function TopBar({ user }: { user: AppUser }) {
     }, 250);
     return () => clearTimeout(handle);
   }, [query]);
-
-  const profileHref = useMemo(() => {
-    if (user.role === "accounting") return "/accounting/profile";
-    return getPageTitle(pathname) ? "#" : "#";
-  }, [user.role, pathname]);
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-[var(--cf-border)] bg-white px-3 sm:px-6">
@@ -211,16 +205,6 @@ export function TopBar({ user }: { user: AppUser }) {
                 {user.email}
               </p>
             </div>
-            {user.role === "accounting" ? (
-              <Link
-                href={profileHref}
-                onClick={() => setProfileOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--cf-ink)] hover:bg-[var(--cf-surface)]"
-              >
-                <User className="h-4 w-4" />
-                Profile
-              </Link>
-            ) : null}
             <form action={signOut}>
               <button
                 type="submit"

@@ -8,7 +8,6 @@ import {
   ChevronDown,
   LogOut,
   Search,
-  UserRound,
 } from "lucide-react";
 import { signOut } from "@/app/actions/demo-switch-role";
 import { ROLE_LABELS } from "@/lib/auth/roles";
@@ -321,14 +320,6 @@ export function ClientTopBar({
                   {user.email}
                 </p>
               </div>
-              <Link
-                href="/client/profile"
-                onClick={() => setProfileOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--cf-ink)] hover:bg-[var(--cf-surface)]"
-              >
-                <UserRound className="h-4 w-4" />
-                View profile
-              </Link>
               <form action={signOut}>
                 <button
                   type="submit"
