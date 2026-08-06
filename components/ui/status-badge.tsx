@@ -8,10 +8,15 @@ export function StatusBadge({
   status?: string;
   tone?: "neutral" | "success" | "warning" | "danger" | "info";
 }) {
-  const text = label ?? status ?? "";
-  const resolvedTone = tone !== "neutral" || !status ? tone : statusTone(status);
+  const raw = label ?? status ?? "";
+  const text = formatStatusLabel(raw);
+  const resolvedTone =
+    tone !== "neutral" || !(status || label)
+      ? tone
+      : statusTone(status || label || "");
   const tones: Record<string, string> = {
-    neutral: "bg-[var(--cf-surface)] text-[var(--cf-ink)] border-[var(--cf-border)]",
+    neutral:
+      "bg-[var(--cf-surface)] text-[var(--cf-ink)] border-[var(--cf-border)]",
     success: "bg-emerald-50 text-emerald-800 border-emerald-200",
     warning: "bg-amber-50 text-amber-900 border-amber-200",
     danger: "bg-red-50 text-red-800 border-red-200",
@@ -26,10 +31,25 @@ export function StatusBadge({
   );
 }
 
+/** Capitalize Active / Inactive (and similar single-word entity statuses). */
+function formatStatusLabel(raw: string) {
+  const trimmed = raw.trim();
+  if (/^(active|inactive)$/i.test(trimmed)) {
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+  }
+  return trimmed;
+}
+
 export function statusTone(
   label: string,
 ): "neutral" | "success" | "warning" | "danger" | "info" {
-  const l = label.toLowerCase();
+  const l = label.toLowerCase().trim();
+
+  // Explicit priority + entity status rules (app-wide standard)
+  if (l === "inactive" || l === "high" || l === "high priority") return "danger";
+  if (l === "medium" || l === "medium priority") return "warning";
+  if (l === "low" || l === "low priority" || l === "active") return "success";
+
   if (l.includes("paid") && !l.includes("partial") && !l.includes("unpaid"))
     return "success";
   if (
@@ -38,7 +58,8 @@ export function statusTone(
     l.includes("rejected") ||
     l.includes("cancelled") ||
     l.includes("ended") ||
-    l.includes("closed")
+    l.includes("closed") ||
+    l.includes("inactive")
   )
     return "danger";
   if (
@@ -54,18 +75,19 @@ export function statusTone(
   )
     return "warning";
   if (
-    l.includes("active") ||
     l.includes("approved") ||
     l.includes("open") ||
     l.includes("hired") ||
     l.includes("filled") ||
     l.includes("completed") ||
     l.includes("scheduled") ||
-    l.includes("high") ||
     l.includes("extended") ||
-    l.includes("posted")
+    l.includes("posted") ||
+    l.includes("active") ||
+    /(^|\s)low(\s|$)/.test(l)
   )
-    return "info";
+    return "success";
+  if (/(^|\s)high(\s|$)/.test(l)) return "danger";
   if (l.includes("void")) return "danger";
   return "neutral";
 }

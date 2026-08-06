@@ -145,8 +145,12 @@ export function seedStatusTone(
   status: string,
 ): "default" | "navy" | "success" | "warning" | "danger" | "muted" | "accent" {
   const s = status.toLowerCase().replaceAll(" ", "_");
+  // App-wide: Active/Low = green, Inactive/High = red, Medium = yellow
+  if (s === "inactive" || s === "high" || s === "high_priority") return "danger";
+  if (s === "medium" || s === "medium_priority") return "warning";
+  if (s === "low" || s === "low_priority" || s === "active") return "success";
   if (
-    ["paid", "approved", "active", "completed", "accepted", "filled"].includes(s)
+    ["paid", "approved", "completed", "accepted", "filled"].includes(s)
   )
     return "success";
   if (
@@ -166,7 +170,7 @@ export function seedStatusTone(
     s.includes("partial")
   )
     return "warning";
-  if (["disputed", "rejected", "cancelled", "closed"].includes(s))
+  if (["disputed", "rejected", "cancelled", "closed", "inactive"].includes(s))
     return "danger";
   return "navy";
 }

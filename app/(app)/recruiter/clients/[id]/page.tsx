@@ -27,7 +27,6 @@ export default async function ClientDetailPage({
     <div className="space-y-6">
       <PageHeader
         title={client.company}
-        description="Employer profile, open jobs, and placements."
         actions={
           <Link
             href="/recruiter/clients"

@@ -74,7 +74,6 @@ export default async function JobOrderDetailPage({
     <div>
       <PageHeader
         title="Job order details"
-        description={`${job.title} at ${job.company}`}
         actions={
           <Link
             href="/recruiter/job-orders"

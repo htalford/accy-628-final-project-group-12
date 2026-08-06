@@ -4,7 +4,6 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/client-portal/breadcrumbs";
-import { PinContractButton } from "@/components/portal-pins/pin-contract-button";
 import { getPlacementForClient } from "@/lib/client-portal/queries";
 import {
   formatMoney,
@@ -44,14 +43,6 @@ export default async function ContractDetailPage({
           <Badge tone={seedStatusTone(p.status)}>
             {placementStatusLabel(p.status)}
           </Badge>
-          <PinContractButton
-            scope="client"
-            contractId={p.id}
-            contractNumber={number}
-            employeeName={name}
-            positionTitle={title}
-            size="md"
-          />
           <Button size="sm" variant="secondary" href="/client/contracts">
             Back
           </Button>
