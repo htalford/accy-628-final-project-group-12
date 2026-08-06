@@ -191,3 +191,75 @@ export async function listAccountingMessageThreads(): Promise<
     (a, b) => b.updatedAt.localeCompare(a.updatedAt),
   );
 }
+
+const DELETED_THREAD_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+export type AccountingDeletedThread = {
+  participantType: AccountingParticipantType;
+  threadId: string;
+  deletedAt: string;
+};
+
+export function isAccountingDeletedThreadVisible(
+  deletedAt: string,
+  now = Date.now(),
+) {
+  const t = new Date(deletedAt).getTime();
+  if (Number.isNaN(t)) return false;
+  return now - t <= DELETED_THREAD_RETENTION_MS;
+}
+
+export async function listAccountingDeletedThreadKeys(): Promise<
+  AccountingDeletedThread[]
+> {
+  const { error } = await requireAccounting();
+  if (error) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("accounting_deleted_threads")
+    .select("participant_type, thread_id, deleted_at")
+    .order("deleted_at", { ascending: false });
+
+  return (data ?? []).map((row) => ({
+    participantType: row.participant_type as AccountingParticipantType,
+    threadId: String(row.thread_id),
+    deletedAt: String(row.deleted_at),
+  }));
+}
+
+export async function listAccountingInboxThreads(): Promise<
+  AccountingMessageThread[]
+> {
+  const [threads, deleted] = await Promise.all([
+    listAccountingMessageThreads(),
+    listAccountingDeletedThreadKeys(),
+  ]);
+  const hidden = new Set(
+    deleted.map((d) => `${d.participantType}:${d.threadId}`),
+  );
+  return threads.filter((t) => !hidden.has(`${t.participantType}:${t.id}`));
+}
+
+export async function listAccountingDeletedThreads(): Promise<
+  (AccountingMessageThread & { deletedAt: string })[]
+> {
+  const [threads, deleted] = await Promise.all([
+    listAccountingMessageThreads(),
+    listAccountingDeletedThreadKeys(),
+  ]);
+  const visibleDeleted = deleted.filter((d) =>
+    isAccountingDeletedThreadVisible(d.deletedAt),
+  );
+  const byKey = new Map(
+    visibleDeleted.map((d) => [`${d.participantType}:${d.threadId}`, d]),
+  );
+  return threads
+    .filter((t) => byKey.has(`${t.participantType}:${t.id}`))
+    .map((t) => ({
+      ...t,
+      deletedAt: byKey.get(`${t.participantType}:${t.id}`)!.deletedAt,
+      unread: 0,
+    }))
+    .sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+}
