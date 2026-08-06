@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { INDUSTRIES } from "@/lib/marketing/content";
 
 const INTEREST_OPTIONS = [
@@ -13,6 +14,7 @@ type Interest = (typeof INTEREST_OPTIONS)[number]["value"];
 const RECRUITER_EMAIL = "recruiter@talentquest.demo";
 
 export function SignupForm() {
+  const searchParams = useSearchParams();
   const [interest, setInterest] = useState<Interest | "">("");
   const [name, setName] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -20,6 +22,13 @@ export function SignupForm() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+
+  useEffect(() => {
+    const fromQuery = searchParams.get("interest");
+    if (fromQuery === "hire" || fromQuery === "work") {
+      setInterest(fromQuery);
+    }
+  }, [searchParams]);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
