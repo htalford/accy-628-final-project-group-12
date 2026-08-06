@@ -599,7 +599,12 @@ export async function listRecentJobOrders(limit = 5) {
 }
 
 export async function listInterviews(): Promise<RecruiterInterview[]> {
-  const candidates = await listCandidates();
+  const [candidates, jobs] = await Promise.all([
+    listCandidates(),
+    listJobOrders(),
+  ]);
+  const jobById = new Map(jobs.map((j) => [j.id, j]));
+
   return candidates
     .filter((c) => {
       if (!c.interviewAt) return false;
@@ -608,19 +613,18 @@ export async function listInterviews(): Promise<RecruiterInterview[]> {
     })
     .map((c) => {
       const dt = new Date(c.interviewAt!);
+      const job = c.jobId ? jobById.get(c.jobId) : undefined;
+      const company =
+        job?.company ||
+        job?.client ||
+        job?.employerName ||
+        (c.location !== "—" ? c.location : "Employer");
       return {
         id: `int-${c.applicationId ?? c.id}`,
         applicationId: c.applicationId ?? c.id,
         candidate: c.name,
         candidateId: c.employeeId,
-        company:
-          c.source === "employer_submittal"
-            ? c.location !== "—"
-              ? c.location
-              : "Employer"
-            : c.location !== "—"
-              ? c.location
-              : "Employer",
+        company,
         position: c.positionApplied,
         jobOrderId: c.jobId ?? "",
         date: dt.toISOString().slice(0, 10),

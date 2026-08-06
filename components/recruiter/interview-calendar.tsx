@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { RecruiterInterview } from "@/lib/recruiter/types";
 import { rescheduleInterview } from "@/app/actions/recruiter";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -52,6 +53,17 @@ export function InterviewCalendar({
     year: "numeric",
   });
 
+  const listPreview = useMemo(() => {
+    const now = Date.now() - 3600_000;
+    const chronological = [...interviews].sort((a, b) =>
+      a.datetime.localeCompare(b.datetime),
+    );
+    const upcoming = chronological.filter(
+      (i) => new Date(i.datetime).getTime() >= now,
+    );
+    return (upcoming.length > 0 ? upcoming : chronological).slice(0, 3);
+  }, [interviews]);
+
   const days = useMemo(() => {
     const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
     const start = addDays(first, -((first.getDay() + 6) % 7)); // Monday-based
@@ -74,29 +86,61 @@ export function InterviewCalendar({
         </div>
       ) : null}
 
+      <section className="rounded-xl border border-[var(--cf-border)] bg-white p-4 shadow-sm">
+        <h2 className="mb-3 text-sm font-semibold">Interview list</h2>
+        {listPreview.length === 0 ? (
+          <p className="text-sm text-[var(--cf-muted)]">
+            No scheduled interviews yet. Schedule from a candidate detail page.
+          </p>
+        ) : (
+          <ul className="divide-y divide-[var(--cf-border)]">
+            {listPreview.map((item) => (
+              <li
+                key={item.id}
+                className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(item)}
+                    className="font-medium text-[var(--cf-navy)] hover:underline"
+                  >
+                    {item.candidate}
+                  </button>
+                  <p className="text-xs text-[var(--cf-muted)]">
+                    {item.company} · {item.position} · {item.date} {item.time} ·{" "}
+                    {item.type}
+                  </p>
+                </div>
+                <StatusBadge status={item.status} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <div className="flex flex-col gap-3 rounded-xl border border-[var(--cf-border)] bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => shift(-1)}
-            className="rounded-lg border border-[var(--cf-border)] px-3 py-1.5 text-sm"
+            aria-label="Previous month"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--cf-border)] text-[var(--cf-ink)] hover:bg-[var(--cf-surface)]"
           >
-            Prev
+            <ChevronLeft className="h-4 w-4" />
           </button>
-          <p className="min-w-[12rem] text-center text-sm font-semibold text-[var(--cf-ink)]">
-            {label}
-          </p>
           <button
             type="button"
             onClick={() => shift(1)}
-            className="rounded-lg border border-[var(--cf-border)] px-3 py-1.5 text-sm"
+            aria-label="Next month"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--cf-border)] text-[var(--cf-ink)] hover:bg-[var(--cf-surface)]"
           >
-            Next
+            <ChevronRight className="h-4 w-4" />
           </button>
+          <p className="ml-2 text-sm font-semibold text-[var(--cf-ink)]">
+            {label}
+          </p>
         </div>
-        <p className="text-xs font-medium tracking-wide text-[var(--cf-muted)] uppercase">
-          Month
-        </p>
       </div>
 
       <div className="grid grid-cols-7 gap-2">
@@ -148,38 +192,6 @@ export function InterviewCalendar({
         })}
       </div>
 
-      <section className="rounded-xl border border-[var(--cf-border)] bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-semibold">Interview list</h2>
-        {interviews.length === 0 ? (
-          <p className="text-sm text-[var(--cf-muted)]">
-            No scheduled interviews yet. Schedule from a candidate detail page.
-          </p>
-        ) : (
-          <ul className="divide-y divide-[var(--cf-border)]">
-            {interviews.map((item) => (
-              <li
-                key={item.id}
-                className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => setSelected(item)}
-                    className="font-medium text-[var(--cf-navy)] hover:underline"
-                  >
-                    {item.candidate}
-                  </button>
-                  <p className="text-xs text-[var(--cf-muted)]">
-                    {item.position} · {item.date} {item.time} · {item.type}
-                  </p>
-                </div>
-                <StatusBadge status={item.status} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
       {selected ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-xl border border-[var(--cf-border)] bg-white p-5 shadow-lg">
@@ -191,7 +203,9 @@ export function InterviewCalendar({
             </div>
             <dl className="space-y-2 text-sm">
               <div>
-                <dt className="text-xs text-[var(--cf-muted)] uppercase">Candidate</dt>
+                <dt className="text-xs text-[var(--cf-muted)] uppercase">
+                  Candidate
+                </dt>
                 <dd>
                   <Link
                     href={`/recruiter/candidates/${selected.applicationId}`}
@@ -202,7 +216,15 @@ export function InterviewCalendar({
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-[var(--cf-muted)] uppercase">Position</dt>
+                <dt className="text-xs text-[var(--cf-muted)] uppercase">
+                  Employer / client
+                </dt>
+                <dd>{selected.company}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-[var(--cf-muted)] uppercase">
+                  Position
+                </dt>
                 <dd>{selected.position}</dd>
               </div>
               <div>
@@ -213,7 +235,9 @@ export function InterviewCalendar({
               </div>
               {selected.notes ? (
                 <div>
-                  <dt className="text-xs text-[var(--cf-muted)] uppercase">Notes</dt>
+                  <dt className="text-xs text-[var(--cf-muted)] uppercase">
+                    Notes
+                  </dt>
                   <dd>{selected.notes}</dd>
                 </div>
               ) : null}
@@ -250,8 +274,8 @@ export function InterviewCalendar({
                     });
                     setNotice(
                       result.ok
-                        ? result.message ?? "Rescheduled"
-                        : result.error ?? "Failed",
+                        ? (result.message ?? "Rescheduled")
+                        : (result.error ?? "Failed"),
                     );
                     if (result.ok) router.refresh();
                   });

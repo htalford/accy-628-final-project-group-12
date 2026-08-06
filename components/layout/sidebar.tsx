@@ -201,7 +201,11 @@ function NavLink({
             />
           ) : null}
         </span>
-        {!collapsed ? <span className="truncate">{item.label}</span> : null}
+        {!collapsed ? (
+          <span className="min-w-0 flex-1 leading-snug whitespace-normal">
+            {item.label}
+          </span>
+        ) : null}
         {showDot && !collapsed ? (
           <span className="sr-only">Unread messages</span>
         ) : null}
@@ -515,7 +519,7 @@ export function Sidebar({
       ) : null}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-[var(--cf-navy)] text-white transition-transform lg:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-[var(--cf-navy)] text-white transition-transform lg:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -524,7 +528,7 @@ export function Sidebar({
 
       <aside
         className={`hidden shrink-0 flex-col bg-[var(--cf-navy)] text-white transition-[width] lg:flex ${
-          showCollapsed ? "w-[4.25rem]" : "w-60"
+          showCollapsed ? "w-[4.25rem]" : "w-72"
         }`}
       >
         {nav}

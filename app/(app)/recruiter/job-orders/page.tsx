@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { JobOrderFiltersPanel } from "@/components/recruiter/job-order-filters";
+import { RECRUITER_PAGE_COPY } from "@/components/recruiter/summary-cards";
 import { jobOrderFilterOptions, listJobOrders } from "@/lib/recruiter/data";
 
 export default async function JobOrdersPage() {
@@ -7,13 +8,11 @@ export default async function JobOrdersPage() {
     jobOrderFilterOptions(),
     listJobOrders(),
   ]);
+  const copy = RECRUITER_PAGE_COPY.jobOrders;
 
   return (
     <div>
-      <PageHeader
-        title="Job Orders"
-        description="Roles from the job board and employer requests"
-      />
+      <PageHeader title="Job Orders" description={copy.subtitle} />
       <JobOrderFiltersPanel
         initialRows={rows}
         clients={options.clients}

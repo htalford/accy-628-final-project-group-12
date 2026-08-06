@@ -18,7 +18,7 @@ export default async function RecruiterDashboardPage() {
 
   const [metrics, activity] = await Promise.all([
     getDashboardMetrics(),
-    listRecentActivity(),
+    listRecentActivity(10),
   ]);
 
   return (
