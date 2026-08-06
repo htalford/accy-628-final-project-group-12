@@ -8,11 +8,9 @@ import {
 } from "@/components/accounting/charts";
 import { getDashboardData } from "@/lib/accounting/queries";
 import { money } from "@/lib/accounting/format";
-import { daysAgoIso } from "@/lib/accounting/calculations";
 
 export default async function AccountingHomePage() {
   const data = await getDashboardData();
-  const from = daysAgoIso(30);
 
   return (
     <div className="space-y-6">
@@ -40,8 +38,8 @@ export default async function AccountingHomePage() {
         <StatCard
           label="Payroll (Last 30 Days)"
           value={money(data.cards.payrollLast30Days)}
-          hint="Approved contract labor + staff salaries (last 30 days)"
-          href={`/accounting/payroll?from=${from}`}
+          hint="Contract labor, staff salaries, and employee benefits (last 30 days)"
+          href={`/accounting/payroll?range=month`}
         />
         <StatCard
           label="Gross Profit"

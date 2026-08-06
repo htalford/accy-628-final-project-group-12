@@ -6,7 +6,7 @@ import {
   ContractLink,
   PayrollEmployeeLink,
 } from "@/components/accounting/entity-links";
-import { getContracts } from "@/lib/accounting/queries";
+import { getClients, getContracts } from "@/lib/accounting/queries";
 import {
   moneyExact,
   placementStatusLabel,
@@ -17,13 +17,29 @@ import { ContractsToolbar } from "@/components/accounting/contracts-toolbar";
 export default async function ContractsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    status?: string;
+    type?: string;
+    client?: string;
+  }>;
 }) {
   const params = await searchParams;
-  const contracts = await getContracts();
+  const [contracts, clients] = await Promise.all([
+    getContracts(),
+    getClients(),
+  ]);
 
   const filtered = contracts.filter((c) => {
     if (params.status && params.status !== "all" && c.status !== params.status)
+      return false;
+    if (params.type && params.type !== "all" && c.billingType !== params.type)
+      return false;
+    if (
+      params.client &&
+      params.client !== "all" &&
+      c.clientId !== params.client
+    )
       return false;
     if (params.q) {
       const q = params.q.toLowerCase();
@@ -36,7 +52,12 @@ export default async function ContractsPage({
   return (
     <div className="space-y-6">
       <PageHeader title="Contracts" />
-      <ContractsToolbar />
+      <ContractsToolbar
+        clients={clients.map((c) => ({
+          id: c.id as string,
+          name: c.name as string,
+        }))}
+      />
       <DataTable
         rows={filtered}
         rowHref={(row) => `/accounting/contracts/${row.id}`}

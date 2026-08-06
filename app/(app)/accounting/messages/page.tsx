@@ -7,10 +7,7 @@ export default async function AccountingMessagesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Messages"
-        description="Chat with recruiters, employers, and candidates about pay, invoices, and timesheets."
-      />
+      <PageHeader title="Messages" />
       <AccountingMessagesCenter threads={threads} />
     </div>
   );

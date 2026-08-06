@@ -61,7 +61,10 @@ export function accountForPlacementExpenseType(
 ): string {
   switch (type) {
     case "payroll_tax":
+    case "workers_comp":
       return "5300";
+    case "benefits":
+      return "5400";
     case "recruiting_cost":
       return "5200";
     default:

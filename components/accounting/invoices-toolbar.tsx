@@ -27,12 +27,12 @@ export function InvoicesToolbar({
       <input
         type="search"
         defaultValue={searchParams.get("q") ?? ""}
-        placeholder="Search invoices…"
-        className="min-w-[12rem] flex-1 rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-sm outline-none ring-[var(--cf-accent)] focus:ring-2"
+        placeholder="Search invoices..."
+        className="min-w-[12rem] flex-1 rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-sm text-[var(--cf-ink)] outline-none ring-[var(--cf-accent)] placeholder:text-[var(--cf-muted)] focus:ring-2"
         onChange={(e) => update("q", e.target.value)}
       />
       <select
-        className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-sm"
+        className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-sm text-[var(--cf-ink)]"
         defaultValue={searchParams.get("status") ?? "all"}
         onChange={(e) => update("status", e.target.value)}
       >
@@ -45,7 +45,7 @@ export function InvoicesToolbar({
         <option value="disputed">Disputed</option>
       </select>
       <select
-        className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-sm"
+        className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-sm text-[var(--cf-ink)]"
         defaultValue={searchParams.get("client") ?? "all"}
         onChange={(e) => update("client", e.target.value)}
       >
