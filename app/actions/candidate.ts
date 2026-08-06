@@ -637,3 +637,66 @@ export async function updateCandidateProfile(
   revalidatePath("/candidate/jobs");
   return { ok: true };
 }
+
+/**
+ * Candidate responds to an offer (accept/decline) or acknowledges a rejection.
+ * Offer/decline notifications stay until this is recorded.
+ */
+export async function respondToApplicationOutcome(input: {
+  applicationId: string;
+  decision: "accepted" | "declined" | "acknowledged";
+}): Promise<ActionResult> {
+  const user = await requireCandidateContext();
+  if (!user) return { ok: false, error: "Candidate session required." };
+
+  const applicationId = input.applicationId.trim();
+  if (!applicationId) return { ok: false, error: "Application is required." };
+
+  const supabase = await createClient();
+  const { data: app, error: findError } = await supabase
+    .from("applications")
+    .select("id, status, candidate_decision")
+    .eq("id", applicationId)
+    .eq("employee_id", user.linked_employee_id!)
+    .maybeSingle();
+
+  if (findError || !app) {
+    return { ok: false, error: findError?.message ?? "Application not found." };
+  }
+
+  if (app.candidate_decision) {
+    return { ok: false, error: "You already responded to this update." };
+  }
+
+  if (input.decision === "acknowledged") {
+    if (app.status !== "rejected") {
+      return { ok: false, error: "Only declined applications can be acknowledged." };
+    }
+  } else if (app.status !== "offered") {
+    return { ok: false, error: "Only open offers can be accepted or declined." };
+  }
+
+  const patch: Record<string, unknown> = {
+    candidate_decision: input.decision,
+    candidate_decision_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  if (input.decision === "declined") {
+    patch.status = "withdrawn";
+  }
+
+  const { error } = await supabase
+    .from("applications")
+    .update(patch)
+    .eq("id", applicationId)
+    .eq("employee_id", user.linked_employee_id!);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/candidate/applications");
+  revalidatePath("/candidate/dashboard");
+  revalidatePath("/candidate/messages");
+  revalidatePath("/recruiter/candidates");
+  revalidatePath("/client/candidates");
+  return { ok: true };
+}

@@ -6,6 +6,7 @@ import { ShellProvider } from "@/components/layout/shell-context";
 import { loadClientPortalChrome } from "@/lib/client-portal/chrome";
 import { loadCandidateNotifications } from "@/lib/candidate/notifications";
 import { loadAccountingNotifications } from "@/lib/accounting/notifications";
+import { loadRecruiterNotifications } from "@/lib/recruiter/notifications";
 import type { AppUser } from "@/lib/types/database";
 
 export async function AppShell({
@@ -23,6 +24,7 @@ export async function AppShell({
           user={user}
           notifications={chrome.notifications}
           searchIndex={chrome.searchIndex}
+          attentionHrefs={chrome.navAttentionHrefs}
         >
           {children}
         </ClientPortalShell>
@@ -31,24 +33,39 @@ export async function AppShell({
     );
   }
 
-  const [candidateChrome, accountingNotifications] = await Promise.all([
-    user.role === "candidate" ? loadCandidateNotifications() : null,
-    user.role === "accounting" ? loadAccountingNotifications() : null,
-  ]);
+  const [candidateChrome, accountingChrome, recruiterChrome] =
+    await Promise.all([
+      user.role === "candidate" ? loadCandidateNotifications() : null,
+      user.role === "accounting" ? loadAccountingNotifications() : null,
+      user.role === "recruiter" ? loadRecruiterNotifications() : null,
+    ]);
+
+  const attentionHrefs =
+    candidateChrome?.navAttentionHrefs ??
+    accountingChrome?.navAttentionHrefs ??
+    recruiterChrome?.navAttentionHrefs ??
+    [];
+
+  const unreadMessageCount =
+    candidateChrome?.unreadMessageCount ??
+    recruiterChrome?.unreadMessageCount ??
+    0;
 
   return (
     <ShellProvider>
       <div className="flex min-h-full flex-1">
         <Sidebar
           role={user.role}
-          unreadMessageCount={candidateChrome?.unreadMessageCount ?? 0}
+          unreadMessageCount={unreadMessageCount}
+          attentionHrefs={attentionHrefs}
         />
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar
             user={user}
             notifications={
               candidateChrome?.notifications ??
-              accountingNotifications ??
+              accountingChrome?.notifications ??
+              recruiterChrome?.notifications ??
               undefined
             }
           />

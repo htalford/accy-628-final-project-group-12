@@ -180,7 +180,7 @@ function NavLink({
       <Link
         href={item.href}
         title={
-          showDot ? `${item.label} (unread messages)` : item.label
+          showDot ? `${item.label} (needs attention)` : item.label
         }
         onClick={onNavigate}
         className={`relative flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-sm font-medium transition ${
@@ -191,7 +191,7 @@ function NavLink({
           <Icon className="h-4 w-4" aria-hidden />
           {showDot ? (
             <span
-              className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--cf-accent)] ring-2 ring-[var(--cf-navy)]"
+              className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-[var(--cf-navy)]"
               aria-hidden
             />
           ) : null}
@@ -203,7 +203,7 @@ function NavLink({
         ) : null}
         {iconsOnly ? <span className="sr-only">{item.label}</span> : null}
         {showDot && !iconsOnly ? (
-          <span className="sr-only">Unread messages</span>
+          <span className="sr-only">Needs attention</span>
         ) : null}
       </Link>
       {showPinControls && onTogglePin && !iconsOnly && !lockPin ? (
@@ -245,12 +245,14 @@ function NavLink({
 export function Sidebar({
   role,
   unreadMessageCount = 0,
+  attentionHrefs = [],
 }: {
   role: UserRole;
   unreadMessageCount?: number;
+  /** Nav roots that should show an attention dot. */
+  attentionHrefs?: string[];
 }) {
   const items = getNavForRole(role);
-  const isCandidate = role === "candidate";
   const homePath = getDashboardPath(role);
   const dashboardHref = homePath;
   const pinStorageKey = PIN_KEYS[role] ?? `cf-${role}-nav-pins`;
@@ -258,9 +260,18 @@ export function Sidebar({
   const lockedHomeLabel =
     items.find((item) => item.href === dashboardHref)?.label ?? "Dashboard";
 
-  const showMessagesDot = isCandidate && unreadMessageCount > 0;
+  const attentionSet = useMemo(() => {
+    const set = new Set(attentionHrefs);
+    // Messages also lights up from unread count even if notifications lag.
+    if (unreadMessageCount > 0) {
+      if (role === "candidate") set.add("/candidate/messages");
+      if (role === "recruiter") set.add("/recruiter/messages");
+    }
+    return set;
+  }, [attentionHrefs, role, unreadMessageCount]);
+
   function navShowDot(href: string) {
-    return showMessagesDot && href === "/candidate/messages";
+    return attentionSet.has(href);
   }
 
   const { mobileOpen, setMobileOpen } = useShell();

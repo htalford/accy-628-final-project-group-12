@@ -9,6 +9,8 @@ import {
   getInvoices,
   getTimesheets,
 } from "@/lib/accounting/queries";
+import { getNavForRole } from "@/lib/auth/roles";
+import { attentionHrefsFromNotifications } from "@/lib/nav-attention";
 
 export type AccountingNotification = {
   id: string;
@@ -18,6 +20,13 @@ export type AccountingNotification = {
   time: string;
   tone: "warning" | "info" | "success";
 };
+
+export type AccountingNotificationChrome = {
+  notifications: AccountingNotification[];
+  navAttentionHrefs: string[];
+};
+
+const ACCOUNTING_NAV_ROOTS = getNavForRole("accounting").map((i) => i.href);
 
 function daysUntil(dateStr: string): number {
   const target = new Date(`${dateStr}T00:00:00`);
@@ -34,10 +43,8 @@ function daysPhrase(days: number): string {
   return `in ${days} days`;
 }
 
-/** Live action items for the accounting top-bar bell, linking to the related page. */
-export async function loadAccountingNotifications(): Promise<
-  AccountingNotification[]
-> {
+/** Live action items for the accounting top-bar bell + sidebar attention dots. */
+export async function loadAccountingNotifications(): Promise<AccountingNotificationChrome> {
   const [ar, timesheets, contracts, expenses, invoices, threads] =
     await Promise.all([
       getAccountsReceivable(),
@@ -161,18 +168,25 @@ export async function loadAccountingNotifications(): Promise<
     });
   }
 
-  if (items.length === 0) {
-    return [
-      {
-        id: "all-clear",
-        title: "You're all caught up",
-        body: "No overdue invoices, timesheets, expenses, or contracts need attention.",
-        href: "/accounting/dashboard",
-        time: "Just now",
-        tone: "success",
-      },
-    ];
-  }
+  const notifications =
+    items.length === 0
+      ? [
+          {
+            id: "all-clear",
+            title: "You're all caught up",
+            body: "No overdue invoices, timesheets, expenses, or contracts need attention.",
+            href: "/accounting/dashboard",
+            time: "Just now",
+            tone: "success" as const,
+          },
+        ]
+      : items.slice(0, 12);
 
-  return items.slice(0, 12);
+  return {
+    notifications,
+    navAttentionHrefs: attentionHrefsFromNotifications(
+      notifications,
+      ACCOUNTING_NAV_ROOTS,
+    ),
+  };
 }

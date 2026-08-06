@@ -140,7 +140,8 @@ export async function updateClientProfileAction(formData: {
 }
 
 /**
- * Insert into job_requests only (not public.jobs).
+ * Insert into job_requests and publish a linked open jobs row for the
+ * candidate Available jobs board (via publish_job_request_to_board).
  * Employer client_id is forced from session — never trusts form for client id.
  */
 export async function createJobRequestAction(formData: {
@@ -206,13 +207,30 @@ export async function createJobRequestAction(formData: {
     return { ok: false, message: error.message };
   }
 
+  const requestId = data?.id ? String(data.id) : null;
+  if (requestId) {
+    const { error: publishError } = await supabase.rpc(
+      "publish_job_request_to_board",
+      { p_request_id: requestId },
+    );
+    if (publishError) {
+      return {
+        ok: false,
+        message: `Request saved, but publishing to Available jobs failed: ${publishError.message}`,
+      };
+    }
+  }
+
   revalidatePath("/client/job-requests");
   revalidatePath("/client/dashboard");
+  revalidatePath("/candidate/jobs");
+  revalidatePath("/candidate/dashboard");
+  revalidatePath("/recruiter/job-orders");
 
   return {
     ok: true,
-    message: "Job request submitted.",
-    id: data?.id ? String(data.id) : undefined,
+    message: "Job request submitted and posted to Available jobs.",
+    id: requestId ?? undefined,
   };
 }
 

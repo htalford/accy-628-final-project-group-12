@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { FireworksBackdrop } from "@/components/candidate/fireworks-backdrop";
-
-const STORAGE_KEY = "tq-candidate-dismissed-offers";
+import { respondToApplicationOutcome } from "@/app/actions/candidate";
 
 export type OfferNotice = {
   id: string;
@@ -15,69 +15,59 @@ export type OfferNotice = {
   employmentType: string | null;
 };
 
-function readDismissed(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return new Set();
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return new Set();
-    return new Set(parsed.filter((id): id is string => typeof id === "string"));
-  } catch {
-    return new Set();
-  }
-}
-
-function writeDismissed(ids: Set<string>) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
-}
-
+/**
+ * Celebratory offer popup. Closing it only hides for this session —
+ * it returns on the next visit until the candidate accepts or declines.
+ */
 export function OfferReceivedModal({ offers }: { offers: OfferNotice[] }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [queue, setQueue] = useState<OfferNotice[]>([]);
+  const [sessionHidden, setSessionHidden] = useState<Set<string>>(new Set());
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const dismissed = readDismissed();
-    const remaining = offers.filter((o) => !dismissed.has(o.id));
+    const remaining = offers.filter((o) => !sessionHidden.has(o.id));
     setQueue(remaining);
     setOpen(remaining.length > 0);
-  }, [offers]);
+  }, [offers, sessionHidden]);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      setQueue((prev) => {
-        const current = prev[0];
-        if (!current) {
-          setOpen(false);
-          return prev;
-        }
-        const dismissed = readDismissed();
-        dismissed.add(current.id);
-        writeDismissed(dismissed);
-        const remaining = prev.slice(1);
-        setOpen(remaining.length > 0);
-        return remaining;
-      });
+      if (e.key === "Escape") hideForNow();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [open, queue]);
 
   const offer = queue[0] ?? null;
 
-  function dismissCurrent() {
+  function hideForNow() {
     if (!offer) {
       setOpen(false);
       return;
     }
-    const dismissed = readDismissed();
-    dismissed.add(offer.id);
-    writeDismissed(dismissed);
-    const remaining = queue.slice(1);
-    setQueue(remaining);
-    setOpen(remaining.length > 0);
+    setSessionHidden((prev) => new Set(prev).add(offer.id));
+    setError(null);
+  }
+
+  function respond(decision: "accepted" | "declined") {
+    if (!offer) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await respondToApplicationOutcome({
+        applicationId: offer.id,
+        decision,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setSessionHidden((prev) => new Set(prev).add(offer.id));
+      router.refresh();
+    });
   }
 
   if (!offer || !open) return null;
@@ -88,7 +78,7 @@ export function OfferReceivedModal({ offers }: { offers: OfferNotice[] }) {
         type="button"
         className="absolute inset-0 bg-[var(--cf-ink)]/55"
         aria-label="Close dialog"
-        onClick={dismissCurrent}
+        onClick={hideForNow}
       />
       <FireworksBackdrop active={open} />
       <div
@@ -106,7 +96,7 @@ export function OfferReceivedModal({ offers }: { offers: OfferNotice[] }) {
           </h2>
           <button
             type="button"
-            onClick={dismissCurrent}
+            onClick={hideForNow}
             aria-label="Close"
             className="rounded-md p-1.5 text-[var(--cf-muted)] hover:bg-[var(--cf-surface)] hover:text-[var(--cf-ink)]"
           >
@@ -116,8 +106,8 @@ export function OfferReceivedModal({ offers }: { offers: OfferNotice[] }) {
 
         <div className="space-y-4">
           <p className="text-sm text-[var(--cf-muted)]">
-            Great news — an employer extended an offer on one of your
-            applications.
+            Great news — accept or decline this offer. It will stay in your
+            notification bell until you respond.
           </p>
           <div className="rounded-lg border border-[var(--cf-border)] bg-[var(--cf-surface)] px-4 py-3">
             <p className="text-base font-semibold text-[var(--cf-ink)]">
@@ -135,21 +125,39 @@ export function OfferReceivedModal({ offers }: { offers: OfferNotice[] }) {
               {queue.length - 1 === 1 ? "" : "s"} waiting after this one.
             </p>
           ) : null}
+          {error ? <p className="text-sm text-red-700">{error}</p> : null}
           <div className="flex flex-wrap justify-end gap-2">
             <button
               type="button"
-              onClick={dismissCurrent}
-              className="rounded-md border border-[var(--cf-border)] px-4 py-2 text-sm font-semibold text-[var(--cf-ink)] hover:bg-[var(--cf-surface)]"
+              disabled={pending}
+              onClick={hideForNow}
+              className="rounded-md border border-[var(--cf-border)] px-4 py-2 text-sm font-semibold text-[var(--cf-ink)] hover:bg-[var(--cf-surface)] disabled:opacity-60"
             >
-              Acknowledge
+              Remind me later
             </button>
             <Link
-              href="/candidate/applications"
-              onClick={dismissCurrent}
-              className="inline-flex items-center justify-center rounded-md bg-[var(--cf-navy)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--cf-navy-hover)]"
+              href={`/candidate/applications?app=${offer.id}`}
+              onClick={hideForNow}
+              className="inline-flex items-center justify-center rounded-md border border-[var(--cf-border)] px-4 py-2 text-sm font-semibold text-[var(--cf-ink)] hover:bg-[var(--cf-surface)]"
             >
               View application
             </Link>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => respond("declined")}
+              className="rounded-md border border-[var(--cf-border)] px-4 py-2 text-sm font-semibold text-[var(--cf-ink)] hover:bg-[var(--cf-surface)] disabled:opacity-60"
+            >
+              Decline
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => respond("accepted")}
+              className="rounded-md bg-[var(--cf-navy)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--cf-navy-hover)] disabled:opacity-60"
+            >
+              Accept offer
+            </button>
           </div>
         </div>
       </div>

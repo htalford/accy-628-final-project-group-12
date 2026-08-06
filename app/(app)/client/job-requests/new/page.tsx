@@ -414,7 +414,7 @@ export default function NewJobRequestPage() {
         open={confirmOpen}
         onClose={() => !busy && setConfirmOpen(false)}
         title="Submit job request?"
-        description="This saves a new row in job_requests for your linked client only. Public job board posts are unchanged."
+        description="This saves a job request for your company and also posts it to the candidate Available jobs board."
         confirmLabel="Submit request"
         confirmVariant="primary"
         showReason={false}

@@ -406,6 +406,9 @@ export type Application = {
   interview_at?: string | null;
   interview_type?: string | null;
   interview_notes?: string | null;
+  /** accepted | declined for offers; acknowledged for employer rejections. */
+  candidate_decision?: "accepted" | "declined" | "acknowledged" | null;
+  candidate_decision_at?: string | null;
   created_at: string;
   updated_at: string;
 };
