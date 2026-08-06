@@ -286,7 +286,6 @@ export function getNavForRole(role: UserRole): NavItem[] {
         { href: "/accounting/dashboard", label: "Home", icon: "layout-dashboard" },
         { href: "/accounting/invoices", label: "Invoices", icon: "file-text" },
         { href: "/accounting/payroll", label: "Payroll", icon: "wallet" },
-        { href: "/accounting/timesheets", label: "Timesheets", icon: "clock" },
         {
           href: "/accounting/accounts-receivable",
           label: "Accounts Receivable",
@@ -376,6 +375,7 @@ export function getPageTitle(pathname: string): string {
   if (pathname === "/accounting/reports/balance-sheet") return "Balance Sheet";
   if (pathname.startsWith("/accounting/reports/")) return "Report preview";
   if (pathname.startsWith("/accounting/timesheets/")) return "Timesheet detail";
+  if (pathname.startsWith("/accounting/employees/")) return "Employee detail";
   if (pathname.startsWith("/accounting/contracts/")) return "Contract detail";
   if (pathname.startsWith("/candidate/contracts/")) return "Contract detail";
   if (pathname.startsWith("/candidate/completions/")) return "Completion detail";

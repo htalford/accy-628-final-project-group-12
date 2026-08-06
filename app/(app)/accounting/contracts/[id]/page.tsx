@@ -96,7 +96,10 @@ export default async function ContractDetailPage({
               <dt className="text-[var(--cf-muted)]">Candidate</dt>
               <dd>
                 {employeeName ? (
-                  <PayrollEmployeeLink name={employeeName} />
+                  <PayrollEmployeeLink
+                    name={employeeName}
+                    employeeId={contract.employee?.id}
+                  />
                 ) : (
                   "—"
                 )}

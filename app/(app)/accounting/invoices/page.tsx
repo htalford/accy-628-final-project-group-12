@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PageHeader } from "@/components/ui/page-header";
+import { CircleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge, statusTone } from "@/components/ui/status-badge";
@@ -20,6 +20,10 @@ export default async function InvoicesPage({
   const params = await searchParams;
   const [invoices, clients] = await Promise.all([getInvoices(), getClients()]);
 
+  const overdueCount = invoices.filter(
+    (inv) => inv.displayStatus === "Overdue",
+  ).length;
+
   const filtered = invoices.filter((inv) => {
     if (params.status && params.status !== "all") {
       if (params.status === "overdue") {
@@ -39,7 +43,22 @@ export default async function InvoicesPage({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader title="Invoices" />
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--cf-ink)]">
+            Invoices
+          </h1>
+          <Link
+            href="/accounting/invoices?status=overdue"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-600 hover:underline"
+          >
+            <CircleAlert className="h-4 w-4 shrink-0" aria-hidden />
+            <span>
+              {overdueCount === 1
+                ? "1 overdue invoice"
+                : `${overdueCount} overdue invoices`}
+            </span>
+          </Link>
+        </div>
         <Button href="/accounting/invoices/new">Create Invoice</Button>
       </div>
 

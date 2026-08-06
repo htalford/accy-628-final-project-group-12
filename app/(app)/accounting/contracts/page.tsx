@@ -54,7 +54,10 @@ export default async function ContractsPage({
             header: "Candidate",
             interactive: true,
             render: (row) => (
-              <PayrollEmployeeLink name={row.employeeName} />
+              <PayrollEmployeeLink
+                name={row.employeeName}
+                employeeId={row.employeeId}
+              />
             ),
           },
           {

@@ -24,6 +24,7 @@ import type {
 
 function revalidateExpensePaths(placementId?: string | null) {
   revalidatePath("/accounting/expenses");
+  revalidatePath("/accounting/payroll");
   revalidatePath("/accounting/dashboard");
   revalidatePath("/accounting/profitability");
   revalidatePath("/accounting/audit-trail");
