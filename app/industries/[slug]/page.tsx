@@ -70,16 +70,10 @@ export default async function IndustryDetailPage({
             {industry.staffingNotes}
           </p>
         </div>
-        <div className="flex flex-wrap gap-4">
-          <Link
-            href="/signup"
-            className="rounded-md bg-[var(--ot-ocean)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[var(--ot-ocean-hover)]"
-          >
-            Request staffing support
-          </Link>
+        <div>
           <Link
             href="/industries"
-            className="text-sm font-semibold text-[var(--ot-navy)] hover:text-[var(--ot-ocean)]"
+            className="inline-flex items-center gap-2 rounded-md bg-[var(--ot-ocean)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[var(--ot-ocean-hover)]"
           >
             ← All industries
           </Link>

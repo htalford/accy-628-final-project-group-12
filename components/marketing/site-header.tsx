@@ -69,18 +69,20 @@ export function SiteHeader() {
         </div>
 
         <div className="flex shrink-0 flex-col items-end gap-1 pt-1">
-          <Link
-            href="/signup"
-            className="inline-flex items-center justify-center rounded-md bg-[var(--ot-ocean)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--ot-ocean-hover)]"
-          >
-            Get Started
-          </Link>
-          <Link
-            href="/login"
-            className="text-sm font-medium text-[var(--ot-navy)] underline-offset-4 hover:text-[var(--ot-ocean)] hover:underline"
-          >
-            Login
-          </Link>
+          <div className="inline-flex flex-col items-stretch">
+            <Link
+              href="/signup"
+              className="inline-flex items-center justify-center rounded-md bg-[var(--ot-ocean)] px-4 py-2 text-sm font-semibold whitespace-nowrap text-white shadow-sm transition hover:bg-[var(--ot-ocean-hover)]"
+            >
+              Get Started
+            </Link>
+            <Link
+              href="/login"
+              className="pt-1 text-right text-sm font-medium text-[var(--ot-navy)] underline-offset-4 hover:text-[var(--ot-ocean)] hover:underline"
+            >
+              Login
+            </Link>
+          </div>
           <button
             type="button"
             className="mt-1 inline-flex items-center rounded-md border border-[var(--ot-border)] p-2 text-[var(--ot-navy)] md:hidden"

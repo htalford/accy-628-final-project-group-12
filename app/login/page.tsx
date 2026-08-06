@@ -21,11 +21,10 @@ export default function LoginPage() {
             Client sign in
           </h1>
           <p className="mt-2 text-sm text-[var(--ot-muted)]">
-            For employers and candidates only. Use an{" "}
-            <span className="font-medium text-[var(--ot-navy)]">employer@</span>{" "}
-            or{" "}
+            Demo sign in for employers and candidates. Any email and password
+            will work — use a{" "}
             <span className="font-medium text-[var(--ot-navy)]">candidate@</span>{" "}
-            email to sign in.
+            email for the candidate portal.
           </p>
         </div>
         <div className="rounded-xl border border-[var(--ot-border)] bg-white p-6 shadow-sm">
@@ -47,7 +46,7 @@ export default function LoginPage() {
           </Link>
         </p>
         <p className="mt-2 text-center text-xs text-[var(--ot-muted)]">
-          Demo password: <code className="font-mono">DemoPass123!</code>
+          Any password works in demo mode.
         </p>
       </div>
     </div>
