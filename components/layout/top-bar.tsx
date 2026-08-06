@@ -147,7 +147,9 @@ export function TopBar({
     pathname === "/candidate/pay" ||
     pathname.startsWith("/candidate/pay/") ||
     pathname === "/candidate/interviews" ||
-    pathname.startsWith("/candidate/interviews/");
+    pathname.startsWith("/candidate/interviews/") ||
+    pathname === "/candidate/completions" ||
+    pathname.startsWith("/candidate/completions/");
 
   useEffect(() => {
     if (!hideSearch) return;
@@ -194,8 +196,7 @@ export function TopBar({
               user.role === "candidate"
                 ? pathname.startsWith("/candidate/messages")
                   ? "Search messages"
-                  : pathname.startsWith("/candidate/contracts") ||
-                      pathname.startsWith("/candidate/completions")
+                  : pathname.startsWith("/candidate/contracts")
                     ? "Search by employer"
                     : "Search by recruiter…"
                 : "Search clients, invoices, contracts…"
