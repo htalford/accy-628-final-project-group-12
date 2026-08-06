@@ -78,7 +78,7 @@ export default async function EmployeeDetailPage({
               <dd className="font-medium">{placement.start_date.slice(0, 10)}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-[var(--cf-muted)]">Bill / pay rate</dt>
+              <dt className="text-[var(--cf-muted)]">Bill / Pay rate</dt>
               <dd className="font-medium">
                 {placement.bill_rate != null
                   ? formatMoney(placement.bill_rate)

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { FilePenLine, StickyNote, UserPlus } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import type { JobOrderStatus, RecruiterCandidate, RecruiterJobOrder } from "@/lib/recruiter/types";
+import type { MatchResult } from "@/lib/matching/score";
+import { MatchScoreBadge, MatchedSkills } from "@/components/matching/match-score-badge";
 import {
   addJobNote,
   assignCandidateToJob,
@@ -15,10 +17,15 @@ export function JobOrderDetail({
   job,
   assignedCandidates,
   approvedCandidates,
+  suggestedMatches = [],
 }: {
   job: RecruiterJobOrder;
   assignedCandidates: RecruiterCandidate[];
   approvedCandidates: RecruiterCandidate[];
+  suggestedMatches?: Array<{
+    candidate: RecruiterCandidate;
+    result: MatchResult;
+  }>;
 }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -157,6 +164,54 @@ export function JobOrderDetail({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
+        <Card title="Automated matches">
+          {suggestedMatches.length === 0 ? (
+            <p className="text-sm text-[var(--cf-muted)]">
+              No strong automated matches yet. Improve job skills/description
+              or wait for more applications in the pipeline.
+            </p>
+          ) : (
+            <ul className="divide-y divide-[var(--cf-border)]">
+              {suggestedMatches.map(({ candidate: c, result }) => (
+                <li
+                  key={c.id}
+                  className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <Link
+                      href={`/recruiter/candidates/${c.id}`}
+                      className="font-medium text-[var(--cf-navy)] hover:underline"
+                    >
+                      {c.name}
+                    </Link>
+                    <p className="text-xs text-[var(--cf-muted)]">
+                      {c.positionApplied}
+                      {c.jobId === job.id ? " · applied to this order" : " · pool match"}
+                    </p>
+                    {result.reasons[0] ? (
+                      <p className="mt-0.5 text-xs text-[var(--cf-muted)]">
+                        {result.reasons[0]}
+                      </p>
+                    ) : null}
+                    <MatchedSkills
+                      skills={result.skillHits}
+                      className="mt-1.5"
+                      emptyLabel="No skill chips matched — score is from title/location only"
+                    />
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <MatchScoreBadge
+                      score={result.score}
+                      band={result.band}
+                      compact
+                    />
+                    <StatusBadge status={c.status} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
         <Card title="Assigned Candidates">
           {assignedCandidates.length === 0 ? (
             <p className="text-sm text-[var(--cf-muted)]">
@@ -184,6 +239,9 @@ export function JobOrderDetail({
             </ul>
           )}
         </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Recruiter Notes">
           {job.recruiterNotes.length === 0 ? (
             <p className="text-sm text-[var(--cf-muted)]">No notes yet.</p>
@@ -203,6 +261,25 @@ export function JobOrderDetail({
                 </li>
               ))}
             </ol>
+          )}
+        </Card>
+        <Card title="Required skills (match inputs)">
+          {job.requiredSkills.length === 0 ? (
+            <p className="text-sm text-[var(--cf-muted)]">
+              No skill tags on this order yet. Skills on employer job requests
+              improve automated ranking.
+            </p>
+          ) : (
+            <ul className="flex flex-wrap gap-1.5">
+              {job.requiredSkills.map((s) => (
+                <li
+                  key={s}
+                  className="rounded-full border border-[var(--cf-border)] bg-[var(--cf-surface)] px-2.5 py-0.5 text-xs font-medium text-[var(--cf-ink)]"
+                >
+                  {s}
+                </li>
+              ))}
+            </ul>
           )}
         </Card>
       </div>

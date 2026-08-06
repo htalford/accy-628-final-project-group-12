@@ -7,6 +7,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ApplyButton } from "@/components/candidate/apply-button";
 import { InterestedButton } from "@/components/candidate/interested-button";
 import { DataTable, StatusPill } from "@/components/candidate/ui";
+import { MatchScoreBadge, MatchedSkills } from "@/components/matching/match-score-badge";
+import type { MatchBand } from "@/lib/matching/score";
 
 export type CandidateJobRow = {
   id: string;
@@ -21,6 +23,10 @@ export type CandidateJobRow = {
   applied: boolean;
   interested: boolean;
   profileResumeUrl: string | null;
+  matchScore?: number;
+  matchBand?: MatchBand;
+  matchReasons?: string[];
+  matchSkills?: string[];
 };
 
 function uniqueSorted(values: string[]) {
@@ -41,6 +47,9 @@ function matchesSearch(row: CandidateJobRow, q: string) {
     row.postedLabel,
     row.applied ? "applied" : "not applied open apply",
     row.interested ? "interested thumbs up" : "",
+    row.matchScore != null ? `${row.matchScore} match` : "",
+    ...(row.matchReasons ?? []),
+    ...(row.matchSkills ?? []),
   ]
     .join(" ")
     .toLowerCase();
@@ -57,6 +66,7 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
   const [posted, setPosted] = useState("all");
   const [applied, setApplied] = useState("all");
   const [interest, setInterest] = useState("all");
+  const [matchFilter, setMatchFilter] = useState("all");
 
   const roles = useMemo(() => uniqueSorted(jobs.map((j) => j.title)), [jobs]);
   const employers = useMemo(
@@ -94,6 +104,11 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
       if (applied === "open" && job.applied) return false;
       if (interest === "interested" && !job.interested) return false;
       if (interest === "not" && job.interested) return false;
+      const score = job.matchScore ?? 0;
+      if (matchFilter === "strong" && score < 70) return false;
+      if (matchFilter === "good" && score < 50) return false;
+      if (matchFilter === "recommended" && (score < 50 || job.applied))
+        return false;
       return matchesSearch(job, q);
     });
   }, [
@@ -106,6 +121,7 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
     posted,
     applied,
     interest,
+    matchFilter,
     q,
   ]);
 
@@ -118,7 +134,8 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
     pay !== "all" ||
     posted !== "all" ||
     applied !== "all" ||
-    interest !== "all";
+    interest !== "all" ||
+    matchFilter !== "all";
 
   function clearFilters() {
     setSearch("");
@@ -130,6 +147,7 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
     setPosted("all");
     setApplied("all");
     setInterest("all");
+    setMatchFilter("all");
   }
 
   if (jobs.length === 0) {
@@ -151,8 +169,7 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
                 Search jobs
               </p>
               <p className="mt-0.5 text-xs text-[var(--cf-muted)]">
-                Match any column — role, employer, location, type, pay, date, or
-                status
+              Match any column — role, employer, location, match score, or status
               </p>
             </div>
             {hasFilters ? (
@@ -178,7 +195,18 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
           <p className="mb-3 text-[11px] font-semibold tracking-[0.08em] text-[var(--cf-muted)] uppercase">
             Filter by column
           </p>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-9">
+            <FilterSelect
+              label="Match"
+              value={matchFilter}
+              onChange={setMatchFilter}
+              options={[
+                { value: "all", label: "All scores" },
+                { value: "recommended", label: "Recommended for you" },
+                { value: "good", label: "50%+ match" },
+                { value: "strong", label: "70%+ strong" },
+              ]}
+            />
             <FilterSelect
               label="Role"
               value={role}
@@ -275,6 +303,7 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
       ) : (
         <DataTable
           headers={[
+            "Match",
             "Role",
             "Employer",
             "Location",
@@ -287,6 +316,24 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
         >
           {filtered.map((job) => (
             <tr key={job.id} className="align-top">
+              <td className="px-4 py-3">
+                <MatchScoreBadge
+                  score={job.matchScore ?? 0}
+                  band={job.matchBand ?? "low"}
+                  compact
+                />
+                <MatchedSkills
+                  skills={job.matchSkills}
+                  className="mt-1.5 max-w-[12rem]"
+                  emptyLabel=""
+                />
+                {(job.matchSkills?.length ?? 0) === 0 &&
+                (job.matchReasons?.length ?? 0) > 0 ? (
+                  <p className="mt-1 max-w-[12rem] text-[10px] leading-snug text-[var(--cf-muted)]">
+                    {job.matchReasons![0]}
+                  </p>
+                ) : null}
+              </td>
               <td className="px-4 py-3">
                 <p className="font-medium text-[var(--cf-ink)]">{job.title}</p>
                 <p className="mt-1 max-w-md text-xs text-[var(--cf-muted)]">

@@ -13,6 +13,11 @@ import type {
   SubmittalExperience,
   SubmittalStage,
 } from "@/lib/types/database";
+import { isClientDeletedThreadVisible } from "@/lib/client-portal/message-retention";
+import type { InterestedCandidateRow } from "@/lib/client-portal/types";
+import { scoreMatch } from "@/lib/matching/score";
+
+export type { InterestedCandidateRow } from "@/lib/client-portal/types";
 
 function asStringArray(v: unknown): string[] {
   if (Array.isArray(v)) return v.map(String);
@@ -234,6 +239,34 @@ function mapApplicationToCandidate(
       `Profile submitted from candidate portal (${Object.keys(snap).length} fields).`,
     );
   }
+  // Certifications double as skill signals for automated matching.
+  const skillsFromSnap =
+    snap && Array.isArray(snap.skills)
+      ? (snap.skills as unknown[]).map(String)
+      : [];
+
+  const skills = Array.from(new Set([...certs, ...skillsFromSnap]));
+  const jobTitle = job?.title != null ? String(job.title) : "Open role";
+  const match = scoreMatch(
+    {
+      title: jobTitle,
+      description: job?.description != null ? String(job.description) : null,
+      location: job?.location != null ? String(job.location) : null,
+      employmentType:
+        job?.employment_type != null ? String(job.employment_type) : null,
+      requiredSkills: [],
+    },
+    {
+      skills,
+      certifications: certs,
+      employmentType:
+        emp?.employment_type != null ? String(emp.employment_type) : null,
+      profileText: summaryParts.join("\n"),
+      titles: [jobTitle],
+      locations:
+        job?.location != null ? [String(job.location)] : [],
+    },
+  );
 
   return {
     id: String(row.id),
@@ -242,14 +275,14 @@ function mapApplicationToCandidate(
     candidate_name: name,
     candidate_email: emp?.email != null ? String(emp.email) : null,
     candidate_phone: emp?.phone != null ? String(emp.phone) : null,
-    position_title: job?.title != null ? String(job.title) : "Open role",
+    position_title: jobTitle,
     recruiter_name: "Jobs board",
     years_experience: null,
     stage: applicationStatusToStage(status),
     application_status: status,
     source_label: "Candidate portal application",
     resume_status: row.resume_url ? "Attached" : "None",
-    skills: [],
+    skills,
     certifications: certs,
     experience: [],
     interview_notes:
@@ -260,6 +293,11 @@ function mapApplicationToCandidate(
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
     job_title: job?.title != null ? String(job.title) : null,
+    match_score: match.score,
+    match_band: match.band,
+    match_reasons: match.reasons,
+    match_skills: match.skillHits,
+    job_location: job?.location != null ? String(job.location) : null,
   };
 }
 
@@ -271,7 +309,7 @@ export async function listApplicationsForClient(): Promise<ClientCandidate[]> {
   const { data, error } = await supabase
     .from("applications")
     .select(
-      "*, jobs(id, title, client_id, employer_name), employees(id, first_name, last_name, email, phone, certifications)",
+      "*, jobs(id, title, client_id, employer_name, description, location, employment_type), employees(id, first_name, last_name, email, phone, certifications, employment_type)",
     )
     .order("created_at", { ascending: false });
 
@@ -313,6 +351,121 @@ export async function listClientCandidates(): Promise<ClientCandidate[]> {
   return listApplicationsForClient();
 }
 
+/** Application IDs the employer has liked for their client. */
+export async function listLikedApplicationIdsForClient(): Promise<string[]> {
+  const user = await requireEmployerUser();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("employer_candidate_likes")
+    .select("application_id")
+    .eq("client_id", user.linked_client_id!)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("employer_candidate_likes list", error.message);
+    return [];
+  }
+  return (data ?? []).map((r) => String(r.application_id));
+}
+
+/**
+ * Candidates who marked 👍 Interested on this company's public jobs
+ * (candidate portal job_interests — not formal applications).
+ */
+export async function listInterestedCandidatesForClient(): Promise<
+  InterestedCandidateRow[]
+> {
+  await requireEmployerUser();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("job_interests")
+    .select(
+      "id, job_id, employee_id, created_at, jobs(id, title, location, client_id, employer_name), employees(id, first_name, last_name, email, phone)",
+    )
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("job_interests list for client", error.message);
+    return [];
+  }
+
+  const rows = data ?? [];
+  if (rows.length === 0) return [];
+
+  const jobIds = Array.from(
+    new Set(rows.map((r) => String(r.job_id)).filter(Boolean)),
+  );
+  const employeeIds = Array.from(
+    new Set(rows.map((r) => String(r.employee_id)).filter(Boolean)),
+  );
+
+  const { data: apps } = await supabase
+    .from("applications")
+    .select("id, job_id, employee_id")
+    .in("job_id", jobIds)
+    .in("employee_id", employeeIds);
+
+  const appByKey = new Map<string, string>();
+  for (const a of apps ?? []) {
+    appByKey.set(`${a.job_id}:${a.employee_id}`, String(a.id));
+  }
+
+  return rows.map((row) => {
+    const jobRaw = row.jobs as
+      | {
+          id: string;
+          title: string;
+          location: string | null;
+        }
+      | {
+          id: string;
+          title: string;
+          location: string | null;
+        }[]
+      | null;
+    const job = Array.isArray(jobRaw) ? jobRaw[0] : jobRaw;
+    const empRaw = row.employees as
+      | {
+          id: string;
+          first_name: string;
+          last_name: string;
+          email: string | null;
+          phone: string | null;
+        }
+      | {
+          id: string;
+          first_name: string;
+          last_name: string;
+          email: string | null;
+          phone: string | null;
+        }[]
+      | null;
+    const emp = Array.isArray(empRaw) ? empRaw[0] : empRaw;
+    const applicationId =
+      appByKey.get(`${row.job_id}:${row.employee_id}`) ?? null;
+    const name = emp
+      ? `${emp.first_name} ${emp.last_name}`.trim()
+      : "Candidate";
+
+    return {
+      interestId: String(row.id),
+      jobId: String(row.job_id),
+      jobTitle: job?.title ? String(job.title) : "Open role",
+      jobLocation: job?.location != null ? String(job.location) : null,
+      employeeId: String(row.employee_id),
+      name,
+      email: emp?.email != null ? String(emp.email) : null,
+      phone: emp?.phone != null ? String(emp.phone) : null,
+      interestedAt: String(row.created_at),
+      applicationId,
+      detailHref: applicationId
+        ? `/client/candidates/applications/${applicationId}`
+        : null,
+    };
+  });
+}
+
 export async function getClientCandidate(
   id: string,
   source?: "submittal" | "application",
@@ -329,26 +482,14 @@ export async function getClientCandidate(
   return getApplicationForClient(id);
 }
 
-/** Live client↔recruiter threads (does not touch candidate messages). */
-export async function listClientMessageThreads(): Promise<
-  ClientMessageThread[]
-> {
-  const user = await requireEmployerUser();
-  const supabase = await createClient();
-  const { data: threads, error } = await supabase
-    .from("client_message_threads")
-    .select("*")
-    .eq("client_id", user.linked_client_id!)
-    .order("updated_at", { ascending: false });
+type MessageThreadFolder = "inbox" | "deleted";
 
-  if (error) {
-    console.error("client_message_threads", error.message);
-    return [];
-  }
-
-  const list = threads ?? [];
+async function mapClientMessageThreads(
+  list: Array<Record<string, unknown>>,
+): Promise<ClientMessageThread[]> {
   if (list.length === 0) return [];
 
+  const supabase = await createClient();
   const ids = list.map((t) => String(t.id));
   const { data: msgs } = await supabase
     .from("client_messages")
@@ -375,6 +516,7 @@ export async function listClientMessageThreads(): Promise<
     const id = String(t.id);
     const messages = byThread.get(id) ?? [];
     const last = messages[messages.length - 1];
+    const deletedAt = t.deleted_at != null ? String(t.deleted_at) : null;
     return {
       id,
       client_id: String(t.client_id),
@@ -382,9 +524,43 @@ export async function listClientMessageThreads(): Promise<
       recruiter_name: String(t.recruiter_name),
       created_at: String(t.created_at),
       updated_at: String(t.updated_at),
+      deleted_at: deletedAt,
       messages,
       preview: last?.body.slice(0, 64) ?? "No messages yet",
       unread: 0,
     };
   });
+}
+
+/**
+ * Client↔recruiter threads for the employer inbox or Deleted folder.
+ * Soft-deleted threads stay out of inbox; Deleted keeps last 30 days.
+ */
+export async function listClientMessageThreads(
+  folder: MessageThreadFolder = "inbox",
+): Promise<ClientMessageThread[]> {
+  const user = await requireEmployerUser();
+  const supabase = await createClient();
+  const { data: threads, error } = await supabase
+    .from("client_message_threads")
+    .select("*")
+    .eq("client_id", user.linked_client_id!)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.error("client_message_threads", error.message);
+    return [];
+  }
+
+  const raw = (threads ?? []) as Array<Record<string, unknown>>;
+  const filtered =
+    folder === "deleted"
+      ? raw.filter(
+          (t) =>
+            t.deleted_at != null &&
+            isClientDeletedThreadVisible(String(t.deleted_at)),
+        )
+      : raw.filter((t) => t.deleted_at == null);
+
+  return mapClientMessageThreads(filtered);
 }

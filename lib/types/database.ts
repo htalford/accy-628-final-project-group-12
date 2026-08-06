@@ -154,6 +154,13 @@ export type ClientCandidate = {
   created_at: string;
   updated_at: string;
   job_title?: string | null;
+  /** Automated fit vs the role they applied to (0–100). */
+  match_score?: number | null;
+  match_band?: "strong" | "good" | "fair" | "low" | null;
+  match_reasons?: string[];
+  /** Skills/keywords that contributed to the automated match. */
+  match_skills?: string[];
+  job_location?: string | null;
 };
 
 export type ClientMessageThread = {
@@ -163,6 +170,8 @@ export type ClientMessageThread = {
   recruiter_name: string;
   created_at: string;
   updated_at: string;
+  /** Set when the employer moved the thread to Deleted (soft-delete). */
+  deleted_at?: string | null;
   preview?: string;
   unread?: number;
   messages?: ClientPortalMessage[];

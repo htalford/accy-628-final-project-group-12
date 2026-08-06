@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Panel, StatusPill } from "@/components/candidate/ui";
 import { ProfileCompletionCard } from "@/components/candidate/profile-completion-card";
 import { getProfileCompletion } from "@/lib/candidate/profile-completion";
+import { MatchScoreBadge, MatchedSkills } from "@/components/matching/match-score-badge";
 import {
   formatCurrency,
   formatDate,
@@ -15,6 +16,12 @@ import {
   getCandidateTimesheets,
   getOpenJobs,
 } from "@/lib/candidate/data";
+import {
+  candidateInputFromEmployee,
+  jobInputFromPublicJob,
+  rankJobsForCandidate,
+  skillsForPublicJobs,
+} from "@/lib/matching";
 
 function firstNameFrom(displayName: string | null | undefined, fallback: string) {
   const raw = (displayName ?? "").trim();
@@ -94,7 +101,27 @@ export default async function CandidateDashboardPage() {
     active && !hasThisWeekTimesheet ? 1 : 0;
 
   const appliedJobIds = new Set(applications.map((a) => a.job_id));
-  const newJobsMatching = jobs.filter((j) => !appliedJobIds.has(j.id)).length;
+  const skillMap = await skillsForPublicJobs(jobs.map((j) => j.id));
+  const candidateProfile = candidateInputFromEmployee(employee, {
+    titles: applications
+      .map((a) => a.jobs?.title)
+      .filter(Boolean) as string[],
+  });
+  const ranked = rankJobsForCandidate(
+    jobs.map((j) =>
+      jobInputFromPublicJob(j, skillMap.get(j.id) ?? []),
+    ),
+    jobs.map((j) => j.id),
+    candidateProfile,
+    { minScore: 50 },
+  );
+  const newJobsMatching = ranked.filter(
+    (r) => !appliedJobIds.has(r.jobId),
+  ).length;
+  const topMatches = ranked
+    .filter((r) => !appliedJobIds.has(r.jobId))
+    .slice(0, 3);
+  const jobsById = new Map(jobs.map((j) => [j.id, j]));
 
   const name = firstNameFrom(
     employee?.first_name ?? user?.name,
@@ -121,7 +148,7 @@ export default async function CandidateDashboardPage() {
   }
   if (newJobsMatching > 0) {
     todos.push(
-      `${newJobsMatching} new job${newJobsMatching === 1 ? "" : "s"} matching your profile`,
+      `${newJobsMatching} open job${newJobsMatching === 1 ? "" : "s"} with a solid automated match (50%+)`,
     );
   }
 
@@ -165,6 +192,68 @@ export default async function CandidateDashboardPage() {
       <div className="mb-8">
         <ProfileCompletionCard completion={profileCompletion} />
       </div>
+
+      {topMatches.length > 0 ? (
+        <div className="mb-8">
+          <Panel
+            title="Recommended for you"
+            action={
+              <Link
+                href="/candidate/jobs"
+                className="text-xs font-semibold text-[var(--cf-accent)]"
+              >
+                View all jobs
+              </Link>
+            }
+          >
+            <ul className="divide-y divide-[var(--cf-border)]">
+              {topMatches.map((m) => {
+                const job = jobsById.get(m.jobId);
+                if (!job) return null;
+                return (
+                  <li
+                    key={m.jobId}
+                    className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-[var(--cf-ink)]">
+                        {job.title}
+                      </p>
+                      <p className="text-xs text-[var(--cf-muted)]">
+                        {job.employer_name}
+                        {job.location ? ` · ${job.location}` : ""}
+                      </p>
+                      {m.result.reasons[0] ? (
+                        <p className="mt-0.5 text-xs text-[var(--cf-muted)]">
+                          {m.result.reasons[0]}
+                        </p>
+                      ) : null}
+                      <MatchedSkills
+                        skills={m.result.skillHits}
+                        className="mt-1.5"
+                        emptyLabel=""
+                      />
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <MatchScoreBadge
+                        score={m.result.score}
+                        band={m.result.band}
+                        compact
+                      />
+                      <Link
+                        href="/candidate/jobs"
+                        className="text-xs font-semibold text-[var(--cf-navy)] hover:underline"
+                      >
+                        Open board
+                      </Link>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </Panel>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel

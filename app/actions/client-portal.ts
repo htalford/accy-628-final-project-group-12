@@ -334,7 +334,7 @@ export async function sendClientMessageAction(
   const supabase = await createClient();
   const { data: thread, error: tError } = await supabase
     .from("client_message_threads")
-    .select("id")
+    .select("id, deleted_at")
     .eq("id", threadId)
     .eq("client_id", auth.clientId)
     .maybeSingle();
@@ -356,7 +356,11 @@ export async function sendClientMessageAction(
 
   await supabase
     .from("client_message_threads")
-    .update({ updated_at: new Date().toISOString() })
+    .update({
+      updated_at: new Date().toISOString(),
+      // Replying restores a soft-deleted thread to the inbox.
+      deleted_at: null,
+    })
     .eq("id", threadId)
     .eq("client_id", auth.clientId);
 
@@ -424,7 +428,7 @@ export async function createClientMessageThreadAction(formData: {
 }
 
 /**
- * Delete a client↔recruiter thread owned by this employer (cascades client_messages).
+ * Soft-delete: move conversation to Deleted folder (visible 30 days).
  */
 export async function deleteClientMessageThreadAction(
   threadId: string,
@@ -435,7 +439,7 @@ export async function deleteClientMessageThreadAction(
   const supabase = await createClient();
   const { data: thread, error: findError } = await supabase
     .from("client_message_threads")
-    .select("id, subject")
+    .select("id, subject, deleted_at")
     .eq("id", threadId)
     .eq("client_id", auth.clientId)
     .maybeSingle();
@@ -444,6 +448,107 @@ export async function deleteClientMessageThreadAction(
     return {
       ok: false,
       message: findError?.message ?? "Conversation not found for your company.",
+    };
+  }
+
+  if (thread.deleted_at) {
+    return { ok: false, message: "Conversation is already in Deleted." };
+  }
+
+  const { error } = await supabase
+    .from("client_message_threads")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", threadId)
+    .eq("client_id", auth.clientId);
+
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/client/messages");
+  revalidatePath("/client/dashboard");
+
+  return {
+    ok: true,
+    message: thread.subject
+      ? `Moved “${String(thread.subject)}” to Deleted.`
+      : "Conversation moved to Deleted.",
+  };
+}
+
+/**
+ * Restore a soft-deleted conversation to the Inbox.
+ */
+export async function restoreClientMessageThreadAction(
+  threadId: string,
+): Promise<ActionResult> {
+  const auth = await requireEmployerClientId();
+  if (!auth.ok) return auth;
+
+  const supabase = await createClient();
+  const { data: thread, error: findError } = await supabase
+    .from("client_message_threads")
+    .select("id, subject, deleted_at")
+    .eq("id", threadId)
+    .eq("client_id", auth.clientId)
+    .maybeSingle();
+
+  if (findError || !thread) {
+    return {
+      ok: false,
+      message: findError?.message ?? "Conversation not found for your company.",
+    };
+  }
+
+  if (!thread.deleted_at) {
+    return { ok: false, message: "Conversation is not in Deleted." };
+  }
+
+  const { error } = await supabase
+    .from("client_message_threads")
+    .update({ deleted_at: null })
+    .eq("id", threadId)
+    .eq("client_id", auth.clientId);
+
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/client/messages");
+  revalidatePath("/client/dashboard");
+
+  return {
+    ok: true,
+    message: thread.subject
+      ? `Restored “${String(thread.subject)}” to Inbox.`
+      : "Conversation restored to Inbox.",
+  };
+}
+
+/**
+ * Permanently remove a soft-deleted conversation (cascades messages).
+ */
+export async function permanentlyDeleteClientMessageThreadAction(
+  threadId: string,
+): Promise<ActionResult> {
+  const auth = await requireEmployerClientId();
+  if (!auth.ok) return auth;
+
+  const supabase = await createClient();
+  const { data: thread, error: findError } = await supabase
+    .from("client_message_threads")
+    .select("id, subject, deleted_at")
+    .eq("id", threadId)
+    .eq("client_id", auth.clientId)
+    .maybeSingle();
+
+  if (findError || !thread) {
+    return {
+      ok: false,
+      message: findError?.message ?? "Conversation not found for your company.",
+    };
+  }
+
+  if (!thread.deleted_at) {
+    return {
+      ok: false,
+      message: "Move the conversation to Deleted first, then delete permanently.",
     };
   }
 
@@ -461,8 +566,75 @@ export async function deleteClientMessageThreadAction(
   return {
     ok: true,
     message: thread.subject
-      ? `Deleted “${String(thread.subject)}”.`
-      : "Conversation deleted.",
+      ? `Permanently deleted “${String(thread.subject)}”.`
+      : "Conversation permanently deleted.",
   };
+}
+
+/** Load full invoice detail for the employer invoice popup. */
+export async function getClientInvoiceDetailAction(invoiceId: string) {
+  const auth = await requireEmployerClientId();
+  if (!auth.ok) return { ok: false as const, message: auth.message, invoice: null };
+
+  const { getInvoiceForClient } = await import("@/lib/client-portal/queries");
+  const invoice = await getInvoiceForClient(invoiceId);
+  if (!invoice) {
+    return {
+      ok: false as const,
+      message: "Invoice not found for your company.",
+      invoice: null,
+    };
+  }
+  return { ok: true as const, message: "ok", invoice };
+}
+
+/**
+ * Like / unlike a candidate application (employer shortlist).
+ */
+export async function toggleEmployerCandidateLikeAction(
+  applicationId: string,
+  liked: boolean,
+): Promise<ActionResult> {
+  const auth = await requireEmployerClientId();
+  if (!auth.ok) return auth;
+
+  const supabase = await createClient();
+
+  // Ensure the application is visible to this employer (RLS + ownership).
+  const { data: application, error: findError } = await supabase
+    .from("applications")
+    .select("id")
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (findError || !application) {
+    return {
+      ok: false,
+      message: findError?.message ?? "Candidate application not found for your company.",
+    };
+  }
+
+  if (liked) {
+    const { error } = await supabase.from("employer_candidate_likes").upsert(
+      {
+        client_id: auth.clientId,
+        application_id: applicationId,
+      },
+      { onConflict: "client_id,application_id" },
+    );
+    if (error) return { ok: false, message: error.message };
+    revalidatePath("/client/candidates");
+    return { ok: true, message: "Candidate liked." };
+  }
+
+  const { error } = await supabase
+    .from("employer_candidate_likes")
+    .delete()
+    .eq("client_id", auth.clientId)
+    .eq("application_id", applicationId);
+
+  if (error) return { ok: false, message: error.message };
+  revalidatePath("/client/candidates");
+  return { ok: true, message: "Removed from liked." };
 }
 
