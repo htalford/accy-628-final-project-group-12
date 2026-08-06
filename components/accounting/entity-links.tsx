@@ -65,12 +65,17 @@ export function ClientArLink({
   return <EntityLink href={href}>{name}</EntityLink>;
 }
 
-export function PayrollEmployeeLink({ name }: { name: string }) {
-  return (
-    <EntityLink href={`/accounting/payroll?employee=${encodeURIComponent(name)}`}>
-      {name}
-    </EntityLink>
-  );
+export function PayrollEmployeeLink({
+  name,
+  employeeId,
+}: {
+  name: string;
+  employeeId?: string | null;
+}) {
+  const href = employeeId
+    ? `/accounting/employees/${employeeId}`
+    : `/accounting/payroll?employee=${encodeURIComponent(name)}`;
+  return <EntityLink href={href}>{name}</EntityLink>;
 }
 
 export function TimesheetLink({
@@ -87,12 +92,15 @@ export function TimesheetLink({
   );
 }
 
-export function TimesheetEmployeeLink({ name }: { name: string }) {
-  return (
-    <EntityLink
-      href={`/accounting/timesheets?employee=${encodeURIComponent(name)}`}
-    >
-      {name}
-    </EntityLink>
-  );
+export function TimesheetEmployeeLink({
+  name,
+  employeeId,
+}: {
+  name: string;
+  employeeId?: string | null;
+}) {
+  const href = employeeId
+    ? `/accounting/employees/${employeeId}`
+    : `/accounting/timesheets?employee=${encodeURIComponent(name)}`;
+  return <EntityLink href={href}>{name}</EntityLink>;
 }

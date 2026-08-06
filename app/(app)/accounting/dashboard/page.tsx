@@ -40,8 +40,8 @@ export default async function AccountingHomePage() {
         <StatCard
           label="Payroll (Last 30 Days)"
           value={money(data.cards.payrollLast30Days)}
-          hint="Approved timesheets in the last 30 days"
-          href={`/accounting/payroll?status=approved&from=${from}`}
+          hint="Approved contract labor + staff salaries (last 30 days)"
+          href={`/accounting/payroll?from=${from}`}
         />
         <StatCard
           label="Gross Profit"

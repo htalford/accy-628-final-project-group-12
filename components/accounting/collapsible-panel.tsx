@@ -44,7 +44,10 @@ export function CollapsiblePanel({
   }
 
   return (
-    <section className="rounded-xl border border-[var(--cf-border)] bg-white p-4 shadow-sm sm:p-5">
+    <section
+      id={id}
+      className="scroll-mt-24 rounded-xl border border-[var(--cf-border)] bg-white p-4 shadow-sm sm:p-5"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <button
           type="button"

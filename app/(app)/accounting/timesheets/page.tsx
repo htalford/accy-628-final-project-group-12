@@ -76,7 +76,10 @@ export default async function AccountingTimesheetsPage({
             key: "employee",
             header: "Candidate",
             render: (row) => (
-              <TimesheetEmployeeLink name={row.employeeName} />
+              <TimesheetEmployeeLink
+                name={row.employeeName}
+                employeeId={row.employeeId}
+              />
             ),
           },
           {

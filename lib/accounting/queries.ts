@@ -34,6 +34,7 @@ import {
   sumMoney,
   yearMonth,
 } from "@/lib/accounting/calculations";
+import { isPayrollOperatingCategory } from "@/lib/accounting/payroll-expenses";
 import type {
   ExpenseStatus,
   ExpenseType,
@@ -309,12 +310,61 @@ export async function getTimesheetById(id: string) {
   return rows.find((r) => r.id === id) ?? null;
 }
 
+export async function getAccountingEmployeeById(id: string) {
+  const supabase = await createClient();
+  const { data: employee } = await supabase
+    .from("employees")
+    .select(
+      "id, first_name, last_name, email, phone, employment_type, status, certifications, resume_url, emergency_contact_name, emergency_contact_phone, created_at",
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!employee) return null;
+
+  const [placements, timesheets] = await Promise.all([
+    getContracts(),
+    getTimesheets(),
+  ]);
+
+  const employeePlacements = placements.filter((p) => p.employeeId === id);
+  const employeeTimesheets = timesheets.filter((t) => t.employeeId === id);
+  const name = `${employee.first_name} ${employee.last_name}`;
+
+  return {
+    id: employee.id as string,
+    firstName: employee.first_name as string,
+    lastName: employee.last_name as string,
+    name,
+    email: employee.email as string,
+    phone: (employee.phone as string | null) ?? null,
+    employmentType: employee.employment_type as string,
+    status: employee.status as string,
+    certifications: (employee.certifications as string | null) ?? null,
+    resumeUrl: (employee.resume_url as string | null) ?? null,
+    emergencyContactName:
+      (employee.emergency_contact_name as string | null) ?? null,
+    emergencyContactPhone:
+      (employee.emergency_contact_phone as string | null) ?? null,
+    createdAt: employee.created_at as string,
+    placements: employeePlacements,
+    timesheets: employeeTimesheets,
+    totals: {
+      hours: roundMoney(
+        employeeTimesheets.reduce((s, t) => s + t.hoursWorked, 0),
+      ),
+      grossPay: sumMoney(employeeTimesheets.map((t) => t.grossPay)),
+      billAmount: sumMoney(employeeTimesheets.map((t) => t.billAmount)),
+    },
+  };
+}
+
 export async function getContracts() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("placements")
     .select(
-      "id, placement_type, bill_rate, pay_rate, placement_fee, guarantee_end_date, start_date, end_date, status, clients(id, name), employees(first_name, last_name)",
+      "id, placement_type, bill_rate, pay_rate, placement_fee, guarantee_end_date, start_date, end_date, status, clients(id, name), employees(id, first_name, last_name)",
     )
     .order("start_date", { ascending: false });
 
@@ -330,6 +380,7 @@ export async function getContracts() {
       id: row.id as string,
       clientId: client?.id ?? null,
       clientName: client?.name ?? "Unknown",
+      employeeId: employee?.id ?? null,
       employeeName: employee
         ? `${employee.first_name} ${employee.last_name}`
         : "Unknown",
@@ -620,10 +671,19 @@ export async function getDashboardData() {
   );
   const earnedRevenue = sumMoney(approvedSheets.map((t) => t.billAmount));
   const directLabor = sumMoney(approvedSheets.map((t) => t.grossPay));
-  const payrollLast30Days = sumMoney(
+  const contractLaborLast30Days = sumMoney(
     approvedSheets
       .filter((t) => isWithinLastDays(t.weekEnding, 30))
       .map((t) => t.grossPay),
+  );
+  const staffSalariesLast30Days = sumMoney(
+    operatingExpenseRows
+      .filter((e) => isPayrollOperatingCategory(e.category))
+      .filter((e) => isWithinLastDays(e.expenseDate, 30))
+      .map((e) => e.amount),
+  );
+  const payrollLast30Days = roundMoney(
+    contractLaborLast30Days + staffSalariesLast30Days,
   );
 
   const paidByInvoice = new Map<string, number>();

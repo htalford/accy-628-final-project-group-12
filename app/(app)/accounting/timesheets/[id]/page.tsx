@@ -25,10 +25,10 @@ export default async function AccountingTimesheetDetailPage({
     <div className="space-y-6">
       <div>
         <Link
-          href="/accounting/timesheets"
+          href="/accounting/payroll"
           className="text-sm font-medium text-[var(--cf-ink)] hover:underline"
         >
-          ← Back to timesheets
+          ← Back to payroll
         </Link>
         <PageHeader title={`Timesheet ${shortId(sheet.id)}`} />
       </div>
@@ -46,7 +46,10 @@ export default async function AccountingTimesheetDetailPage({
             <div className="flex justify-between gap-4">
               <dt className="text-[var(--cf-muted)]">Name</dt>
               <dd>
-                <TimesheetEmployeeLink name={sheet.employeeName} />
+                <TimesheetEmployeeLink
+                  name={sheet.employeeName}
+                  employeeId={sheet.employeeId}
+                />
               </dd>
             </div>
             {sheet.employeeEmail ? (
@@ -124,9 +127,18 @@ export default async function AccountingTimesheetDetailPage({
         >
           View in payroll
         </Button>
-        <Button href="/accounting/timesheets" variant="ghost">
-          All timesheets
-        </Button>
+        {sheet.employeeId ? (
+          <Button
+            href={`/accounting/employees/${sheet.employeeId}`}
+            variant="ghost"
+          >
+            Employee profile
+          </Button>
+        ) : (
+          <Button href="/accounting/timesheets" variant="ghost">
+            All timesheets
+          </Button>
+        )}
         {sheet.placementId ? (
           <Button
             href={`/accounting/contracts/${sheet.placementId}`}
