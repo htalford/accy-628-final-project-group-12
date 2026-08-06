@@ -15,7 +15,12 @@ import type {
 } from "@/lib/types/database";
 import { isClientDeletedThreadVisible } from "@/lib/client-portal/message-retention";
 import type { InterestedCandidateRow } from "@/lib/client-portal/types";
+import {
+  candidateInputFromProfile,
+  profileFieldsFromSnapshot,
+} from "@/lib/matching/profile-from-employee";
 import { scoreMatch } from "@/lib/matching/score";
+import { skillsForPublicJobs } from "@/lib/matching";
 
 export type { InterestedCandidateRow } from "@/lib/client-portal/types";
 
@@ -211,6 +216,7 @@ function submittalToCandidate(s: PortalSubmittal): ClientCandidate {
 
 function mapApplicationToCandidate(
   row: Record<string, unknown>,
+  requiredSkills: string[] = [],
 ): ClientCandidate {
   const job = (row.jobs ?? row.job) as Record<string, unknown> | null | undefined;
   const emp = (row.employees ?? row.employee) as
@@ -224,9 +230,41 @@ function mapApplicationToCandidate(
     (emp?.email != null ? String(emp.email) : "Applicant");
   const status = String(row.status ?? "submitted") as ApplicationStatus;
   const snap = row.profile_snapshot as Record<string, unknown> | null;
+
+  const liveProfile = {
+    certifications:
+      emp?.certifications == null ? null : String(emp.certifications),
+    employment_type:
+      emp?.employment_type == null ? null : String(emp.employment_type),
+    education_background:
+      emp?.education_background == null
+        ? null
+        : String(emp.education_background),
+    previous_employments: emp?.previous_employments ?? null,
+    resume_text: emp?.resume_text == null ? null : String(emp.resume_text),
+  };
+  const snapProfile = profileFieldsFromSnapshot(snap);
+  // Prefer live employee profile; fill gaps from the application snapshot.
+  const mergedProfile = {
+    certifications:
+      liveProfile.certifications || snapProfile?.certifications || null,
+    employment_type:
+      liveProfile.employment_type || snapProfile?.employment_type || null,
+    education_background:
+      liveProfile.education_background ||
+      snapProfile?.education_background ||
+      null,
+    previous_employments:
+      liveProfile.previous_employments ??
+      snapProfile?.previous_employments ??
+      null,
+    resume_text:
+      liveProfile.resume_text || snapProfile?.resume_text || null,
+  };
+
   const certs =
-    emp?.certifications != null
-      ? String(emp.certifications)
+    mergedProfile.certifications != null
+      ? String(mergedProfile.certifications)
           .split(",")
           .map((c) => c.trim())
           .filter(Boolean)
@@ -234,19 +272,15 @@ function mapApplicationToCandidate(
   const summaryParts: string[] = [];
   if (row.cover_letter) summaryParts.push(String(row.cover_letter));
   if (row.note) summaryParts.push(String(row.note));
-  if (snap) {
-    summaryParts.push(
-      `Profile submitted from candidate portal (${Object.keys(snap).length} fields).`,
-    );
-  }
-  // Certifications double as skill signals for automated matching.
-  const skillsFromSnap =
-    snap && Array.isArray(snap.skills)
-      ? (snap.skills as unknown[]).map(String)
-      : [];
 
-  const skills = Array.from(new Set([...certs, ...skillsFromSnap]));
+  const skills = Array.from(new Set([...certs]));
   const jobTitle = job?.title != null ? String(job.title) : "Open role";
+  const candidateMatchInput = candidateInputFromProfile(mergedProfile, {
+    skills,
+    titles: [jobTitle],
+    locations: job?.location != null ? [String(job.location)] : [],
+    profileText: summaryParts.join("\n") || null,
+  });
   const match = scoreMatch(
     {
       title: jobTitle,
@@ -254,19 +288,23 @@ function mapApplicationToCandidate(
       location: job?.location != null ? String(job.location) : null,
       employmentType:
         job?.employment_type != null ? String(job.employment_type) : null,
-      requiredSkills: [],
+      requiredSkills,
     },
-    {
-      skills,
-      certifications: certs,
-      employmentType:
-        emp?.employment_type != null ? String(emp.employment_type) : null,
-      profileText: summaryParts.join("\n"),
-      titles: [jobTitle],
-      locations:
-        job?.location != null ? [String(job.location)] : [],
-    },
+    candidateMatchInput,
   );
+
+  const experience = Array.isArray(mergedProfile.previous_employments)
+    ? (mergedProfile.previous_employments as Array<Record<string, unknown>>).map(
+        (e) => ({
+          company: String(e.company ?? ""),
+          title: String(e.title ?? ""),
+          years: [e.startDate ?? e.start_date, e.endDate ?? e.end_date]
+            .filter(Boolean)
+            .map(String)
+            .join(" – "),
+        }),
+      )
+    : [];
 
   return {
     id: String(row.id),
@@ -277,19 +315,24 @@ function mapApplicationToCandidate(
     candidate_phone: emp?.phone != null ? String(emp.phone) : null,
     position_title: jobTitle,
     recruiter_name: "Jobs board",
-    years_experience: null,
+    years_experience: candidateMatchInput.yearsExperience ?? null,
     stage: applicationStatusToStage(status),
     application_status: status,
     source_label: "Candidate portal application",
-    resume_status: row.resume_url ? "Attached" : "None",
+    resume_status: row.resume_url || emp?.resume_url ? "Attached" : "None",
     skills,
     certifications: certs,
-    experience: [],
+    experience,
     interview_notes:
       row.interview_notes == null ? null : String(row.interview_notes),
     resume_summary: summaryParts.join("\n\n") || null,
     cover_letter: row.cover_letter == null ? null : String(row.cover_letter),
-    resume_url: row.resume_url == null ? null : String(row.resume_url),
+    resume_url:
+      row.resume_url == null
+        ? emp?.resume_url == null
+          ? null
+          : String(emp.resume_url)
+        : String(row.resume_url),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
     job_title: job?.title != null ? String(job.title) : null,
@@ -301,6 +344,9 @@ function mapApplicationToCandidate(
   };
 }
 
+const APPLICATION_SELECT =
+  "*, jobs(id, title, client_id, employer_name, description, location, employment_type), employees(id, first_name, last_name, email, phone, certifications, employment_type, education_background, previous_employments, resume_url, resume_text)";
+
 /** Applications submitted via the candidate portal for this employer's jobs. */
 export async function listApplicationsForClient(): Promise<ClientCandidate[]> {
   const user = await requireEmployerUser();
@@ -308,9 +354,7 @@ export async function listApplicationsForClient(): Promise<ClientCandidate[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("applications")
-    .select(
-      "*, jobs(id, title, client_id, employer_name, description, location, employment_type), employees(id, first_name, last_name, email, phone, certifications, employment_type)",
-    )
+    .select(APPLICATION_SELECT)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -318,9 +362,20 @@ export async function listApplicationsForClient(): Promise<ClientCandidate[]> {
     return [];
   }
 
-  return (data ?? []).map((r) =>
-    mapApplicationToCandidate(r as Record<string, unknown>),
-  );
+  const rows = (data ?? []) as Record<string, unknown>[];
+  const jobIds = rows
+    .map((r) => {
+      const job = (r.jobs ?? r.job) as Record<string, unknown> | null | undefined;
+      return job?.id != null ? String(job.id) : "";
+    })
+    .filter(Boolean);
+  const skillMap = await skillsForPublicJobs(jobIds);
+
+  return rows.map((r) => {
+    const job = (r.jobs ?? r.job) as Record<string, unknown> | null | undefined;
+    const jid = job?.id != null ? String(job.id) : "";
+    return mapApplicationToCandidate(r, skillMap.get(jid) ?? []);
+  });
 }
 
 export async function getApplicationForClient(
@@ -330,9 +385,7 @@ export async function getApplicationForClient(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("applications")
-    .select(
-      "*, jobs(id, title, client_id, employer_name), employees(id, first_name, last_name, email, phone, certifications)",
-    )
+    .select(APPLICATION_SELECT)
     .eq("id", id)
     .maybeSingle();
 
@@ -340,7 +393,11 @@ export async function getApplicationForClient(
     if (error) console.error("applications get", error.message);
     return null;
   }
-  return mapApplicationToCandidate(data as Record<string, unknown>);
+  const row = data as Record<string, unknown>;
+  const job = (row.jobs ?? row.job) as Record<string, unknown> | null | undefined;
+  const jid = job?.id != null ? String(job.id) : "";
+  const skillMap = await skillsForPublicJobs(jid ? [jid] : []);
+  return mapApplicationToCandidate(row, skillMap.get(jid) ?? []);
 }
 
 /**

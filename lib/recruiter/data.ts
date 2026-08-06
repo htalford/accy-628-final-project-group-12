@@ -255,7 +255,7 @@ export async function listCandidates(
       `id, job_id, employee_id, status, note, cover_letter, resume_url, updated_at, created_at,
        interview_at, interview_type, interview_notes,
        jobs(id, title, employer_name, location),
-       employees(id, first_name, last_name, email, phone, employment_type, status, resume_url, certifications)`,
+       employees(id, first_name, last_name, email, phone, employment_type, status, resume_url, resume_text, certifications, education_background, previous_employments)`,
     )
     .order("updated_at", { ascending: false });
 
@@ -273,6 +273,19 @@ export async function listCandidates(
       (str(emp?.resume_url) || null);
     const interviewAt = (app.interview_at as string | null) ?? null;
     const interviewType = (app.interview_type as InterviewType | null) ?? null;
+    const education =
+      emp?.education_background != null && String(emp.education_background).trim()
+        ? String(emp.education_background)
+        : "—";
+    const previousEmployments = Array.isArray(emp?.previous_employments)
+      ? (emp?.previous_employments as import("@/lib/types/database").PreviousEmployment[])
+      : null;
+    const certSkills = emp?.certifications
+      ? String(emp.certifications)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
 
     return {
       id: app.id as string,
@@ -289,18 +302,18 @@ export async function listCandidates(
       experienceYears: emp?.employment_type === "permanent" ? 5 : 2,
       status: applicationStatusToPipeline(status),
       applicationStatus: status,
-      skills: emp?.certifications
-        ? String(emp.certifications)
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
+      skills: certSkills.length
+        ? certSkills
         : [str(job?.employer_name, "General")].filter(Boolean),
       location: str(job?.location, "—"),
       recruiter: "Morgan Recruiter",
       lastUpdated: String(app.updated_at ?? app.created_at).slice(0, 10),
-      education: "—",
+      education,
       notes: (app.note as string) || (app.cover_letter as string) || "No notes.",
       resumeUrl,
+      resumeText:
+        emp?.resume_text != null ? String(emp.resume_text) : null,
+      previousEmployments,
       interviewAt,
       interviewType,
       interviewNotes: (app.interview_notes as string | null) ?? null,

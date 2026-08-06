@@ -5,6 +5,10 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import {
+  candidateInputFromProfile,
+  type EmployeeProfileFields,
+} from "@/lib/matching/profile-from-employee";
+import {
   type MatchBand,
   type MatchCandidateInput,
   type MatchJobInput,
@@ -27,28 +31,41 @@ export type RankedCandidateMatch = {
   source?: string;
 };
 
+export {
+  candidateInputFromProfile,
+  profileFieldsFromSnapshot,
+} from "@/lib/matching/profile-from-employee";
+
+/**
+ * Candidate matching signals from the candidate-portal employee row:
+ * certifications, education, previous employment, and extracted resume text.
+ */
 export function candidateInputFromEmployee(
-  employee: Pick<
-    Employee,
-    "certifications" | "employment_type" | "first_name" | "last_name"
-  > | null,
+  employee:
+    | (Pick<
+        Employee,
+        | "certifications"
+        | "employment_type"
+        | "first_name"
+        | "last_name"
+        | "education_background"
+        | "previous_employments"
+      > & {
+        resume_text?: string | null;
+      })
+    | null,
   extras?: {
     titles?: string[];
     locations?: string[];
     yearsExperience?: number | null;
     profileText?: string | null;
+    skills?: string[];
   },
 ): MatchCandidateInput {
-  const certs = splitSkills(employee?.certifications);
-  return {
-    skills: certs,
-    certifications: certs,
-    employmentType: employee?.employment_type ?? null,
-    yearsExperience: extras?.yearsExperience ?? null,
-    profileText: extras?.profileText ?? null,
-    locations: extras?.locations ?? [],
-    titles: extras?.titles ?? [],
-  };
+  return candidateInputFromProfile(
+    employee as EmployeeProfileFields | null,
+    extras,
+  );
 }
 
 export function jobInputFromPublicJob(
@@ -94,15 +111,22 @@ export function jobInputFromRecruiterOrder(job: RecruiterJobOrder): MatchJobInpu
 export function candidateInputFromRecruiter(
   c: RecruiterCandidate,
 ): MatchCandidateInput {
-  return {
-    skills: c.skills ?? [],
-    certifications: c.skills ?? [],
-    employmentType: null,
-    yearsExperience: c.experienceYears,
-    profileText: [c.notes, c.education].filter(Boolean).join("\n"),
-    locations: c.location ? [c.location] : [],
-    titles: [c.positionApplied, c.jobTitle].filter(Boolean) as string[],
-  };
+  return candidateInputFromProfile(
+    {
+      certifications: (c.skills ?? []).join(", "),
+      employment_type: null,
+      education_background: c.education && c.education !== "—" ? c.education : null,
+      previous_employments: c.previousEmployments ?? null,
+      resume_text: c.resumeText ?? null,
+    },
+    {
+      skills: c.skills ?? [],
+      titles: [c.positionApplied, c.jobTitle].filter(Boolean) as string[],
+      locations: c.location ? [c.location] : [],
+      yearsExperience: c.experienceYears,
+      profileText: c.notes || null,
+    },
+  );
 }
 
 /** Rank open jobs for one candidate profile. */

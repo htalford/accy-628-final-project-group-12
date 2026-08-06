@@ -116,6 +116,21 @@ function uniq(tokens: string[]): string[] {
   return Array.from(new Set(tokens.map((t) => t.toLowerCase()).filter(Boolean)));
 }
 
+/** Deduplicate skills while keeping the first-seen display casing. */
+function uniqPreserveCase(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of values) {
+    const t = raw.trim();
+    if (!t) continue;
+    const key = t.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(t);
+  }
+  return out;
+}
+
 function normType(t: string | null | undefined): string {
   if (!t) return "";
   const s = t.toLowerCase();
@@ -131,8 +146,34 @@ function locationTokens(loc: string | null | undefined): string[] {
 }
 
 /**
+ * Whether the candidate has this required skill phrase.
+ * Multi-word skills match as a whole phrase only (not “Accounts” / “Payable” / “Analyst”).
+ * Single-token skills match as a whole skill tag/token only.
+ */
+function candidateHasSkill(
+  skill: string,
+  candSkillSet: Set<string>,
+  profileBlob: string,
+): boolean {
+  const normalized = skill.toLowerCase().trim();
+  if (!normalized) return false;
+
+  if (candSkillSet.has(normalized)) return true;
+
+  // Whole skill phrase appears in free text (resume, education, history).
+  if (profileBlob.includes(normalized)) return true;
+
+  // Allow simple punctuation variants: "3-way match" vs "3 way match"
+  const loose = normalized.replace(/[-_/]+/g, " ").replace(/\s+/g, " ");
+  if (loose !== normalized && profileBlob.includes(loose)) return true;
+  if (candSkillSet.has(loose)) return true;
+
+  return false;
+}
+
+/**
  * Score how well a candidate fits a job (0–100).
- * Reasons are short human strings for UI.
+ * Skill hits are only the job’s required skill phrases — never title fragments.
  */
 export function scoreMatch(
   job: MatchJobInput,
@@ -142,146 +183,75 @@ export function scoreMatch(
   const skillHits: string[] = [];
   let score = 0;
 
-  const jobSkills = uniq([
-    ...splitSkills(job.requiredSkills),
-    ...tokenize(job.title),
-  ]);
-  // Prefer explicit required skills; description keywords fill gaps.
-  const jobSkillSet = new Set(
-    job.requiredSkills?.length
-      ? uniq(splitSkills(job.requiredSkills))
-      : jobSkills,
-  );
-  const jobDescTokens = new Set(tokenize(job.description));
-  const jobTitleTokens = new Set(tokenize(job.title));
+  // Required skills only (comma list / array). Never job title word tokens.
+  const requiredSkills = uniqPreserveCase(splitSkills(job.requiredSkills));
 
-  const candSkills = uniq([
+  const candSkills = uniqPreserveCase([
     ...splitSkills(candidate.skills),
     ...splitSkills(candidate.certifications),
   ]);
-  const candSkillSet = new Set(candSkills);
-  const candText = new Set([
-    ...candSkills,
-    ...tokenize(candidate.profileText),
-    ...tokenize((candidate.titles ?? []).join(" ")),
-  ]);
+  const candSkillSet = new Set(candSkills.map((s) => s.toLowerCase()));
+  const profileBlob = [
+    candidate.profileText ?? "",
+    candSkills.join(" "),
+    (candidate.titles ?? []).join(" "),
+  ]
+    .join("\n")
+    .toLowerCase();
 
-  // --- Skills (max 40) ---
-  if (jobSkillSet.size > 0) {
-    let hits = 0;
-    for (const skill of jobSkillSet) {
-      const parts = skill.split(/\s+/).filter((p) => p.length >= 3);
-      const matched =
-        candSkillSet.has(skill) ||
-        candText.has(skill) ||
-        parts.some((p) => candText.has(p) || candSkillSet.has(p));
-      if (matched) {
-        hits += 1;
+  // --- Skills only (max 75) — drives match chips ---
+  if (requiredSkills.length > 0) {
+    for (const skill of requiredSkills) {
+      if (candidateHasSkill(skill, candSkillSet, profileBlob)) {
         skillHits.push(skill);
       }
     }
-    const ratio = hits / jobSkillSet.size;
-    const skillScore = Math.round(ratio * 40);
-    score += skillScore;
-    if (hits > 0) {
+    const ratio = skillHits.length / requiredSkills.length;
+    score += Math.round(ratio * 75);
+    if (skillHits.length > 0) {
       reasons.push(
-        `${hits} of ${jobSkillSet.size} skill signal${jobSkillSet.size === 1 ? "" : "s"} matched`,
+        `${skillHits.length} of ${requiredSkills.length} required skill${requiredSkills.length === 1 ? "" : "s"} matched`,
       );
     } else {
-      reasons.push("No direct skill overlap yet");
+      reasons.push("No required skills matched yet");
     }
   } else {
-    // Fall back to description keywords vs candidate profile text
-    let hits = 0;
-    const sample = Array.from(jobDescTokens).slice(0, 12);
-    for (const t of sample) {
-      if (candText.has(t)) {
-        hits += 1;
-        if (!skillHits.includes(t)) skillHits.push(t);
-      }
-    }
-    const descScore = sample.length
-      ? Math.round((hits / sample.length) * 30)
-      : 10;
-    score += descScore;
-    if (hits > 0) reasons.push("Keywords in the posting match your profile");
+    // No skill list on the role — neutral mid band; no token chips.
+    score += 30;
+    reasons.push("No required skills listed for this role");
   }
 
-  // --- Title fit (max 25) ---
-  const candTitles = new Set(tokenize((candidate.titles ?? []).join(" ")));
-  let titleHits = 0;
-  for (const t of jobTitleTokens) {
-    if (candTitles.has(t) || candText.has(t) || candSkillSet.has(t)) {
-      titleHits += 1;
-      if (!skillHits.includes(t)) skillHits.push(t);
-    }
-  }
-  if (jobTitleTokens.size > 0) {
-    const titleScore = Math.round(
-      (titleHits / jobTitleTokens.size) * 25,
-    );
-    score += titleScore;
-    if (titleHits > 0) reasons.push("Title wording aligns with your background");
-  } else {
-    score += 5;
-  }
-
-  // --- Location (max 15) ---
-  const jobLoc = locationTokens(job.location);
-  const candLoc = uniq((candidate.locations ?? []).flatMap((l) => locationTokens(l)));
-  if (jobLoc.length === 0) {
-    score += 8;
-    reasons.push("Location open / flexible");
-  } else if (
-    job.location?.toLowerCase().includes("remote") ||
-    jobLoc.includes("remote")
-  ) {
-    score += 15;
-    reasons.push("Remote-friendly role");
-  } else {
-    const locHits = jobLoc.filter(
-      (t) => candLoc.includes(t) || candText.has(t),
-    ).length;
-    if (locHits > 0) {
-      score += 15;
-      reasons.push("Location looks compatible");
-    } else if (candLoc.length === 0) {
-      score += 6;
-    } else {
-      score += 2;
-      reasons.push("Location may need review");
-    }
-  }
-
-  // --- Employment type (max 10) ---
+  // --- Soft ranking signals (not shown as skill chips) ---
   const jobType = normType(job.employmentType);
   const candType = normType(candidate.employmentType);
-  if (jobType && candType) {
-    if (jobType === candType) {
-      score += 10;
-      reasons.push(
-        jobType === "permanent" ? "Permanent type match" : "Temp/hourly type match",
-      );
-    } else {
-      score += 3;
-    }
+  if (jobType && candType && jobType === candType) {
+    score += 10;
   } else {
     score += 5;
   }
 
-  // --- Experience years soft signal (max 10) ---
   const years = candidate.yearsExperience;
-  if (years != null && years >= 0) {
-    if (years >= 5) {
-      score += 10;
-      reasons.push("Solid experience level");
-    } else if (years >= 2) {
-      score += 7;
-    } else {
-      score += 4;
-    }
-  } else {
+  if (years != null && years >= 5) score += 10;
+  else if (years != null && years >= 2) score += 7;
+  else if (years != null) score += 4;
+  else score += 5;
+
+  const jobLoc = locationTokens(job.location);
+  if (
+    !job.location ||
+    job.location.toLowerCase().includes("remote") ||
+    jobLoc.includes("remote")
+  ) {
     score += 5;
+  } else {
+    const candLoc = uniq(
+      (candidate.locations ?? []).flatMap((l) => locationTokens(l)),
+    );
+    if (jobLoc.some((t) => candLoc.includes(t) || profileBlob.includes(t))) {
+      score += 5;
+    } else {
+      score += 2;
+    }
   }
 
   // Clamp
@@ -294,7 +264,8 @@ export function scoreMatch(
     score,
     band,
     reasons: reasons.slice(0, 4),
-    skillHits: skillHits.slice(0, 6),
+    // Preserve original skill casing/order from the job request
+    skillHits: skillHits.slice(0, 8),
   };
 }
 

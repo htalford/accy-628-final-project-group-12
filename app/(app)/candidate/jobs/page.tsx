@@ -100,8 +100,8 @@ export default async function CandidateJobsPage() {
         title="Available jobs"
         description={
           strongCount > 0
-            ? `Open roles ranked for you automatically. ${strongCount} solid match${strongCount === 1 ? "" : "es"} based on your profile and certifications.`
-            : "Open roles ranked by how well they fit your profile. Complete certifications and title history for better matches."
+            ? `Open roles ranked for you automatically. ${strongCount} solid match${strongCount === 1 ? "" : "es"} based on your certifications, education, work history, and resume.`
+            : "Open roles ranked by how well they fit your profile. Add certifications, education, previous roles, and a resume for better matches."
         }
       />
       <CandidateJobsBoard jobs={rows} />

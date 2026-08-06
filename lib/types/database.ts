@@ -213,6 +213,8 @@ export type Employee = {
   status: EntityStatus;
   certifications: string | null;
   resume_url: string | null;
+  /** Plain text extracted from resume file for automated matching. */
+  resume_text?: string | null;
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
   education_background?: string | null;
