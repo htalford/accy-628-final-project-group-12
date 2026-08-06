@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -10,7 +11,7 @@ import {
   Search,
 } from "lucide-react";
 import { signOut } from "@/app/actions/demo-switch-role";
-import { ROLE_LABELS } from "@/lib/auth/roles";
+import { getDashboardPath, ROLE_LABELS } from "@/lib/auth/roles";
 import { DemoRoleMenu } from "@/components/demo/demo-role-menu";
 import {
   filterSearchIndex,
@@ -20,26 +21,6 @@ import {
 import type { AppUser } from "@/lib/types/database";
 import { MobileMenuButton } from "@/components/client-portal/client-sidebar";
 import { SearchInput } from "@/components/ui/search-input";
-
-function pageTitleFromPath(pathname: string): string {
-  if (pathname.startsWith("/client/job-requests/new")) return "New Job Request";
-  if (pathname.startsWith("/client/job-requests/")) return "Job Request";
-  if (pathname.startsWith("/client/job-requests")) return "Job Requests";
-  if (pathname.startsWith("/client/candidates/")) return "Candidate Profile";
-  if (pathname.startsWith("/client/candidates")) return "Candidates";
-  if (pathname.startsWith("/client/employees/")) return "Employee";
-  if (pathname.startsWith("/client/employees")) return "Employees";
-  if (pathname.startsWith("/client/contracts/")) return "Contract";
-  if (pathname.startsWith("/client/contracts")) return "Contracts";
-  if (pathname.startsWith("/client/timesheets/")) return "Timesheet";
-  if (pathname.startsWith("/client/timesheets")) return "Timesheets";
-  if (pathname.startsWith("/client/invoices/")) return "Invoice";
-  if (pathname.startsWith("/client/invoices")) return "Invoices";
-  if (pathname.startsWith("/client/messages")) return "Messages";
-  if (pathname.startsWith("/client/profile")) return "Profile";
-  if (pathname.startsWith("/client/dashboard")) return "Dashboard";
-  return "Client Portal";
-}
 
 function SearchHitButton({
   item,
@@ -146,7 +127,6 @@ export function ClientTopBar({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const title = useMemo(() => pageTitleFromPath(pathname), [pathname]);
 
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -209,23 +189,27 @@ export function ClientTopBar({
   return (
     <header
       data-client-top-bar
-      className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-[var(--cf-border)] bg-white/95 px-4 backdrop-blur sm:px-6 print:hidden"
+      className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-[var(--cf-border)] bg-white px-3 sm:px-6 print:hidden"
     >
       <MobileMenuButton onClick={onOpenMobileMenu} />
 
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-[var(--cf-ink)]">
-            {title}
-          </p>
-          <p className="hidden truncate text-xs text-[var(--cf-muted)] sm:block">
-            TalentQuest · Client Portal
-          </p>
-        </div>
-      </div>
+      <Link
+        href={getDashboardPath(user.role)}
+        className="flex min-w-0 shrink-0 items-center"
+        title="TalentQuest"
+      >
+        <Image
+          src="/talentquest-logo.png"
+          alt="TalentQuest"
+          width={168}
+          height={118}
+          className="h-8 w-auto"
+          priority
+        />
+      </Link>
 
       <div
-        className="relative mx-auto hidden max-w-md flex-1 md:block"
+        className="relative ml-auto hidden max-w-md min-w-0 flex-1 md:block"
         ref={desktopSearchRef}
       >
         <SearchInput
@@ -370,7 +354,7 @@ export function ClientTopBar({
 
       {searchOpen ? (
         <div
-          className="absolute top-16 right-4 left-4 z-40 md:hidden"
+          className="absolute top-14 right-4 left-4 z-40 md:hidden"
           ref={mobileSearchRef}
         >
           <div className="rounded-xl border border-[var(--cf-border)] bg-white p-3 shadow-lg">

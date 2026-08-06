@@ -220,10 +220,10 @@ export function ClientSidebar({
         }`}
       >
         {iconsOnly ? (
-          <div className="flex flex-col items-stretch gap-2">
+          <div className="flex flex-col items-center text-center gap-2">
             <Link
               href="/client/dashboard"
-              className="block w-full rounded-md bg-white p-2"
+              className="inline-flex rounded-md bg-white p-2"
               title="TalentQuest"
               onClick={onMobileClose}
             >
@@ -232,14 +232,14 @@ export function ClientSidebar({
                 alt="TalentQuest"
                 width={168}
                 height={118}
-                className="mx-auto h-11 w-auto max-w-full object-contain"
+                className="mx-auto h-8 w-auto object-contain"
                 priority
               />
             </Link>
             <button
               type="button"
               onClick={onToggleCollapse}
-              className="mx-auto hidden rounded-md p-1.5 text-white/70 hover:bg-white/10 hover:text-white lg:inline-flex"
+              className="hidden rounded-md p-1.5 text-white/70 hover:bg-white/10 hover:text-white lg:inline-flex"
               title="Show tab titles"
               aria-label="Show tab titles"
               aria-pressed={true}
@@ -249,36 +249,18 @@ export function ClientSidebar({
             <button
               type="button"
               onClick={onMobileClose}
-              className="mx-auto inline-flex rounded-md p-1.5 text-white/70 hover:bg-white/10 lg:hidden"
+              className="inline-flex rounded-md p-1.5 text-white/70 hover:bg-white/10 lg:hidden"
               aria-label="Close menu"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
         ) : (
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <Link
-                href="/client/dashboard"
-                className="block rounded-md bg-white p-2"
-                title="TalentQuest"
-                onClick={onMobileClose}
-              >
-                <Image
-                  src="/talentquest-logo.png"
-                  alt="TalentQuest"
-                  width={168}
-                  height={118}
-                  className="h-11 w-auto max-w-full object-contain"
-                  priority
-                />
-              </Link>
-              <p className="mt-2 text-sm text-white/60">Client Portal</p>
-            </div>
+          <div className="relative">
             <button
               type="button"
               onClick={onToggleCollapse}
-              className="hidden rounded-md p-1.5 text-white/70 hover:bg-white/10 hover:text-white lg:inline-flex"
+              className="absolute top-0 right-0 hidden rounded-md p-1.5 text-white/70 hover:bg-white/10 hover:text-white lg:inline-flex"
               title="Hide tab titles (icons only)"
               aria-label="Hide tab titles, show icons only"
               aria-pressed={false}
@@ -288,11 +270,29 @@ export function ClientSidebar({
             <button
               type="button"
               onClick={onMobileClose}
-              className="inline-flex rounded-md p-1.5 text-white/70 hover:bg-white/10 lg:hidden"
+              className="absolute top-0 right-0 inline-flex rounded-md p-1.5 text-white/70 hover:bg-white/10 lg:hidden"
               aria-label="Close menu"
             >
               <X className="h-4 w-4" />
             </button>
+            <div className="flex w-full flex-col items-center text-center">
+              <Link
+                href="/client/dashboard"
+                className="inline-flex rounded-md bg-white p-2"
+                title="TalentQuest"
+                onClick={onMobileClose}
+              >
+                <Image
+                  src="/talentquest-logo.png"
+                  alt="TalentQuest"
+                  width={168}
+                  height={118}
+                  className="mx-auto h-11 w-auto object-contain"
+                  priority
+                />
+              </Link>
+              <p className="mt-2 text-sm text-white/60">Employer Portal</p>
+            </div>
           </div>
         )}
       </div>
@@ -406,7 +406,7 @@ export function MobileMenuButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex rounded-lg border border-[var(--cf-border)] p-2 text-[var(--cf-ink)] lg:hidden"
+      className="inline-flex rounded-md border border-[var(--cf-border)] p-2 text-[var(--cf-ink)] hover:bg-[var(--cf-surface)] lg:hidden"
       aria-label="Open menu"
       suppressHydrationWarning
     >
