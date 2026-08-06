@@ -162,7 +162,7 @@ export function HorizontalProfitBars({
           <CartesianGrid strokeDasharray="3 3" stroke="#d7e0e6" />
           <XAxis type="number" tick={{ fontSize: 12 }} />
           <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
-          <Tooltip formatter={(v) => money(Number(v))} />
+          <Tooltip cursor={false} formatter={(v) => money(Number(v))} />
           <Bar dataKey="profit" fill="#1f8a70" radius={[0, 6, 6, 0]} />
         </BarChart>
       </ResponsiveContainer>

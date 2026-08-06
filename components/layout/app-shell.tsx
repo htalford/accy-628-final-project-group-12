@@ -5,6 +5,7 @@ import { FaqWidget } from "@/components/help/faq-widget";
 import { ShellProvider } from "@/components/layout/shell-context";
 import { loadClientPortalChrome } from "@/lib/client-portal/chrome";
 import { loadCandidateNotifications } from "@/lib/candidate/notifications";
+import { loadAccountingNotifications } from "@/lib/accounting/notifications";
 import type { AppUser } from "@/lib/types/database";
 
 export async function AppShell({
@@ -30,8 +31,10 @@ export async function AppShell({
     );
   }
 
-  const candidateChrome =
-    user.role === "candidate" ? await loadCandidateNotifications() : null;
+  const [candidateChrome, accountingNotifications] = await Promise.all([
+    user.role === "candidate" ? loadCandidateNotifications() : null,
+    user.role === "accounting" ? loadAccountingNotifications() : null,
+  ]);
 
   return (
     <ShellProvider>
@@ -43,7 +46,11 @@ export async function AppShell({
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar
             user={user}
-            notifications={candidateChrome?.notifications}
+            notifications={
+              candidateChrome?.notifications ??
+              accountingNotifications ??
+              undefined
+            }
           />
           <main className="flex-1 bg-[var(--cf-surface)] p-4 sm:p-6">
             {children}
