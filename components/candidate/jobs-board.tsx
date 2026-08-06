@@ -281,6 +281,7 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
             "Type",
             "Pay range",
             "Posted",
+            "Interested?",
             "",
           ]}
         >
@@ -299,23 +300,23 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
               </td>
               <td className="px-4 py-3">{job.payLabel}</td>
               <td className="px-4 py-3">{job.postedLabel}</td>
+              <td className="px-4 py-3 text-center">
+                <InterestedButton
+                  jobId={job.id}
+                  interested={job.interested}
+                  jobTitle={job.title}
+                />
+              </td>
               <td className="px-4 py-3">
-                <div className="flex items-center justify-end gap-2">
-                  <InterestedButton
+                {job.applied ? (
+                  <StatusPill label="Applied" tone="good" />
+                ) : (
+                  <ApplyButton
                     jobId={job.id}
-                    interested={job.interested}
                     jobTitle={job.title}
+                    profileResumeUrl={job.profileResumeUrl}
                   />
-                  {job.applied ? (
-                    <StatusPill label="Applied" tone="good" />
-                  ) : (
-                    <ApplyButton
-                      jobId={job.id}
-                      jobTitle={job.title}
-                      profileResumeUrl={job.profileResumeUrl}
-                    />
-                  )}
-                </div>
+                )}
               </td>
             </tr>
           ))}

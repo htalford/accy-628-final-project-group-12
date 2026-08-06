@@ -5,6 +5,7 @@ import { getContractCompletion } from "@/lib/candidate/contract-completion";
 import {
   getCandidateApplications,
   getCandidateEmployee,
+  getCandidateHiddenThreadRoles,
   getCandidateMessages,
   getCandidatePlacements,
   getCandidateTimesheets,
@@ -23,9 +24,10 @@ function currentWeekEndingDate() {
 }
 
 /** Live action items for the candidate top-bar bell, linking to portal tabs. */
-export async function loadCandidateNotifications(): Promise<
-  CandidateNotification[]
-> {
+export async function loadCandidateNotifications(): Promise<{
+  notifications: CandidateNotification[];
+  unreadMessageCount: number;
+}> {
   const [
     { employee },
     placements,
@@ -33,6 +35,7 @@ export async function loadCandidateNotifications(): Promise<
     applications,
     timesheets,
     messages,
+    hiddenRoles,
   ] = await Promise.all([
     getCandidateEmployee(),
     getCandidatePlacements(),
@@ -40,10 +43,26 @@ export async function loadCandidateNotifications(): Promise<
     getCandidateApplications(),
     getCandidateTimesheets(),
     getCandidateMessages(),
+    getCandidateHiddenThreadRoles(),
   ]);
 
   const items: CandidateNotification[] = [];
-  const unread = messages.filter((m) => !m.is_read);
+  const hidden = new Set(hiddenRoles);
+  const unread = messages.filter((m) => {
+    if (m.is_read || m.sender_role === "candidate") return false;
+    const role =
+      m.counterpart_role === "recruiter" ||
+      m.counterpart_role === "accounting" ||
+      m.counterpart_role === "system"
+        ? m.counterpart_role
+        : m.sender_role === "accounting"
+          ? "accounting"
+          : m.sender_role === "system"
+            ? "system"
+            : "recruiter";
+    return !hidden.has(role);
+  });
+  const unreadMessageCount = unread.length;
   const active = placements.find((p) => p.status === "active") ?? null;
   const weekEnding = currentWeekEndingDate();
   const hasThisWeekTimesheet = timesheets.some(
@@ -186,5 +205,8 @@ export async function loadCandidateNotifications(): Promise<
     });
   }
 
-  return items.slice(0, 12);
+  return {
+    notifications: items.slice(0, 12),
+    unreadMessageCount,
+  };
 }

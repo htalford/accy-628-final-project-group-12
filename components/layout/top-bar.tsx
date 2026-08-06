@@ -44,7 +44,7 @@ type TopBarNotification = {
 function toTopBarNotifications(
   live: CandidateNotification[] | undefined,
 ): TopBarNotification[] {
-  if (live) {
+  if (Array.isArray(live)) {
     return live.map((n) => ({
       id: n.id,
       title: n.title,
@@ -135,12 +135,17 @@ export function TopBar({
   }, [user.role]);
 
   const hideSearch =
+    pathname === "/candidate" ||
+    pathname === "/candidate/dashboard" ||
+    pathname.startsWith("/candidate/dashboard/") ||
     pathname === "/candidate/timesheets" ||
     pathname.startsWith("/candidate/timesheets/") ||
     pathname === "/candidate/profile" ||
     pathname.startsWith("/candidate/profile/") ||
     pathname === "/candidate/jobs" ||
-    pathname.startsWith("/candidate/jobs/");
+    pathname.startsWith("/candidate/jobs/") ||
+    pathname === "/candidate/pay" ||
+    pathname.startsWith("/candidate/pay/");
 
   useEffect(() => {
     if (!hideSearch) return;
@@ -185,7 +190,12 @@ export function TopBar({
             onFocus={() => hits.length > 0 && setSearchOpen(true)}
             placeholder={
               user.role === "candidate"
-                ? "Search by recruiter…"
+                ? pathname.startsWith("/candidate/messages")
+                  ? "Search messages"
+                  : pathname.startsWith("/candidate/contracts") ||
+                      pathname.startsWith("/candidate/completions")
+                    ? "Search by employer"
+                    : "Search by recruiter…"
                 : "Search clients, invoices, contracts…"
             }
             className="w-full rounded-md border border-[var(--cf-border)] bg-[var(--cf-surface)] py-2 pr-3 pl-9 text-sm outline-none ring-[var(--cf-accent)] focus:bg-white focus:ring-2"

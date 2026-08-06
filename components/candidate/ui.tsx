@@ -13,8 +13,8 @@ export function DataTable({
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-[var(--cf-border)] bg-[var(--cf-surface)] text-xs tracking-wide text-[var(--cf-muted)] uppercase">
             <tr>
-              {headers.map((header) => (
-                <th key={header} className="px-4 py-3 font-medium">
+              {headers.map((header, i) => (
+                <th key={`${header}-${i}`} className="px-4 py-3 font-medium">
                   {header}
                 </th>
               ))}

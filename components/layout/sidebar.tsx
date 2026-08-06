@@ -156,6 +156,7 @@ function NavLink({
   showPinControls,
   pinLocked,
   onTogglePin,
+  showDot,
 }: {
   item: NavItem;
   collapsed: boolean;
@@ -164,6 +165,7 @@ function NavLink({
   showPinControls?: boolean;
   pinLocked?: boolean;
   onTogglePin?: () => void;
+  showDot?: boolean;
 }) {
   const pathname = usePathname();
   const active =
@@ -182,14 +184,27 @@ function NavLink({
     >
       <Link
         href={item.href}
-        title={item.label}
+        title={
+          showDot ? `${item.label} (unread messages)` : item.label
+        }
         onClick={onNavigate}
-        className={`flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-sm font-medium transition ${
+        className={`relative flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-sm font-medium transition ${
           collapsed ? "justify-center px-2" : ""
         } ${active ? "text-white" : "text-white/70 group-hover:text-white"}`}
       >
-        <Icon className="h-4 w-4 shrink-0" aria-hidden />
+        <span className="relative shrink-0">
+          <Icon className="h-4 w-4" aria-hidden />
+          {showDot ? (
+            <span
+              className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--cf-accent)] ring-2 ring-[var(--cf-navy)]"
+              aria-hidden
+            />
+          ) : null}
+        </span>
         {!collapsed ? <span className="truncate">{item.label}</span> : null}
+        {showDot && !collapsed ? (
+          <span className="sr-only">Unread messages</span>
+        ) : null}
       </Link>
       {showPinControls && !collapsed ? (
         pinLocked ? (
@@ -284,13 +299,25 @@ function AccountingPinnedTaskLink({
   );
 }
 
-export function Sidebar({ role }: { role: UserRole }) {
+export function Sidebar({
+  role,
+  unreadMessageCount = 0,
+}: {
+  role: UserRole;
+  unreadMessageCount?: number;
+}) {
   const items = getNavForRole(role);
   const isCandidate = role === "candidate";
   const isRecruiter = role === "recruiter";
   const isAccounting = role === "accounting";
   const usesTabPins = isCandidate || isRecruiter;
   const homePath = getDashboardPath(role);
+  const showMessagesDot =
+    isCandidate && unreadMessageCount > 0;
+
+  function navShowDot(href: string) {
+    return showMessagesDot && href === "/candidate/messages";
+  }
   const {
     showCollapsed,
     mobileOpen,
@@ -499,6 +526,7 @@ export function Sidebar({ role }: { role: UserRole }) {
                       }
                       onTogglePin={() => togglePin(item.href)}
                       onNavigate={() => setMobileOpen(false)}
+                      showDot={navShowDot(item.href)}
                     />
                   ))}
                 </div>
@@ -520,6 +548,7 @@ export function Sidebar({ role }: { role: UserRole }) {
                       showPinControls
                       onTogglePin={() => togglePin(item.href)}
                       onNavigate={() => setMobileOpen(false)}
+                      showDot={navShowDot(item.href)}
                     />
                   ))}
                 </div>
@@ -539,6 +568,7 @@ export function Sidebar({ role }: { role: UserRole }) {
                 item={item}
                 collapsed={navCollapsed}
                 onNavigate={() => setMobileOpen(false)}
+                showDot={navShowDot(item.href)}
               />
             ))}
           </>

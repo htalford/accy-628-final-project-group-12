@@ -9,6 +9,7 @@ import {
   formatDate,
   getCandidateApplications,
   getCandidateEmployee,
+  getCandidateHiddenThreadRoles,
   getCandidateMessages,
   getCandidatePlacements,
   getCandidateTimesheets,
@@ -61,6 +62,7 @@ export default async function CandidateDashboardPage() {
     applications,
     timesheets,
     messages,
+    hiddenRoles,
   ] = await Promise.all([
     getCandidateEmployee(),
     getCandidatePlacements(),
@@ -68,10 +70,21 @@ export default async function CandidateDashboardPage() {
     getCandidateApplications(),
     getCandidateTimesheets(),
     getCandidateMessages(),
+    getCandidateHiddenThreadRoles(),
   ]);
 
   const active = placements.find((p) => p.status === "active") ?? null;
-  const unread = messages.filter((m) => !m.is_read).length;
+  const hidden = new Set(hiddenRoles);
+  const unread = messages.filter((m) => {
+    if (m.is_read || m.sender_role === "candidate") return false;
+    const role =
+      m.counterpart_role === "recruiter" ||
+      m.counterpart_role === "accounting" ||
+      m.counterpart_role === "system"
+        ? m.counterpart_role
+        : "recruiter";
+    return !hidden.has(role);
+  }).length;
 
   const weekEnding = currentWeekEndingDate();
   const hasThisWeekTimesheet = timesheets.some(

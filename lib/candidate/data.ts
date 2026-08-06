@@ -233,4 +233,49 @@ export async function getCandidateMessages() {
   return (data as Message[] | null) ?? [];
 }
 
+export type CandidateDeletedThread = {
+  counterpart_role: "recruiter" | "accounting" | "system";
+  deleted_at: string;
+};
+
+const DELETED_THREAD_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+export function isDeletedThreadVisible(deletedAt: string, now = Date.now()) {
+  const t = new Date(deletedAt).getTime();
+  if (Number.isNaN(t)) return false;
+  return now - t <= DELETED_THREAD_RETENTION_MS;
+}
+
+export async function getCandidateDeletedThreads() {
+  const user = await requireCandidateContext();
+  if (!user) return [] as CandidateDeletedThread[];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("candidate_deleted_threads")
+    .select("counterpart_role, deleted_at")
+    .eq("employee_id", user.linked_employee_id!)
+    .order("deleted_at", { ascending: false });
+
+  return ((data as CandidateDeletedThread[] | null) ?? []).filter((row) =>
+    isDeletedThreadVisible(row.deleted_at),
+  );
+}
+
+/** Roles still soft-deleted (including past 30 days) — stay out of inbox. */
+export async function getCandidateHiddenThreadRoles() {
+  const user = await requireCandidateContext();
+  if (!user) return [] as CandidateDeletedThread["counterpart_role"][];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("candidate_deleted_threads")
+    .select("counterpart_role")
+    .eq("employee_id", user.linked_employee_id!);
+
+  return (data ?? []).map(
+    (row) => row.counterpart_role as CandidateDeletedThread["counterpart_role"],
+  );
+}
+
 export { formatCurrency, formatDate } from "@/lib/candidate/format";

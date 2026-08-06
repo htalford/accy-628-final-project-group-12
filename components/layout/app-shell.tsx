@@ -30,21 +30,29 @@ export async function AppShell({
     );
   }
 
-  const candidateNotifications =
+  const candidateChrome =
     user.role === "candidate" ? await loadCandidateNotifications() : null;
 
   return (
     <ShellProvider>
       <div className="flex min-h-full flex-1">
-        <Sidebar role={user.role} />
+        <Sidebar
+          role={user.role}
+          unreadMessageCount={candidateChrome?.unreadMessageCount ?? 0}
+        />
         <div className="flex min-w-0 flex-1 flex-col">
-          <TopBar user={user} notifications={candidateNotifications ?? undefined} />
+          <TopBar
+            user={user}
+            notifications={candidateChrome?.notifications}
+          />
           <main className="flex-1 bg-[var(--cf-surface)] p-4 sm:p-6">
             {children}
           </main>
         </div>
       </div>
-      <RoleSwitcher currentRole={user.role} />
+      {user.role !== "candidate" ? (
+        <RoleSwitcher currentRole={user.role} />
+      ) : null}
     </ShellProvider>
   );
 }

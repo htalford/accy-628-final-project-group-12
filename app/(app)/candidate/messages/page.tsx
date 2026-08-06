@@ -1,23 +1,38 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { MessagesPanel } from "@/components/candidate/messages-panel";
-import { getCandidateMessages } from "@/lib/candidate/data";
+import {
+  getCandidateDeletedThreads,
+  getCandidateHiddenThreadRoles,
+  getCandidateMessages,
+} from "@/lib/candidate/data";
 
 export default async function CandidateMessagesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ with?: string }>;
+  searchParams: Promise<{ with?: string; folder?: string }>;
 }) {
   const params = await searchParams;
   const withRecruiter = params.with?.trim() || null;
-  const messages = await getCandidateMessages();
+  const folder = params.folder === "deleted" ? "deleted" : "inbox";
+  const [messages, deletedThreads, hiddenRoles] = await Promise.all([
+    getCandidateMessages(),
+    getCandidateDeletedThreads(),
+    getCandidateHiddenThreadRoles(),
+  ]);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Messages"
-        description="Private chats with Recruiter and Accounting — each portal only sees its own conversation with you."
+        description="Private chats with Recruiter and Accounting. Deleted conversations stay in Deleted for 30 days, then disappear from your view."
       />
-      <MessagesPanel messages={messages} withRecruiter={withRecruiter} />
+      <MessagesPanel
+        messages={messages}
+        deletedThreads={deletedThreads}
+        hiddenRoles={hiddenRoles}
+        folder={folder}
+        withRecruiter={withRecruiter}
+      />
     </div>
   );
 }

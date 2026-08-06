@@ -250,10 +250,95 @@ export async function sendCandidateMessage(formData: {
 
   if (error) return { ok: false, error: error.message };
 
+  // Sending restores the thread from Deleted if it was soft-deleted.
+  await supabase
+    .from("candidate_deleted_threads")
+    .delete()
+    .eq("employee_id", user.linked_employee_id!)
+    .eq("counterpart_role", counterpartRole);
+
   revalidatePath("/candidate/messages");
   revalidatePath("/candidate/dashboard");
   revalidatePath("/recruiter/messages");
   revalidatePath("/accounting/messages");
+  return { ok: true };
+}
+
+export async function deleteCandidateThread(
+  counterpartRole: "recruiter" | "accounting" | "system",
+): Promise<ActionResult> {
+  return deleteCandidateThreads([counterpartRole]);
+}
+
+export async function deleteCandidateThreads(
+  counterpartRoles: Array<"recruiter" | "accounting" | "system">,
+): Promise<ActionResult> {
+  const user = await requireCandidateContext();
+  if (!user) return { ok: false, error: "Candidate session required." };
+
+  const roles = Array.from(
+    new Set(
+      counterpartRoles.filter((role) =>
+        ["recruiter", "accounting", "system"].includes(role),
+      ),
+    ),
+  );
+  if (roles.length === 0) {
+    return { ok: false, error: "Select at least one conversation." };
+  }
+
+  const supabase = await createClient();
+  const deletedAt = new Date().toISOString();
+  const { error } = await supabase.from("candidate_deleted_threads").upsert(
+    roles.map((counterpart_role) => ({
+      employee_id: user.linked_employee_id!,
+      counterpart_role,
+      deleted_at: deletedAt,
+    })),
+    { onConflict: "employee_id,counterpart_role" },
+  );
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/candidate/messages");
+  revalidatePath("/candidate/dashboard");
+  return { ok: true };
+}
+
+export async function restoreCandidateThread(
+  counterpartRole: "recruiter" | "accounting" | "system",
+): Promise<ActionResult> {
+  return restoreCandidateThreads([counterpartRole]);
+}
+
+export async function restoreCandidateThreads(
+  counterpartRoles: Array<"recruiter" | "accounting" | "system">,
+): Promise<ActionResult> {
+  const user = await requireCandidateContext();
+  if (!user) return { ok: false, error: "Candidate session required." };
+
+  const roles = Array.from(
+    new Set(
+      counterpartRoles.filter((role) =>
+        ["recruiter", "accounting", "system"].includes(role),
+      ),
+    ),
+  );
+  if (roles.length === 0) {
+    return { ok: false, error: "Select at least one conversation." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("candidate_deleted_threads")
+    .delete()
+    .eq("employee_id", user.linked_employee_id!)
+    .in("counterpart_role", roles);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/candidate/messages");
+  revalidatePath("/candidate/dashboard");
   return { ok: true };
 }
 
