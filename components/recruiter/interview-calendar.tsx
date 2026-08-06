@@ -7,8 +7,6 @@ import type { RecruiterInterview } from "@/lib/recruiter/types";
 import { rescheduleInterview } from "@/app/actions/recruiter";
 import { StatusBadge } from "@/components/ui/status-badge";
 
-type ViewMode = "month" | "week" | "day";
-
 function startOfDay(d: Date) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
@@ -35,7 +33,6 @@ export function InterviewCalendar({
   interviews: RecruiterInterview[];
 }) {
   const router = useRouter();
-  const [view, setView] = useState<ViewMode>("month");
   const [cursor, setCursor] = useState(() => {
     const now = Date.now();
     const upcoming = [...interviews]
@@ -48,48 +45,25 @@ export function InterviewCalendar({
   const [selected, setSelected] = useState<RecruiterInterview | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const today = startOfDay(new Date());
 
-  const label = useMemo(() => {
-    if (view === "month") {
-      return cursor.toLocaleDateString(undefined, {
-        month: "long",
-        year: "numeric",
-      });
-    }
-    if (view === "week") {
-      const end = addDays(cursor, 6);
-      return `${cursor.toLocaleDateString()} – ${end.toLocaleDateString()}`;
-    }
-    return cursor.toLocaleDateString(undefined, {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
-  }, [cursor, view]);
+  const label = cursor.toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
 
   const days = useMemo(() => {
-    if (view === "day") return [cursor];
-    if (view === "week") {
-      return Array.from({ length: 7 }, (_, i) => addDays(cursor, i));
-    }
     const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
     const start = addDays(first, -((first.getDay() + 6) % 7)); // Monday-based
     return Array.from({ length: 42 }, (_, i) => addDays(start, i));
-  }, [cursor, view]);
+  }, [cursor]);
 
   function interviewsOn(day: Date) {
     return interviews.filter((i) => sameDay(new Date(i.datetime), day));
   }
 
   function shift(dir: -1 | 1) {
-    if (view === "month") {
-      setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + dir, 1));
-    } else if (view === "week") {
-      setCursor(addDays(cursor, dir * 7));
-    } else {
-      setCursor(addDays(cursor, dir));
-    }
+    setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + dir, 1));
   }
 
   return (
@@ -120,55 +94,40 @@ export function InterviewCalendar({
             Next
           </button>
         </div>
-        <div className="flex gap-2">
-          {(["month", "week", "day"] as ViewMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setView(mode)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium capitalize ${
-                view === mode
-                  ? "bg-[var(--cf-navy)] text-white"
-                  : "border border-[var(--cf-border)]"
-              }`}
-            >
-              {mode}
-            </button>
-          ))}
-        </div>
+        <p className="text-xs font-medium tracking-wide text-[var(--cf-muted)] uppercase">
+          Month
+        </p>
       </div>
 
-      <div
-        className={`grid gap-2 ${
-          view === "month"
-            ? "grid-cols-7"
-            : view === "week"
-              ? "grid-cols-1 md:grid-cols-7"
-              : "grid-cols-1"
-        }`}
-      >
-        {view === "month"
-          ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-              <div
-                key={d}
-                className="px-2 text-xs font-semibold tracking-wide text-[var(--cf-muted)] uppercase"
-              >
-                {d}
-              </div>
-            ))
-          : null}
+      <div className="grid grid-cols-7 gap-2">
+        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+          <div
+            key={d}
+            className="px-2 text-xs font-semibold tracking-wide text-[var(--cf-muted)] uppercase"
+          >
+            {d}
+          </div>
+        ))}
         {days.map((day) => {
           const items = interviewsOn(day);
-          const inMonth =
-            view !== "month" || day.getMonth() === cursor.getMonth();
+          const inMonth = day.getMonth() === cursor.getMonth();
+          const isToday = sameDay(day, today);
           return (
             <div
               key={day.toISOString()}
-              className={`min-h-[7rem] rounded-xl border border-[var(--cf-border)] bg-white p-2 shadow-sm ${
-                inMonth ? "" : "opacity-40"
-              }`}
+              className={`min-h-[7rem] rounded-xl border bg-white p-2 shadow-sm ${
+                isToday
+                  ? "border-[var(--cf-navy)] ring-2 ring-[var(--cf-navy)]/25"
+                  : "border-[var(--cf-border)]"
+              } ${inMonth ? "" : "opacity-40"}`}
             >
-              <p className="text-xs font-semibold text-[var(--cf-muted)]">
+              <p
+                className={`text-xs font-semibold ${
+                  isToday
+                    ? "inline-flex h-6 w-6 items-center justify-center rounded-full bg-[var(--cf-navy)] text-white"
+                    : "text-[var(--cf-muted)]"
+                }`}
+              >
                 {day.getDate()}
               </p>
               <ul className="mt-1 space-y-1">

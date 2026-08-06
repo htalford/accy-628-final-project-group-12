@@ -12,7 +12,7 @@ export default async function JobOrdersPage() {
     <div>
       <PageHeader
         title="Job Orders"
-        description="Derived from seeded placements by client and placement type."
+        description="Roles from the job board and employer requests"
       />
       <JobOrderFiltersPanel
         initialRows={rows}

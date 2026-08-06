@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  deleteRecruiterMessage,
   markRecruiterCandidateThreadRead,
   sendAccountingStaffMessage,
   sendEmployerMessage,
@@ -11,6 +12,16 @@ import {
 import type { RecruiterMessageThread } from "@/lib/recruiter/types";
 
 type Filter = "all" | "employer" | "candidate" | "accounting";
+
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "employer", label: "Employers" },
+  { id: "candidate", label: "Candidates" },
+  { id: "accounting", label: "Accounting" },
+];
+
+const DELETED_BODY = "Message Deleted";
+const PLACEHOLDER = "Write a message…";
 
 export function MessagesCenter({
   threads,
@@ -21,8 +32,8 @@ export function MessagesCenter({
   const [filter, setFilter] = useState<Filter>("all");
   const [activeId, setActiveId] = useState(threads[0]?.id ?? "");
   const [draft, setDraft] = useState("");
-  const [subject, setSubject] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -62,31 +73,49 @@ export function MessagesCenter({
     router,
   ]);
 
-  function sendReply() {
-    if (!active || !draft.trim()) return;
+  function sendActiveMessage() {
+    if (!active) return;
     const body = draft.trim();
-    const subj = subject.trim() || active.subject;
+    if (!body) return;
     setDraft("");
     startTransition(async () => {
-      let result: { ok: boolean; message?: string; error?: string };
-      if (active.participantType === "candidate") {
-        result = await sendRecruiterMessage({
-          employeeId: active.participantId,
-          subject: subj,
-          body,
-        });
-      } else if (active.participantType === "employer") {
-        result = await sendEmployerMessage({
-          threadId: active.id,
-          body,
-        });
-      } else {
-        result = await sendAccountingStaffMessage({
-          threadId: active.id,
-          body,
-        });
-      }
-      setNotice(result.ok ? (result.message ?? "Sent") : (result.error ?? "Failed"));
+      const result =
+        active.participantType === "candidate"
+          ? await sendRecruiterMessage({
+              employeeId: active.participantId,
+              subject: active.subject || "Message",
+              body,
+            })
+          : active.participantType === "accounting"
+            ? await sendAccountingStaffMessage({
+                threadId: active.id,
+                body,
+              })
+            : await sendEmployerMessage({
+                threadId: active.id,
+                body,
+              });
+      setNotice(
+        result.ok ? result.message ?? "Sent" : result.error ?? "Failed",
+      );
+      if (result.ok) router.refresh();
+    });
+  }
+
+  function confirmDelete() {
+    if (!active || !confirmDeleteId) return;
+    const messageId = confirmDeleteId;
+    setConfirmDeleteId(null);
+    startTransition(async () => {
+      const result = await deleteRecruiterMessage({
+        messageId,
+        participantType: active.participantType,
+      });
+      setNotice(
+        result.ok
+          ? result.message ?? "Message deleted."
+          : result.error ?? "Failed",
+      );
       if (result.ok) router.refresh();
     });
   }
@@ -100,23 +129,23 @@ export function MessagesCenter({
       ) : null}
       <div className="grid min-h-[28rem] lg:grid-cols-[18rem_1fr]">
         <aside className="border-b border-[var(--cf-border)] lg:border-r lg:border-b-0">
-          <div className="flex flex-wrap gap-1 border-b border-[var(--cf-border)] p-3">
-            {(["all", "employer", "candidate", "accounting"] as const).map(
-              (f) => (
+          <div className="overflow-x-auto border-b border-[var(--cf-border)] p-3">
+            <div className="flex w-max min-w-full flex-nowrap gap-1">
+              {FILTERS.map((f) => (
                 <button
-                  key={f}
+                  key={f.id}
                   type="button"
-                  onClick={() => setFilter(f)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize ${
-                    filter === f
+                  onClick={() => setFilter(f.id)}
+                  className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-medium ${
+                    filter === f.id
                       ? "bg-[var(--cf-navy)] text-white"
                       : "text-[var(--cf-muted)] hover:bg-[var(--cf-surface)]"
                   }`}
                 >
-                  {f}
+                  {f.label}
                 </button>
-              ),
-            )}
+              ))}
+            </div>
           </div>
           <ul className="max-h-[24rem] overflow-y-auto">
             {filtered.map((t) => (
@@ -165,55 +194,68 @@ export function MessagesCenter({
                 </p>
               </div>
               <div className="flex-1 space-y-3 overflow-y-auto p-4">
-                {active.messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                      m.mine
-                        ? "ml-auto bg-[var(--cf-navy)] text-white"
-                        : "bg-[var(--cf-surface)] text-[var(--cf-ink)]"
-                    }`}
-                  >
-                    <p className="text-[10px] opacity-70">
-                      {m.sender} · {new Date(m.createdAt).toLocaleString()}
-                    </p>
-                    <p className="mt-1 whitespace-pre-wrap">{m.body}</p>
-                  </div>
-                ))}
+                {active.messages.map((m) => {
+                  const isDeleted = m.body === DELETED_BODY;
+                  return (
+                    <div
+                      key={m.id}
+                      className={`group relative max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                        m.mine
+                          ? "ml-auto bg-[var(--cf-navy)] text-white"
+                          : "bg-[var(--cf-surface)] text-[var(--cf-ink)]"
+                      }`}
+                    >
+                      <p className="text-[10px] opacity-70">
+                        {m.sender} · {new Date(m.createdAt).toLocaleString()}
+                      </p>
+                      <p
+                        className={`mt-1 whitespace-pre-wrap ${
+                          isDeleted ? "italic opacity-80" : ""
+                        }`}
+                      >
+                        {m.body}
+                      </p>
+                      {!isDeleted ? (
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => setConfirmDeleteId(m.id)}
+                          className={`mt-2 text-[11px] font-medium hover:underline disabled:opacity-50 ${
+                            m.mine
+                              ? "text-red-200 hover:text-red-100"
+                              : "text-red-600 hover:text-red-700"
+                          }`}
+                        >
+                          Delete
+                        </button>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
               <div className="space-y-2 border-t border-[var(--cf-border)] p-4">
-                {active.participantType === "candidate" ? (
-                  <input
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    placeholder="Subject"
-                    className="w-full rounded-lg border border-[var(--cf-border)] px-3 py-2 text-sm"
-                  />
-                ) : null}
                 <div className="flex gap-2">
                   <textarea
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     rows={2}
-                    placeholder={
-                      active.participantType === "employer"
-                        ? "Reply to employer…"
-                        : active.participantType === "accounting"
-                          ? "Message accounting…"
-                          : "Write a message…"
-                    }
+                    placeholder={PLACEHOLDER}
                     className="min-h-[2.5rem] flex-1 rounded-lg border border-[var(--cf-border)] px-3 py-2 text-sm"
                   />
                   <button
                     type="button"
                     disabled={pending || !draft.trim()}
                     className="self-end rounded-lg bg-[var(--cf-navy)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                    onClick={sendReply}
+                    onClick={sendActiveMessage}
                   >
                     Send
                   </button>
                 </div>
-                {active.participantType === "employer" ? (
+                {active.participantType === "accounting" ? (
+                  <p className="text-[11px] text-[var(--cf-muted)]">
+                    Synced with Accounting Portal staff conversations.
+                  </p>
+                ) : active.participantType === "employer" ? (
                   <p className="text-[11px] text-[var(--cf-muted)]">
                     Synced with Client Portal employer conversations.
                   </p>
@@ -227,6 +269,33 @@ export function MessagesCenter({
           )}
         </div>
       </div>
+
+      {confirmDeleteId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-xl border border-[var(--cf-border)] bg-white p-5 shadow-lg">
+            <p className="text-sm font-medium text-[var(--cf-ink)]">
+              Are you sure?
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteId(null)}
+                className="rounded-lg border border-[var(--cf-border)] px-3 py-2 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={confirmDelete}
+                className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
