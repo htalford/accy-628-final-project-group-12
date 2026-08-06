@@ -182,7 +182,7 @@ export function TimesheetsClient({
                 <Th>Employee</Th>
                 <Th>Position</Th>
                 <Th>Week Ending</Th>
-                <Th>Regular</Th>
+                <Th>Hours</Th>
                 <Th>Overtime</Th>
                 <Th>Total</Th>
                 <Th>Status</Th>

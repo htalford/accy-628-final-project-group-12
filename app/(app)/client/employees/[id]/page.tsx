@@ -97,8 +97,8 @@ export default async function EmployeeDetailPage({
             <THead>
               <tr>
                 <Th>Week Ending</Th>
-                <Th>Regular</Th>
-                <Th>OT</Th>
+                <Th>Hours</Th>
+                <Th>Overtime</Th>
                 <Th>Total</Th>
                 <Th>Status</Th>
                 <Th> </Th>
