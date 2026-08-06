@@ -55,7 +55,7 @@ export default async function AccountingHomePage() {
         />
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
         <StatCard
           compact
           label="Collected"
@@ -83,6 +83,13 @@ export default async function AccountingHomePage() {
           value={String(data.cards.timesheetsAwaitingApproval)}
           hint="Submitted timesheets pending review"
           href="/accounting/timesheets?status=submitted"
+        />
+        <StatCard
+          compact
+          label="Overdue Invoices"
+          value={String(data.cards.overdueInvoices)}
+          hint="Sent or partial invoices past due"
+          href="/accounting/invoices?status=overdue"
         />
       </div>
 
