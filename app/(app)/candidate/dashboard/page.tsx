@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Panel, StatusPill } from "@/components/candidate/ui";
 import { ProfileCompletionCard } from "@/components/candidate/profile-completion-card";
+import { OfferReceivedModal } from "@/components/candidate/offer-received-modal";
 import { getProfileCompletion } from "@/lib/candidate/profile-completion";
 import { MatchScoreBadge, MatchedSkills } from "@/components/matching/match-score-badge";
 import {
@@ -152,8 +153,25 @@ export default async function CandidateDashboardPage() {
     );
   }
 
+  const offers = applications
+    .filter((a) => a.status === "offered")
+    .map((a) => ({
+      id: a.id,
+      title: a.jobs?.title ?? "Role",
+      employer: a.jobs?.employer_name ?? "Employer",
+      location: a.jobs?.location ?? null,
+      employmentType: a.jobs?.employment_type ?? null,
+    }));
+
+  if (offers.length > 0) {
+    todos.unshift(
+      `${offers.length} job offer${offers.length === 1 ? "" : "s"} to review`,
+    );
+  }
+
   return (
     <div>
+      <OfferReceivedModal offers={offers} />
       <section className="mb-8 rounded-2xl border border-[var(--cf-border)] bg-white p-6 shadow-sm sm:p-8">
         <p className="text-xs font-semibold tracking-[0.14em] text-[var(--cf-accent)] uppercase">
           Candidate home

@@ -75,6 +75,7 @@ export async function loadCandidateNotifications(): Promise<{
   const hotApps = applications.filter((a) =>
     ["reviewing", "interview", "offered"].includes(a.status),
   );
+  const offeredApps = applications.filter((a) => a.status === "offered");
 
   if (unread.length > 0) {
     const latest = unread[0]!;
@@ -88,6 +89,27 @@ export async function loadCandidateNotifications(): Promise<{
       href: "/candidate/messages",
       time: "Messages",
       tone: "info",
+    });
+  }
+
+  if (offeredApps.length > 0) {
+    const first = offeredApps[0]!;
+    const title =
+      (Array.isArray(first.jobs) ? first.jobs[0]?.title : first.jobs?.title) ??
+      "Role";
+    items.push({
+      id: "offer-received",
+      title:
+        offeredApps.length === 1
+          ? "Job offer received"
+          : `${offeredApps.length} job offers received`,
+      body:
+        offeredApps.length === 1
+          ? `${title} — open your dashboard or Applications to review.`
+          : `Including ${title} and ${offeredApps.length - 1} more.`,
+      href: "/candidate/dashboard",
+      time: "Offers",
+      tone: "success",
     });
   }
 
@@ -176,8 +198,8 @@ export async function loadCandidateNotifications(): Promise<{
           completion.missing[0]?.label != null
             ? `Next: ${completion.missing[0].label}`
             : "Review assignment progress.",
-        href: `/candidate/completions/${active.id}`,
-        time: "Completion status",
+        href: `/candidate/contracts/${active.id}`,
+        time: "Contracts",
         tone: "info",
       });
     }

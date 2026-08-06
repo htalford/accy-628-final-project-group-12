@@ -5,6 +5,7 @@ import { Panel } from "@/components/candidate/ui";
 import { StatusBadge, statusTone } from "@/components/ui/status-badge";
 import { DataTable } from "@/components/ui/data-table";
 import { getCandidateContractById } from "@/lib/candidate/data";
+import { getContractCompletion } from "@/lib/candidate/contract-completion";
 import {
   moneyExact,
   placementStatusLabel,
@@ -20,6 +21,24 @@ export default async function CandidateContractDetailPage({
   const { id } = await params;
   const contract = await getCandidateContractById(id);
   if (!contract) notFound();
+
+  const completion = getContractCompletion(
+    {
+      start_date: contract.startDate,
+      end_date: contract.endDate,
+      status: contract.status,
+      pay_rate: contract.payRate,
+    },
+    contract.timesheets.map((t) => ({
+      status: t.status as
+        | "submitted"
+        | "approved"
+        | "disputed"
+        | "rejected",
+      hours_regular: t.hoursRegular,
+      hours_overtime: t.hoursOvertime,
+    })),
+  );
 
   return (
     <div className="space-y-6">
@@ -85,6 +104,59 @@ export default async function CandidateContractDetailPage({
               <dd>{contract.guaranteeEndDate ?? "—"}</dd>
             </div>
           </dl>
+
+          <div className="mt-5 border-t border-[var(--cf-border)] pt-4">
+            <div className="flex items-end justify-between gap-3">
+              <p className="text-sm font-semibold text-[var(--cf-ink)]">
+                Completion status
+              </p>
+              <p className="text-sm tabular-nums text-[var(--cf-muted)]">
+                {completion.percent}% · {completion.doneCount}/
+                {completion.totalCount} milestones
+              </p>
+            </div>
+            <div
+              className="mt-3 h-2.5 overflow-hidden rounded-full bg-[var(--cf-border)]"
+              role="progressbar"
+              aria-valuenow={completion.percent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Contract ${completion.percent}% complete`}
+            >
+              <div
+                className="h-full rounded-full bg-[var(--cf-accent)] transition-[width]"
+                style={{ width: `${completion.percent}%` }}
+              />
+            </div>
+            <ul className="mt-4 space-y-2">
+              {completion.items.map((item) => (
+                <li key={item.id} className="flex gap-2.5 text-sm">
+                  <span
+                    className={`mt-0.5 shrink-0 text-xs font-bold ${
+                      item.complete ? "text-emerald-600" : "text-red-500"
+                    }`}
+                    aria-hidden
+                  >
+                    {item.complete ? "✓" : "✕"}
+                  </span>
+                  <div className="min-w-0">
+                    <p
+                      className={`font-medium ${
+                        item.complete
+                          ? "text-[var(--cf-ink)]"
+                          : "text-[var(--cf-muted)]"
+                      }`}
+                    >
+                      {item.label}
+                    </p>
+                    <p className="text-xs text-[var(--cf-muted)]">
+                      {item.detail}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
         </Panel>
 
         <Panel title="Linked timesheets">
