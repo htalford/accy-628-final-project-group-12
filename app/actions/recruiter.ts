@@ -481,3 +481,34 @@ export async function sendAccountingStaffMessage(input: {
   revalidateRecruiter();
   return { ok: true as const, message: "Message sent to accounting." };
 }
+
+const DELETED_MESSAGE_BODY = "Message Deleted";
+
+export async function deleteRecruiterMessage(input: {
+  messageId: string;
+  participantType: "candidate" | "employer" | "accounting";
+}) {
+  const { error: authError } = await requireRecruiter();
+  if (authError) return { ok: false as const, error: authError };
+
+  if (!input.messageId) {
+    return { ok: false as const, error: "Message id is required." };
+  }
+
+  const supabase = await createClient();
+  const table =
+    input.participantType === "candidate"
+      ? "messages"
+      : input.participantType === "employer"
+        ? "client_messages"
+        : "staff_messages";
+
+  const { error } = await supabase
+    .from(table)
+    .update({ body: DELETED_MESSAGE_BODY })
+    .eq("id", input.messageId);
+
+  if (error) return { ok: false as const, error: error.message };
+  revalidateRecruiter();
+  return { ok: true as const, message: "Message deleted." };
+}

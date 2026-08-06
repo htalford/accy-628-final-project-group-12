@@ -20,7 +20,7 @@ export function RecruiterSummaryCards({ metrics }: { metrics: DashboardMetrics }
       <StatCard
         label="Candidates in Pipeline"
         value={String(metrics.candidatesInPipeline)}
-        description="Applications and employer submittals"
+        description="Employee Applications"
         icon={<Users className="h-4 w-4" />}
         href="/recruiter/candidates"
       />

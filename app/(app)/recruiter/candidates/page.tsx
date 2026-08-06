@@ -12,7 +12,7 @@ export default async function CandidatesPage() {
     <div>
       <PageHeader
         title="Candidates in Pipeline"
-        description="Live talent pool from seeded employees and placements."
+        description="Employee Applications"
       />
       <CandidateFiltersPanel
         initialRows={rows}

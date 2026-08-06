@@ -1,13 +1,9 @@
 import {
   getDashboardMetrics,
   listRecentActivity,
-  listRecentJobOrders,
-  listUpcomingInterviews,
 } from "@/lib/recruiter/data";
 import { getAppUser } from "@/lib/auth/get-app-user";
 import { RecruiterSummaryCards } from "@/components/recruiter/summary-cards";
-import { RecentJobOrdersTable } from "@/components/recruiter/recent-job-orders-table";
-import { UpcomingInterviewsList } from "@/components/recruiter/upcoming-interviews-list";
 import { ActivityTimeline } from "@/components/recruiter/activity-timeline";
 
 export default async function RecruiterDashboardPage() {
@@ -20,10 +16,8 @@ export default async function RecruiterDashboardPage() {
     year: "numeric",
   });
 
-  const [metrics, jobOrders, interviews, activity] = await Promise.all([
+  const [metrics, activity] = await Promise.all([
     getDashboardMetrics(),
-    listRecentJobOrders(),
-    listUpcomingInterviews(),
     listRecentActivity(),
   ]);
 
@@ -37,15 +31,6 @@ export default async function RecruiterDashboardPage() {
       </div>
 
       <RecruiterSummaryCards metrics={metrics} />
-
-      <div className="grid gap-6 xl:grid-cols-5">
-        <div className="xl:col-span-3">
-          <RecentJobOrdersTable rows={jobOrders} />
-        </div>
-        <div className="xl:col-span-2">
-          <UpcomingInterviewsList interviews={interviews} />
-        </div>
-      </div>
 
       <ActivityTimeline events={activity} />
     </div>
