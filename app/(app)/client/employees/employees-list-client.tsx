@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
+import { SearchInput } from "@/components/ui/search-input";
+import { Select } from "@/components/ui/select";
 import { Table, THead, Th, Td } from "@/components/ui/table";
 import {
   formatMoney,
@@ -20,6 +23,7 @@ export type EmployeeListRow = {
   title: string;
   status: string;
   startDate: string;
+  endDate?: string | null;
   placementType: string;
   billRate: number | null;
   payRate: number | null;
@@ -31,18 +35,64 @@ export function EmployeesListClient({
 }: {
   rows: EmployeeListRow[];
 }) {
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState("All");
+
+  const filtered = useMemo(() => {
+    return rows.filter((e) => {
+      const matchesQ =
+        !q ||
+        e.name.toLowerCase().includes(q.toLowerCase()) ||
+        e.title.toLowerCase().includes(q.toLowerCase());
+      const matchesStatus =
+        status === "All" ||
+        e.status === status ||
+        (status === "active" &&
+          (e.status === "active" || e.status === "at_risk"));
+      return matchesQ && matchesStatus;
+    });
+  }, [rows, q, status]);
+
   return (
     <div className="space-y-6">
       <PageHeader title="Employees" />
 
-      {rows.length === 0 ? (
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <SearchInput
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search employees…"
+          aria-label="Search employees"
+          className="sm:max-w-xs"
+        />
+        <Select
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          className="sm:max-w-[12rem]"
+          aria-label="Filter by status"
+        >
+          <option value="All">All statuses</option>
+          <option value="active">Active (incl. at risk)</option>
+          <option value="at_risk">At Risk</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </Select>
+      </div>
+
+      {filtered.length === 0 ? (
         <EmptyState
-          title="No active employees"
-          description="When TalentQuest places people on assignments for your company, they will appear here."
+          title={rows.length === 0 ? "No employees yet" : "No matching employees"}
+          description={
+            rows.length === 0
+              ? "When TalentQuest places people on assignments for your company, they will appear here."
+              : "Try a different search or status filter."
+          }
           action={
-            <Button href="/client/job-requests/new" variant="secondary">
-              Submit a job request
-            </Button>
+            rows.length === 0 ? (
+              <Button href="/client/job-requests/new" variant="secondary">
+                Submit a job request
+              </Button>
+            ) : undefined
           }
         />
       ) : (
@@ -61,7 +111,7 @@ export function EmployeesListClient({
               </tr>
             </THead>
             <tbody>
-              {rows.map((e) => (
+              {filtered.map((e) => (
                 <tr key={e.placementId} className="hover:bg-[var(--cf-surface)]/60">
                   <Td>
                     <Link

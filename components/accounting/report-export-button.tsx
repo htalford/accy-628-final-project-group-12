@@ -3,7 +3,6 @@
 import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { ReportPreview } from "@/lib/accounting/reports";
-import { downloadReportPdf } from "@/lib/accounting/report-pdf";
 
 function escapeCsv(value: string): string {
   if (/[",\n\r]/.test(value)) {
@@ -98,8 +97,9 @@ export function ReportExportButton({ report }: { report: ReportPreview }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const base = useMemo(() => slugify(report.title) || "report", [report.title]);
 
-  function exportAs(format: "pdf" | "csv" | "excel-csv" | "excel-xml") {
+  async function exportAs(format: "pdf" | "csv" | "excel-csv" | "excel-xml") {
     if (format === "pdf") {
+      const { downloadReportPdf } = await import("@/lib/accounting/report-pdf");
       downloadReportPdf(report, base);
     } else if (format === "csv") {
       downloadBlob(

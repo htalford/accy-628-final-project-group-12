@@ -424,7 +424,11 @@ export async function getInvoiceForClient(
   };
 }
 
-/** Employees currently assigned via placements for this employer. */
+/**
+ * Employees assigned via placements for this employer.
+ * Includes completed / cancelled so seed history (e.g. Blake Turner) stays visible;
+ * the list UI filters by status.
+ */
 export function employeesFromPlacements(
   placements: PlacementWithEmployee[],
 ): Array<{
@@ -436,13 +440,14 @@ export function employeesFromPlacements(
   title: string;
   status: PlacementStatus;
   startDate: string;
+  endDate: string | null;
   billRate: number | null;
   payRate: number | null;
   placementType: Placement["placement_type"];
   hoursThisPeriod: number;
 }> {
   return placements
-    .filter((p) => p.employee && (p.status === "active" || p.status === "at_risk"))
+    .filter((p) => p.employee)
     .map((p) => ({
       employeeId: p.employee_id,
       placementId: p.id,
@@ -452,6 +457,7 @@ export function employeesFromPlacements(
       title: placementPositionTitle(p.title, p.placement_type),
       status: p.status,
       startDate: p.start_date,
+      endDate: p.end_date,
       billRate: p.bill_rate,
       payRate: p.pay_rate,
       placementType: p.placement_type,
