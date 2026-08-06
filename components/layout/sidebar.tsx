@@ -191,7 +191,8 @@ function NavLink({
           <Icon className="h-4 w-4" aria-hidden />
           {showDot ? (
             <span
-              className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-[var(--cf-navy)]"
+              className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full ring-2 ring-[var(--cf-navy)]"
+              style={{ backgroundColor: "#ef4444" }}
               aria-hidden
             />
           ) : null}
