@@ -186,7 +186,11 @@ export function JobOrderDetail({
                     </Link>
                     <p className="text-xs text-[var(--cf-muted)]">
                       {c.positionApplied}
-                      {c.jobId === job.id ? " · applied to this order" : " · pool match"}
+                      {c.jobId === job.id
+                        ? " · applied to this order"
+                        : result.score < 60
+                          ? " · pool match · needs review"
+                          : " · pool match"}
                     </p>
                     {result.reasons[0] ? (
                       <p className="mt-0.5 text-xs text-[var(--cf-muted)]">
