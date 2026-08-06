@@ -749,7 +749,7 @@ export async function listMessageThreads(): Promise<RecruiterMessageThread[]> {
         id: String(m.id),
         sender:
           m.sender_role === "staff"
-            ? "Avery Accounting"
+            ? "Accounting"
             : m.sender_role === "recruiter"
               ? String(t.recruiter_name || "Recruiter")
               : company,
@@ -761,8 +761,71 @@ export async function listMessageThreads(): Promise<RecruiterMessageThread[]> {
     };
   });
 
-  return [...byEmployee, ...employerThreads].sort((a, b) =>
-    b.updatedAt.localeCompare(a.updatedAt),
+  const { data: staffThreads } = await supabase
+    .from("staff_message_threads")
+    .select(
+      "id, subject, accounting_user_id, recruiter_user_id, updated_at, created_at",
+    )
+    .order("updated_at", { ascending: false });
+
+  const staffIds = (staffThreads ?? []).map((t) => t.id as string);
+  const [{ data: staffMsgs }, { data: staffUsers }] = await Promise.all([
+    staffIds.length === 0
+      ? Promise.resolve({ data: [] as Record<string, unknown>[] })
+      : supabase
+          .from("staff_messages")
+          .select("*")
+          .in("thread_id", staffIds)
+          .order("created_at", { ascending: true }),
+    supabase
+      .from("users")
+      .select("id, name, role")
+      .in("role", ["recruiter", "accounting"]),
+  ]);
+
+  const userName = new Map(
+    (staffUsers ?? []).map((u) => [u.id as string, u.name as string]),
+  );
+  const msgsByStaff = new Map<string, Record<string, unknown>[]>();
+  for (const m of staffMsgs ?? []) {
+    const tid = String(m.thread_id);
+    const list = msgsByStaff.get(tid) ?? [];
+    list.push(m as Record<string, unknown>);
+    msgsByStaff.set(tid, list);
+  }
+
+  const accountingThreads: RecruiterMessageThread[] = (staffThreads ?? []).map(
+    (t) => {
+      const id = String(t.id);
+      const msgs = msgsByStaff.get(id) ?? [];
+      const last = msgs[msgs.length - 1];
+      const accountingId = String(t.accounting_user_id ?? "");
+      const accountingName = userName.get(accountingId) ?? "Accounting";
+      return {
+        id,
+        participantType: "accounting" as const,
+        participantName: accountingName,
+        participantId: accountingId,
+        subject: String(t.subject ?? "Staff conversation"),
+        preview: last ? String(last.body).slice(0, 80) : "No messages yet",
+        updatedAt: String(t.updated_at ?? t.created_at),
+        unread: 0,
+        messages: msgs.map((m) => ({
+          id: String(m.id),
+          sender:
+            userName.get(String(m.sender_user_id)) ??
+            (m.sender_role === "accounting" ? "Accounting" : "Recruiter"),
+          senderRole: String(m.sender_role),
+          body: String(m.body),
+          createdAt: String(m.created_at),
+          mine: m.sender_role === "recruiter",
+        })),
+      };
+    },
+  );
+
+  return [...byEmployee, ...employerThreads, ...accountingThreads].sort(
+    (a, b) => b.updatedAt.localeCompare(a.updatedAt),
   );
 }
 

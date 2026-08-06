@@ -234,7 +234,8 @@ export type NavIcon =
   | "briefcase-business"
   | "calendar"
   | "building-2"
-  | "user-circle";
+  | "user-circle"
+  | "book-open";
 
 export type NavItem = {
   href: string;
@@ -292,6 +293,11 @@ export function getNavForRole(role: UserRole): NavItem[] {
         },
         { href: "/accounting/contracts", label: "Contracts", icon: "file-signature" },
         { href: "/accounting/expenses", label: "Expenses", icon: "circle-dollar-sign" },
+        {
+          href: "/accounting/journal-entries",
+          label: "Journal Entries",
+          icon: "book-open",
+        },
         { href: "/accounting/profitability", label: "Profitability", icon: "trending-up" },
         { href: "/accounting/reports", label: "Financial Reports", icon: "bar-chart-3" },
         { href: "/accounting/audit-trail", label: "Audit Trail", icon: "history" },
@@ -310,6 +316,7 @@ export function getPageTitle(pathname: string): string {
     "/accounting/accounts-receivable": "Accounts Receivable",
     "/accounting/contracts": "Contracts",
     "/accounting/expenses": "Expenses",
+    "/accounting/journal-entries": "Journal Entries",
     "/accounting/profitability": "Profitability",
     "/accounting/reports": "Financial Reports",
     "/accounting/audit-trail": "Audit Trail",
@@ -349,6 +356,9 @@ export function getPageTitle(pathname: string): string {
   if (pathname === "/accounting/invoices/new") return "Create Invoice";
   if (pathname.startsWith("/accounting/invoices/")) return "Invoice detail";
   if (pathname === "/accounting/expenses/new") return "Add Expense";
+  if (pathname === "/accounting/journal-entries/new") return "Add Journal Entry";
+  if (pathname.startsWith("/accounting/journal-entries/"))
+    return "Journal Entry detail";
   if (pathname === "/accounting/reports/revenue") return "Revenue Report";
   if (pathname === "/accounting/reports/payroll") return "Payroll Report";
   if (pathname === "/accounting/reports/aging") return "Invoice Aging Report";

@@ -9,7 +9,7 @@ export default async function MessagesPage() {
     <div>
       <PageHeader
         title="Messages"
-        description="Conversations with candidates and employers."
+        description="Chat with candidates, employers, and accounting."
       />
       <MessagesCenter threads={threads} />
     </div>

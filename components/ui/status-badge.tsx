@@ -62,8 +62,10 @@ export function statusTone(
     l.includes("completed") ||
     l.includes("scheduled") ||
     l.includes("high") ||
-    l.includes("extended")
+    l.includes("extended") ||
+    l.includes("posted")
   )
     return "info";
+  if (l.includes("void")) return "danger";
   return "neutral";
 }

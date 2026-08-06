@@ -2,6 +2,7 @@ import {
   buildContractAuditEvent,
   buildExpenseAuditEvent,
   buildInvoiceAuditEvent,
+  buildJournalAuditEvent,
   buildPaymentAuditEvent,
   buildTimesheetAuditEvent,
   mergeAuditEvents,
@@ -37,6 +38,8 @@ import type {
   ExpenseStatus,
   ExpenseType,
   InvoiceStatus,
+  JournalEntrySourceType,
+  JournalEntryStatus,
   OperatingExpenseCategory,
   PlacementStatus,
   PlacementType,
@@ -656,6 +659,9 @@ export async function getDashboardData() {
     operatingExpenses,
   );
   const activeContracts = placements.filter((p) => p.status === "active").length;
+  const timesheetsAwaitingApproval = timesheets.filter(
+    (t) => t.status === "submitted",
+  ).length;
 
   const byMonth = new Map<string, number>();
   for (const inv of recognizedInvoices) {
@@ -716,6 +722,7 @@ export async function getDashboardData() {
       payrollLast30Days,
       directLabor,
       activeContracts,
+      timesheetsAwaitingApproval,
       totalExpenses: operatingExpenses,
       grossProfit,
       operatingIncome,
@@ -865,17 +872,37 @@ export async function getAuditTrail(options?: {
   clientId?: string;
   limit?: number;
 }) {
-  const [invoices, paymentsRes, payroll, expenses, operatingExpenses, contracts] =
+  const supabase = await createClient();
+  const [invoices, paymentsRes, payroll, expenses, operatingExpenses, contracts, journalRes] =
     await Promise.all([
       getInvoices(),
-      (await createClient())
+      supabase
         .from("payments")
         .select("id, invoice_id, amount, status, payment_date, created_at"),
       getPayrollRows(),
       getExpenses(),
       getOperatingExpenses(),
       getContracts(),
+      supabase
+        .from("journal_entries")
+        .select("id, entry_date, memo, reference, status, source_type, updated_at")
+        .order("entry_date", { ascending: false })
+        .limit(200),
     ]);
+
+  const journalIds = (journalRes.data ?? []).map((j) => j.id as string);
+  const { data: journalLineTotals } =
+    journalIds.length === 0
+      ? { data: [] as { journal_entry_id: string; debit: number }[] }
+      : await supabase
+          .from("journal_entry_lines")
+          .select("journal_entry_id, debit")
+          .in("journal_entry_id", journalIds);
+  const jeDebits = new Map<string, number>();
+  for (const row of journalLineTotals ?? []) {
+    const id = String(row.journal_entry_id);
+    jeDebits.set(id, roundMoney((jeDebits.get(id) ?? 0) + Number(row.debit ?? 0)));
+  }
 
   const invoiceById = new Map(invoices.map((i) => [i.id, i]));
   const placementClient = new Map(
@@ -961,6 +988,18 @@ export async function getAuditTrail(options?: {
         startDate: c.startDate,
       }),
     ),
+    ...(journalRes.data ?? []).map((j) =>
+      buildJournalAuditEvent({
+        id: j.id as string,
+        entryDate: j.entry_date as string,
+        memo: (j.memo as string) || "",
+        reference: (j.reference as string) || "",
+        status: j.status as string,
+        amount: jeDebits.get(j.id as string) ?? 0,
+        sourceType: (j.source_type as string | null) ?? null,
+        updatedAt: (j.updated_at as string | null) ?? null,
+      }),
+    ),
   ].map((e) => {
     if (e.invoiceId && invoiceById.has(e.invoiceId)) {
       const inv = invoiceById.get(e.invoiceId)!;
@@ -993,4 +1032,153 @@ export async function getAuditTrail(options?: {
   }
 
   return mergeAuditEvents(events, options?.limit ?? 100);
+}
+
+export type JournalEntryListRow = {
+  id: string;
+  entryDate: string;
+  memo: string;
+  reference: string;
+  status: JournalEntryStatus;
+  sourceType: JournalEntrySourceType;
+  sourceId: string | null;
+  debitTotal: number;
+  creditTotal: number;
+  balanced: boolean;
+  lineCount: number;
+  updatedAt: string;
+};
+
+export type JournalEntryDetail = {
+  id: string;
+  entryDate: string;
+  memo: string;
+  reference: string;
+  status: JournalEntryStatus;
+  sourceType: JournalEntrySourceType;
+  sourceId: string | null;
+  postedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  debitTotal: number;
+  creditTotal: number;
+  balanced: boolean;
+  lines: {
+    id: string;
+    lineNo: number;
+    accountCode: string;
+    accountName: string;
+    description: string;
+    debit: number;
+    credit: number;
+  }[];
+};
+
+export async function getJournalEntries(): Promise<JournalEntryListRow[]> {
+  const supabase = await createClient();
+  const { data: entries, error } = await supabase
+    .from("journal_entries")
+    .select(
+      "id, entry_date, memo, reference, status, source_type, source_id, updated_at",
+    )
+    .order("entry_date", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("getJournalEntries", error.message);
+    return [];
+  }
+
+  const ids = (entries ?? []).map((e) => e.id as string);
+  const { data: lines } =
+    ids.length === 0
+      ? { data: [] as Record<string, unknown>[] }
+      : await supabase
+          .from("journal_entry_lines")
+          .select("journal_entry_id, debit, credit")
+          .in("journal_entry_id", ids);
+
+  const totals = new Map<string, { debit: number; credit: number; count: number }>();
+  for (const line of lines ?? []) {
+    const id = String(line.journal_entry_id);
+    const current = totals.get(id) ?? { debit: 0, credit: 0, count: 0 };
+    current.debit = roundMoney(current.debit + Number(line.debit ?? 0));
+    current.credit = roundMoney(current.credit + Number(line.credit ?? 0));
+    current.count += 1;
+    totals.set(id, current);
+  }
+
+  return (entries ?? []).map((e) => {
+    const t = totals.get(e.id as string) ?? { debit: 0, credit: 0, count: 0 };
+    return {
+      id: e.id as string,
+      entryDate: e.entry_date as string,
+      memo: (e.memo as string) || "",
+      reference: (e.reference as string) || "",
+      status: e.status as JournalEntryStatus,
+      sourceType: (e.source_type as JournalEntrySourceType) || "manual",
+      sourceId: (e.source_id as string | null) ?? null,
+      debitTotal: t.debit,
+      creditTotal: t.credit,
+      balanced: t.debit === t.credit && t.count > 0,
+      lineCount: t.count,
+      updatedAt: e.updated_at as string,
+    };
+  });
+}
+
+export async function getJournalEntryById(
+  id: string,
+): Promise<JournalEntryDetail | null> {
+  const supabase = await createClient();
+  const { data: entry, error } = await supabase
+    .from("journal_entries")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !entry) {
+    if (error) console.error("getJournalEntryById", error.message);
+    return null;
+  }
+
+  const { data: lines, error: linesError } = await supabase
+    .from("journal_entry_lines")
+    .select("*")
+    .eq("journal_entry_id", id)
+    .order("line_no", { ascending: true });
+
+  if (linesError) {
+    console.error("getJournalEntryById lines", linesError.message);
+  }
+
+  const mappedLines = (lines ?? []).map((l) => ({
+    id: l.id as string,
+    lineNo: Number(l.line_no),
+    accountCode: l.account_code as string,
+    accountName: (l.account_name as string) || "",
+    description: (l.description as string) || "",
+    debit: Number(l.debit ?? 0),
+    credit: Number(l.credit ?? 0),
+  }));
+
+  const debitTotal = sumMoney(mappedLines.map((l) => l.debit));
+  const creditTotal = sumMoney(mappedLines.map((l) => l.credit));
+
+  return {
+    id: entry.id as string,
+    entryDate: entry.entry_date as string,
+    memo: (entry.memo as string) || "",
+    reference: (entry.reference as string) || "",
+    status: entry.status as JournalEntryStatus,
+    sourceType: (entry.source_type as JournalEntrySourceType) || "manual",
+    sourceId: (entry.source_id as string | null) ?? null,
+    postedAt: (entry.posted_at as string | null) ?? null,
+    createdAt: entry.created_at as string,
+    updatedAt: entry.updated_at as string,
+    debitTotal,
+    creditTotal,
+    balanced: debitTotal === creditTotal && mappedLines.length > 0,
+    lines: mappedLines,
+  };
 }

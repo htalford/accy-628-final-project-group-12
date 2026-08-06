@@ -8,6 +8,7 @@ export function StatCard({
   description,
   icon,
   href,
+  compact = false,
 }: {
   label: string;
   value: string;
@@ -15,10 +16,20 @@ export function StatCard({
   description?: string;
   icon?: ReactNode;
   href?: string;
+  compact?: boolean;
 }) {
   const subtitle = hint ?? description;
 
-  const content = (
+  const content = compact ? (
+    <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
+      <p className="text-xs font-medium leading-tight tracking-wide text-[var(--cf-muted)] uppercase">
+        {label}
+      </p>
+      <p className="text-2xl font-semibold leading-none text-[var(--cf-ink)] sm:text-3xl">
+        {value}
+      </p>
+    </div>
+  ) : (
     <>
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs font-medium tracking-wide text-[var(--cf-muted)] uppercase">
@@ -37,19 +48,20 @@ export function StatCard({
     </>
   );
 
+  const className = compact
+    ? "aspect-square w-full rounded-xl border border-[var(--cf-border)] bg-white shadow-sm transition hover:border-[var(--cf-accent)] hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cf-accent)]"
+    : "rounded-xl border border-[var(--cf-border)] bg-white p-4 shadow-sm transition hover:border-[var(--cf-accent)] hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cf-accent)]";
+
   if (href) {
     return (
-      <Link
-        href={href}
-        className="block rounded-xl border border-[var(--cf-border)] bg-white p-4 shadow-sm transition hover:border-[var(--cf-accent)] hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cf-accent)]"
-      >
+      <Link href={href} className={`block ${className}`} title={subtitle}>
         {content}
       </Link>
     );
   }
 
   return (
-    <div className="rounded-xl border border-[var(--cf-border)] bg-white p-4 shadow-sm transition hover:shadow-md">
+    <div className={className} title={subtitle}>
       {content}
     </div>
   );

@@ -1,17 +1,17 @@
 import { PageHeader } from "@/components/ui/page-header";
-import { AccountingMessagesClient } from "@/components/accounting/messages-client";
-import { listStaffCandidateThreads } from "@/lib/staff/messages";
+import { AccountingMessagesCenter } from "@/components/accounting/messages-center";
+import { listAccountingMessageThreads } from "@/lib/accounting/messages";
 
 export default async function AccountingMessagesPage() {
-  const threads = await listStaffCandidateThreads("accounting");
+  const threads = await listAccountingMessageThreads();
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Messages"
-        description="Conversations with candidates about pay and timesheets. Recruiter chats stay in the recruiter portal."
+        description="Chat with recruiters, employers, and candidates about pay, invoices, and timesheets."
       />
-      <AccountingMessagesClient threads={threads} />
+      <AccountingMessagesCenter threads={threads} />
     </div>
   );
 }

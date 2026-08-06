@@ -3,39 +3,39 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  markRecruiterCandidateThreadRead,
-  sendAccountingStaffMessage,
-  sendEmployerMessage,
-  sendRecruiterMessage,
-} from "@/app/actions/recruiter";
-import type { RecruiterMessageThread } from "@/lib/recruiter/types";
+  markAccountingCandidateThreadRead,
+  sendAccountingCandidateMessage,
+  sendAccountingEmployerMessage,
+  sendAccountingRecruiterMessage,
+} from "@/app/actions/accounting-messages";
+import type { AccountingMessageThread } from "@/lib/accounting/messages";
 
-type Filter = "all" | "employer" | "candidate" | "accounting";
+type Filter = "all" | "candidate" | "employer" | "recruiter";
 
-export function MessagesCenter({
-  threads,
+export function AccountingMessagesCenter({
+  threads: initial,
 }: {
-  threads: RecruiterMessageThread[];
+  threads: AccountingMessageThread[];
 }) {
   const router = useRouter();
+  const [threads, setThreads] = useState(initial);
   const [filter, setFilter] = useState<Filter>("all");
-  const [activeId, setActiveId] = useState(threads[0]?.id ?? "");
+  const [activeId, setActiveId] = useState(initial[0]?.id ?? "");
   const [draft, setDraft] = useState("");
   const [subject, setSubject] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
-    if (threads.length && !threads.some((t) => t.id === activeId)) {
-      setActiveId(threads[0]!.id);
+    setThreads(initial);
+    if (initial.length && !initial.some((t) => t.id === activeId)) {
+      setActiveId(initial[0]!.id);
     }
-  }, [threads, activeId]);
+  }, [initial, activeId]);
 
   const filtered = useMemo(
     () =>
-      threads.filter(
-        (t) => filter === "all" || t.participantType === filter,
-      ),
+      threads.filter((t) => filter === "all" || t.participantType === filter),
     [threads, filter],
   );
 
@@ -51,7 +51,7 @@ export function MessagesCenter({
       return;
     }
     startTransition(async () => {
-      await markRecruiterCandidateThreadRead(active.participantId);
+      await markAccountingCandidateThreadRead(active.participantId);
       router.refresh();
     });
   }, [
@@ -62,7 +62,7 @@ export function MessagesCenter({
     router,
   ]);
 
-  function sendReply() {
+  function send() {
     if (!active || !draft.trim()) return;
     const body = draft.trim();
     const subj = subject.trim() || active.subject;
@@ -70,18 +70,18 @@ export function MessagesCenter({
     startTransition(async () => {
       let result: { ok: boolean; message?: string; error?: string };
       if (active.participantType === "candidate") {
-        result = await sendRecruiterMessage({
+        result = await sendAccountingCandidateMessage({
           employeeId: active.participantId,
           subject: subj,
           body,
         });
       } else if (active.participantType === "employer") {
-        result = await sendEmployerMessage({
+        result = await sendAccountingEmployerMessage({
           threadId: active.id,
           body,
         });
       } else {
-        result = await sendAccountingStaffMessage({
+        result = await sendAccountingRecruiterMessage({
           threadId: active.id,
           body,
         });
@@ -101,7 +101,7 @@ export function MessagesCenter({
       <div className="grid min-h-[28rem] lg:grid-cols-[18rem_1fr]">
         <aside className="border-b border-[var(--cf-border)] lg:border-r lg:border-b-0">
           <div className="flex flex-wrap gap-1 border-b border-[var(--cf-border)] p-3">
-            {(["all", "employer", "candidate", "accounting"] as const).map(
+            {(["all", "recruiter", "employer", "candidate"] as const).map(
               (f) => (
                 <button
                   key={f}
@@ -134,7 +134,7 @@ export function MessagesCenter({
                   <p className="truncate text-xs text-[var(--cf-muted)]">
                     {t.preview}
                   </p>
-                  <p className="mt-1 text-[10px] uppercase tracking-wide text-[var(--cf-muted)]">
+                  <p className="mt-1 text-[10px] tracking-wide text-[var(--cf-muted)] uppercase">
                     {t.participantType}
                     {t.unread ? ` · ${t.unread} unread` : ""}
                   </p>
@@ -156,13 +156,7 @@ export function MessagesCenter({
                 <p className="font-semibold text-[var(--cf-ink)]">
                   {active.participantName}
                 </p>
-                <p className="text-xs text-[var(--cf-muted)]">
-                  {active.participantType === "candidate"
-                    ? "Candidate · recruiter lane"
-                    : active.participantType === "accounting"
-                      ? "Accounting · staff conversation"
-                      : active.subject}
-                </p>
+                <p className="text-xs text-[var(--cf-muted)]">{active.subject}</p>
               </div>
               <div className="flex-1 space-y-3 overflow-y-auto p-4">
                 {active.messages.map((m) => (
@@ -195,29 +189,18 @@ export function MessagesCenter({
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     rows={2}
-                    placeholder={
-                      active.participantType === "employer"
-                        ? "Reply to employer…"
-                        : active.participantType === "accounting"
-                          ? "Message accounting…"
-                          : "Write a message…"
-                    }
+                    placeholder={`Message ${active.participantName}…`}
                     className="min-h-[2.5rem] flex-1 rounded-lg border border-[var(--cf-border)] px-3 py-2 text-sm"
                   />
                   <button
                     type="button"
                     disabled={pending || !draft.trim()}
                     className="self-end rounded-lg bg-[var(--cf-navy)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                    onClick={sendReply}
+                    onClick={send}
                   >
                     Send
                   </button>
                 </div>
-                {active.participantType === "employer" ? (
-                  <p className="text-[11px] text-[var(--cf-muted)]">
-                    Synced with Client Portal employer conversations.
-                  </p>
-                ) : null}
               </div>
             </>
           ) : (

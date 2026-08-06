@@ -28,6 +28,17 @@ export type ExpenseType =
 
 export type ExpenseStatus = "pending" | "approved" | "rejected" | "reimbursed";
 
+export type JournalEntryStatus = "draft" | "posted" | "void";
+
+export type JournalEntrySourceType =
+  | "invoice"
+  | "payment"
+  | "timesheet"
+  | "expense"
+  | "operating_expense"
+  | "manual"
+  | "opening";
+
 /** Company overhead categories (public.operating_expenses.category). */
 export type OperatingExpenseCategory =
   | "recruiter_salaries"
@@ -279,6 +290,32 @@ export type OperatingExpense = {
   month: string;
   created_at: string;
   updated_at: string;
+};
+
+export type JournalEntry = {
+  id: string;
+  entry_date: string;
+  memo: string;
+  reference: string;
+  status: JournalEntryStatus;
+  source_type: JournalEntrySourceType;
+  source_id: string | null;
+  created_by: string | null;
+  posted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type JournalEntryLine = {
+  id: string;
+  journal_entry_id: string;
+  line_no: number;
+  account_code: string;
+  account_name: string;
+  description: string;
+  debit: number;
+  credit: number;
+  created_at: string;
 };
 
 export type AppUser = {

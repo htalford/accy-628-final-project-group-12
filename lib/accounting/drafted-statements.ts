@@ -1,22 +1,24 @@
-import { createClient } from "@/lib/supabase/server";
 import {
   getAccountsReceivable,
   getExpenses,
   getInvoices,
-  getOperatingExpenses,
-  getTimesheets,
 } from "@/lib/accounting/queries";
 import { money, moneyExact } from "@/lib/accounting/format";
 import {
   computeGrossProfit,
   computeOperatingIncome,
-  isApprovedTimesheet,
-  isCompletedPayment,
   isRecognizedExpense,
   isRecognizedInvoice,
   roundMoney,
   sumMoney,
 } from "@/lib/accounting/calculations";
+import {
+  cashFromCustomers,
+  cashPaidForExpenses,
+  getPostedJournalLines,
+  netCredit,
+  netDebit,
+} from "@/lib/accounting/ledger";
 import type {
   ReportFilters,
   ReportId,
@@ -76,18 +78,6 @@ function statementPreview(
   };
 }
 
-function inDateRange(
-  date: string | null | undefined,
-  from?: string | null,
-  to?: string | null,
-): boolean {
-  if (!date) return !(from || to);
-  const d = date.slice(0, 10);
-  if (from && d < from) return false;
-  if (to && d > to) return false;
-  return true;
-}
-
 function matchesClient(
   clientId: string | null | undefined,
   filter?: string | null,
@@ -117,6 +107,7 @@ export type DraftedFinancials = {
   endingCash: number;
   totalAssets: number;
   accruedPayroll: number;
+  accruedExpenses: number;
   totalLiabilities: number;
   beginningRetainedEarnings: number;
   endingRetainedEarnings: number;
@@ -125,144 +116,196 @@ export type DraftedFinancials = {
   totalLiabilitiesAndEquity: number;
 };
 
-/** Drafted statements from operational TalentQuest data (not a full general ledger). */
+async function clientSourceIds(
+  clientFilter?: string | null,
+): Promise<Set<string> | null> {
+  if (!clientFilter || clientFilter === "all") return null;
+  const [invoices, expenses] = await Promise.all([
+    getInvoices(),
+    getExpenses(),
+  ]);
+  const ids = new Set<string>();
+  for (const inv of invoices) {
+    if (inv.clientId === clientFilter) ids.add(inv.id);
+  }
+  for (const exp of expenses) {
+    if (exp.clientId === clientFilter) ids.add(exp.id);
+  }
+  // Payments are filtered later via invoice sources; include payment JE by joining.
+  return ids;
+}
+
+/** Drafted statements from posted general-ledger journal entries. */
 export async function getDraftedFinancials(
   filters: ReportFilters = {},
 ): Promise<DraftedFinancials> {
-  const [invoices, timesheets, placementExpenses, operatingExpenses, ar, supabase] =
-    await Promise.all([
-      getInvoices(),
-      getTimesheets(),
-      getExpenses(),
-      getOperatingExpenses(),
-      getAccountsReceivable(),
-      createClient(),
-    ]);
+  const sourceIds = await clientSourceIds(filters.client);
+  const asOf = filters.to ?? null;
 
-  const { data: payments } = await supabase
-    .from("payments")
-    .select("invoice_id, amount, status, payment_date");
+  const [periodLines, asOfLines, ar] = await Promise.all([
+    getPostedJournalLines({
+      from: filters.from,
+      to: filters.to,
+      sourceIds,
+    }),
+    getPostedJournalLines({
+      asOf,
+      sourceIds,
+    }),
+    getAccountsReceivable(),
+  ]);
 
-  const invoiceById = new Map(invoices.map((i) => [i.id, i]));
+  const linesForPeriod = periodLines;
+  const linesAsOf = asOfLines;
 
-  const recognizedRevenue = sumMoney(
-    invoices
-      .filter(
-        (i) =>
-          isRecognizedInvoice(i.status) &&
-          matchesClient(i.clientId, filters.client) &&
-          inDateRange(i.periodEnd, filters.from, filters.to),
-      )
-      .map((i) => i.amount),
+  const revenue = netCredit(linesForPeriod, ["4000", "4100"]);
+  const directLabor = netDebit(linesForPeriod, ["5100"]);
+  const placementExpenses = roundMoney(
+    netDebit(linesForPeriod, ["5200", "5300"]) +
+      netDebit(linesForPeriod, ["6900"], ["expense"]),
   );
-
-  const directLabor = sumMoney(
-    timesheets
-      .filter(
-        (t) =>
-          isApprovedTimesheet(t.status) &&
-          matchesClient(t.clientId, filters.client) &&
-          inDateRange(t.weekEnding, filters.from, filters.to),
-      )
-      .map((t) => t.grossPay),
-  );
-
-  const placementExp = sumMoney(
-    placementExpenses
-      .filter(
-        (e) =>
-          isRecognizedExpense(e.status) &&
-          matchesClient(e.clientId, filters.client) &&
-          inDateRange(e.expenseDate, filters.from, filters.to),
-      )
-      .map((e) => e.amount),
-  );
-
-  const operatingExp =
+  const operatingExpenses =
     !filters.client || filters.client === "all"
-      ? sumMoney(
-          operatingExpenses
-            .filter((e) =>
-              inDateRange(e.expenseDate, filters.from, filters.to),
-            )
-            .map((e) => e.amount),
+      ? roundMoney(
+          netDebit(linesForPeriod, ["6100", "6200", "6300"]) +
+            netDebit(linesForPeriod, ["6900"], ["operating_expense"]),
         )
       : 0;
 
-  const totalOperatingCosts = roundMoney(placementExp + operatingExp);
-  const grossProfit = computeGrossProfit(recognizedRevenue, directLabor);
+  const totalOperatingCosts = roundMoney(placementExpenses + operatingExpenses);
+  const grossProfit = computeGrossProfit(revenue, directLabor);
   const netIncome = computeOperatingIncome(
-    recognizedRevenue,
+    revenue,
     directLabor,
     totalOperatingCosts,
   );
 
-  const collections = sumMoney(
-    (payments ?? [])
-      .filter((p) => {
-        if (!isCompletedPayment(p.status as string)) return false;
-        const inv = invoiceById.get(p.invoice_id as string);
-        if (!inv) return false;
-        if (!matchesClient(inv.clientId, filters.client)) return false;
-        return inDateRange(
-          (p.payment_date as string | null) ?? null,
-          filters.from,
-          filters.to,
-        );
-      })
-      .map((p) => Number(p.amount)),
-  );
-
-  const accountsReceivable = sumMoney(
-    ar.rows
-      .filter((r) => matchesClient(r.clientId, filters.client))
-      .map((r) => r.amountDue),
-  );
-
-  // Draft cash flow (direct): collections in; payroll & expenses assumed paid in cash.
-  const cashFromCustomers = collections;
-  const cashPaidToEmployees = directLabor;
-  const cashPaidForExpenses = totalOperatingCosts;
+  const collections = cashFromCustomers(linesForPeriod);
+  const cashPaidEmployees = 0; // payroll is accrued (2100), not cash-settled in demo
+  const cashPaidExpenses = cashPaidForExpenses(linesForPeriod);
   const netCashFromOperating = roundMoney(
-    cashFromCustomers - cashPaidToEmployees - cashPaidForExpenses,
+    collections - cashPaidEmployees - cashPaidExpenses,
   );
   const netCashFromInvesting = 0;
   const netCashFromFinancing = 0;
   const netChangeInCash = roundMoney(
     netCashFromOperating + netCashFromInvesting + netCashFromFinancing,
   );
-  const beginningCash = 0;
-  const endingCash = roundMoney(beginningCash + netChangeInCash);
 
-  const accruedPayroll = 0;
-  const totalLiabilities = accruedPayroll;
-  const beginningRetainedEarnings = 0;
-  const endingRetainedEarnings = roundMoney(
-    beginningRetainedEarnings + netIncome,
+  const openingCashLines = await getPostedJournalLines({
+    to: filters.from
+      ? new Date(new Date(filters.from + "T00:00:00").getTime() - 86400000)
+          .toISOString()
+          .slice(0, 10)
+      : "2025-12-31",
+    sourceIds,
+  });
+  const beginningCash = netDebit(openingCashLines, ["1000"]);
+  const endingCash = netDebit(linesAsOf, ["1000"]);
+
+  const accountsReceivableGl = netDebit(linesAsOf, ["1200"]);
+  const accountsReceivable =
+    !filters.client || filters.client === "all"
+      ? accountsReceivableGl
+      : sumMoney(
+          ar.rows
+            .filter((r) => matchesClient(r.clientId, filters.client))
+            .map((r) => r.amountDue),
+        );
+
+  const accruedPayroll = netCredit(linesAsOf, ["2100"]);
+  const accruedExpenses = netCredit(linesAsOf, ["2200", "2300"]);
+  const totalLiabilities = roundMoney(accruedPayroll + accruedExpenses);
+  const commonStock = netCredit(linesAsOf, ["3000"]);
+
+  // Retained earnings = cumulative NI as-of (all periods through asOf)
+  const cumulativeLines = linesAsOf;
+  const cumulativeRevenue = netCredit(cumulativeLines, ["4000", "4100"]);
+  const cumulativeLabor = netDebit(cumulativeLines, ["5100"]);
+  const cumulativeOpEx = roundMoney(
+    netDebit(cumulativeLines, ["5200", "5300", "6100", "6200", "6300", "6900"]),
   );
+  const endingRetainedEarnings = computeOperatingIncome(
+    cumulativeRevenue,
+    cumulativeLabor,
+    cumulativeOpEx,
+  );
+  const beginningRetainedEarnings = roundMoney(
+    endingRetainedEarnings - netIncome,
+  );
+
   const totalAssets = roundMoney(endingCash + accountsReceivable);
-  // Contributed capital plug so the drafted balance sheet balances.
-  const commonStock = roundMoney(
-    totalAssets - totalLiabilities - endingRetainedEarnings,
-  );
   const totalEquity = roundMoney(commonStock + endingRetainedEarnings);
   const totalLiabilitiesAndEquity = roundMoney(
     totalLiabilities + totalEquity,
   );
 
+  // If client filter emptied GL revenue, fall back to ops for that client so reports aren't blank.
+  if (sourceIds && revenue === 0 && directLabor === 0) {
+    const invoices = await getInvoices();
+    const expenses = await getExpenses();
+    const recognizedRevenue = sumMoney(
+      invoices
+        .filter(
+          (i) =>
+            isRecognizedInvoice(i.status) &&
+            matchesClient(i.clientId, filters.client),
+        )
+        .map((i) => i.amount),
+    );
+    const placementExp = sumMoney(
+      expenses
+        .filter(
+          (e) =>
+            isRecognizedExpense(e.status) &&
+            matchesClient(e.clientId, filters.client),
+        )
+        .map((e) => e.amount),
+    );
+    return {
+      revenue: recognizedRevenue,
+      directLabor: 0,
+      placementExpenses: placementExp,
+      operatingExpenses: 0,
+      totalOperatingCosts: placementExp,
+      grossProfit: recognizedRevenue,
+      netIncome: roundMoney(recognizedRevenue - placementExp),
+      collections: 0,
+      accountsReceivable,
+      cashFromCustomers: 0,
+      cashPaidToEmployees: 0,
+      cashPaidForExpenses: 0,
+      netCashFromOperating: 0,
+      netCashFromInvesting: 0,
+      netCashFromFinancing: 0,
+      netChangeInCash: 0,
+      beginningCash: 0,
+      endingCash: 0,
+      totalAssets: accountsReceivable,
+      accruedPayroll: 0,
+      accruedExpenses: 0,
+      totalLiabilities: 0,
+      beginningRetainedEarnings: 0,
+      endingRetainedEarnings: roundMoney(recognizedRevenue - placementExp),
+      commonStock: 0,
+      totalEquity: roundMoney(recognizedRevenue - placementExp),
+      totalLiabilitiesAndEquity: roundMoney(recognizedRevenue - placementExp),
+    };
+  }
+
   return {
-    revenue: recognizedRevenue,
+    revenue,
     directLabor,
-    placementExpenses: placementExp,
-    operatingExpenses: operatingExp,
+    placementExpenses,
+    operatingExpenses,
     totalOperatingCosts,
     grossProfit,
     netIncome,
     collections,
     accountsReceivable,
-    cashFromCustomers,
-    cashPaidToEmployees,
-    cashPaidForExpenses,
+    cashFromCustomers: collections,
+    cashPaidToEmployees: cashPaidEmployees,
+    cashPaidForExpenses: cashPaidExpenses,
     netCashFromOperating,
     netCashFromInvesting,
     netCashFromFinancing,
@@ -271,6 +314,7 @@ export async function getDraftedFinancials(
     endingCash,
     totalAssets,
     accruedPayroll,
+    accruedExpenses,
     totalLiabilities,
     beginningRetainedEarnings,
     endingRetainedEarnings,
@@ -287,22 +331,22 @@ export async function buildIncomeStatementReport(
   return statementPreview(
     "income-statement",
     "Income Statement",
-    "Drafted staffing P&L from recognized invoices, approved labor, and expenses.",
+    "From posted journal entries (revenue, payroll accruals, and expenses).",
     [
       { label: "Revenue", value: money(f.revenue) },
       { label: "Gross profit", value: money(f.grossProfit) },
       { label: "Net income", value: money(f.netIncome) },
     ],
     [
-      line("r1", "Revenue", "Staffing revenue (recognized invoices)", f.revenue),
+      line("r1", "Revenue", "Staffing revenue (posted)", f.revenue),
       line("r2", "Revenue", "Total revenue", f.revenue),
-      line("c1", "Cost of services", "Direct labor (approved timesheets)", f.directLabor),
+      line("c1", "Cost of services", "Direct labor (payroll accruals)", f.directLabor),
       line("c2", "Cost of services", "Total cost of services", f.directLabor),
       line("g1", "Gross profit", "Gross profit", f.grossProfit),
       line("o1", "Operating expenses", "Placement expenses", f.placementExpenses),
       line("o2", "Operating expenses", "Operating expenses", f.operatingExpenses),
       line("o3", "Operating expenses", "Total operating expenses", f.totalOperatingCosts),
-      line("n1", "Net income", "Operating income / net income (draft)", f.netIncome),
+      line("n1", "Net income", "Operating income / net income", f.netIncome),
     ],
   );
 }
@@ -314,7 +358,7 @@ export async function buildBalanceSheetReport(
   return statementPreview(
     "balance-sheet",
     "Balance Sheet",
-    "Drafted position from cash collections, open AR, and equity plugs (not a full GL).",
+    "From posted journal entries (cash, AR, accruals, and equity).",
     [
       { label: "Total assets", value: money(f.totalAssets) },
       { label: "Total liabilities", value: money(f.totalLiabilities) },
@@ -325,8 +369,9 @@ export async function buildBalanceSheetReport(
       line("a2", "Assets", "Accounts receivable", f.accountsReceivable),
       line("a3", "Assets", "Total assets", f.totalAssets),
       line("l1", "Liabilities", "Accrued payroll", f.accruedPayroll),
-      line("l2", "Liabilities", "Total liabilities", f.totalLiabilities),
-      line("e1", "Equity", "Common stock (contributed capital, draft plug)", f.commonStock),
+      line("l2", "Liabilities", "Accrued expenses", f.accruedExpenses),
+      line("l3", "Liabilities", "Total liabilities", f.totalLiabilities),
+      line("e1", "Equity", "Owner equity / common stock", f.commonStock),
       line("e2", "Equity", "Retained earnings", f.endingRetainedEarnings),
       line("e3", "Equity", "Total stockholders' equity", f.totalEquity),
       line(
@@ -346,7 +391,7 @@ export async function buildCashFlowsReport(
   return statementPreview(
     "cash-flows",
     "Statement of Cash Flows",
-    "Drafted direct-method cash flows from collections, payroll, and expenses.",
+    "Direct-method cash flows from posted cash journal lines (collections and cash expenses).",
     [
       { label: "Operating cash flow", value: money(f.netCashFromOperating) },
       { label: "Net change in cash", value: money(f.netChangeInCash) },
@@ -360,7 +405,7 @@ export async function buildCashFlowsReport(
       line(
         "op2",
         "Operating activities",
-        "Cash paid to employees (approved payroll)",
+        "Cash paid to employees",
         -f.cashPaidToEmployees,
       ),
       line(

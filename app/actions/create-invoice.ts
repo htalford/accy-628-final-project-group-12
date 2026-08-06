@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getAppUser } from "@/lib/auth/get-app-user";
-import { roundMoney, sumMoney } from "@/lib/accounting/calculations";
+import {
+  isRecognizedInvoice,
+  roundMoney,
+  sumMoney,
+} from "@/lib/accounting/calculations";
+import { buildInvoiceJournal } from "@/lib/accounting/journal-posting";
+import { insertJournalDraft } from "@/lib/accounting/sync-journal-entries";
 import type { InvoiceStatus } from "@/lib/types/database";
 
 export type CreateInvoiceLineInput = {
@@ -139,11 +145,38 @@ export async function createInvoice(
     };
   }
 
+  if (isRecognizedInvoice(input.status)) {
+    const { data: client } = await supabase
+      .from("clients")
+      .select("name")
+      .eq("id", clientId)
+      .maybeSingle();
+    let placementType: string | null = null;
+    if (placementId) {
+      const { data: placement } = await supabase
+        .from("placements")
+        .select("placement_type")
+        .eq("id", placementId)
+        .maybeSingle();
+      placementType = (placement?.placement_type as string | null) ?? null;
+    }
+    const draft = buildInvoiceJournal({
+      id: invoice.id as string,
+      clientName: (client?.name as string) || "Client",
+      amount,
+      periodEnd,
+      placementType,
+    });
+    if (draft) await insertJournalDraft(draft, user.id);
+  }
+
   revalidatePath("/accounting/invoices");
   revalidatePath("/accounting/accounts-receivable");
   revalidatePath("/accounting/dashboard");
   revalidatePath("/accounting/audit-trail");
   revalidatePath("/accounting/profitability");
+  revalidatePath("/accounting/journal-entries");
+  revalidatePath("/accounting/reports");
   if (placementId) {
     revalidatePath(`/accounting/contracts/${placementId}`);
   }

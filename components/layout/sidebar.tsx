@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
+  BookOpen,
   Briefcase,
   BriefcaseBusiness,
   Building2,
@@ -43,8 +44,6 @@ import {
 import type { UserRole } from "@/lib/types/database";
 import type { NavIcon, NavItem } from "@/lib/auth/roles";
 import { useSidebarLayout } from "@/components/layout/shell-context";
-import { usePinnedTasks } from "@/components/portal-pins/use-pinned-tasks";
-import type { PinnedTask } from "@/lib/portal-pins";
 
 const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   "layout-dashboard": LayoutDashboard,
@@ -73,6 +72,7 @@ const ICONS: Record<NavIcon, React.ComponentType<{ className?: string }>> = {
   calendar: Calendar,
   "building-2": Building2,
   "user-circle": UserCircle,
+  "book-open": BookOpen,
 };
 
 const CANDIDATE_DASHBOARD = "/candidate/dashboard";
@@ -243,62 +243,6 @@ function NavLink({
   );
 }
 
-function AccountingPinnedTaskLink({
-  task,
-  collapsed,
-  onNavigate,
-  onUnpin,
-}: {
-  task: PinnedTask;
-  collapsed: boolean;
-  onNavigate?: () => void;
-  onUnpin: () => void;
-}) {
-  const pathname = usePathname();
-  const active =
-    pathname === task.href || pathname.startsWith(`${task.href}/`);
-
-  return (
-    <div
-      className={`group flex items-center gap-0.5 rounded-md ${
-        active ? "bg-[var(--cf-accent)]/15" : "hover:bg-white/5"
-      }`}
-    >
-      <Link
-        href={task.href}
-        title={task.sublabel ? `${task.label} · ${task.sublabel}` : task.label}
-        onClick={onNavigate}
-        className={`flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-sm font-medium transition ${
-          collapsed ? "justify-center px-2" : ""
-        } ${active ? "text-white" : "text-white/70 group-hover:text-white"}`}
-      >
-        <Pin className="h-3.5 w-3.5 shrink-0 fill-current text-[var(--cf-accent)]" />
-        {!collapsed ? (
-          <span className="min-w-0">
-            <span className="block truncate">{task.label}</span>
-            {task.sublabel ? (
-              <span className="block truncate text-[10px] font-normal text-white/40">
-                {task.sublabel}
-              </span>
-            ) : null}
-          </span>
-        ) : null}
-      </Link>
-      {!collapsed ? (
-        <button
-          type="button"
-          onClick={onUnpin}
-          title={`Unpin ${task.label}`}
-          aria-label={`Unpin ${task.label}`}
-          className="mr-1 rounded p-1.5 text-white/35 opacity-0 transition group-hover:opacity-100 hover:text-white"
-        >
-          <X className="h-3.5 w-3.5" aria-hidden />
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
 export function Sidebar({
   role,
   unreadMessageCount = 0,
@@ -309,7 +253,6 @@ export function Sidebar({
   const items = getNavForRole(role);
   const isCandidate = role === "candidate";
   const isRecruiter = role === "recruiter";
-  const isAccounting = role === "accounting";
   const usesTabPins = isCandidate || isRecruiter;
   const homePath = getDashboardPath(role);
   const showMessagesDot =
@@ -334,8 +277,6 @@ export function Sidebar({
 
   const [pinnedHrefs, setPinnedHrefs] = useState<string[]>([dashboardHref]);
   const [ready, setReady] = useState(!usesTabPins);
-  const { tasks: accountingPins, unpin: unpinAccounting } =
-    usePinnedTasks("accounting");
 
   useEffect(() => {
     if (!usesTabPins) return;
@@ -381,28 +322,6 @@ export function Sidebar({
   // Recruiter uses per-tab pins; hide whole-sidebar pin control for that role.
   const showSidebarPinControl = !isRecruiter && canTogglePin;
   const showHomeLockedPin = !isRecruiter && !canTogglePin;
-
-  const accountingPinnedSection =
-    isAccounting && accountingPins.length > 0 ? (
-      <div className="mb-2">
-        {!navCollapsed ? (
-          <p className="px-3 pb-1 text-[10px] font-semibold tracking-[0.14em] text-white/35 uppercase">
-            Pinned tasks
-          </p>
-        ) : null}
-        <div className="flex flex-col gap-0.5">
-          {accountingPins.map((task) => (
-            <AccountingPinnedTaskLink
-              key={task.id}
-              task={task}
-              collapsed={navCollapsed}
-              onNavigate={() => setMobileOpen(false)}
-              onUnpin={() => unpinAccounting(task.id)}
-            />
-          ))}
-        </div>
-      </div>
-    ) : null;
 
   const nav = (
     <>
@@ -503,7 +422,6 @@ export function Sidebar({
         </div>
       </div>
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
-        {accountingPinnedSection}
         {usesTabPins ? (
           <>
             {pinned.length > 0 ? (
@@ -556,31 +474,22 @@ export function Sidebar({
             ) : null}
           </>
         ) : (
-          <>
-            {isAccounting && accountingPins.length > 0 && !navCollapsed ? (
-              <p className="px-3 pb-1 text-[10px] font-semibold tracking-[0.14em] text-white/35 uppercase">
-                Menu
-              </p>
-            ) : null}
-            {items.map((item) => (
-              <NavLink
-                key={item.href}
-                item={item}
-                collapsed={navCollapsed}
-                onNavigate={() => setMobileOpen(false)}
-                showDot={navShowDot(item.href)}
-              />
-            ))}
-          </>
+          items.map((item) => (
+            <NavLink
+              key={item.href}
+              item={item}
+              collapsed={navCollapsed}
+              onNavigate={() => setMobileOpen(false)}
+              showDot={navShowDot(item.href)}
+            />
+          ))
         )}
       </nav>
       {!navCollapsed ? (
         <div className="border-t border-white/10 px-4 py-3 text-xs text-white/40">
           {usesTabPins
             ? "Use the pin icon on a tab to pin or unpin"
-            : isAccounting
-              ? "Pin contracts from the Contracts page"
-              : "ACCY 628 · Group 12"}
+            : "ACCY 628 · Group 12"}
         </div>
       ) : null}
     </>

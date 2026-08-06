@@ -6,8 +6,10 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/accounting/panel";
 import { createInvoice } from "@/app/actions/create-invoice";
+import { updateInvoice } from "@/app/actions/invoice-mutations";
 import { moneyExact } from "@/lib/accounting/format";
 import { roundMoney } from "@/lib/accounting/calculations";
+import type { InvoiceStatus } from "@/lib/types/database";
 
 type ClientOption = { id: string; name: string };
 type ContractOption = {
@@ -38,19 +40,51 @@ function newLine(rate = ""): LineDraft {
 export function CreateInvoiceForm({
   clients,
   contracts,
+  mode = "create",
+  invoiceId,
+  initial,
 }: {
   clients: ClientOption[];
   contracts: ContractOption[];
+  mode?: "create" | "edit";
+  invoiceId?: string;
+  initial?: {
+    clientId: string;
+    placementId: string | null;
+    periodStart: string;
+    periodEnd: string;
+    status: InvoiceStatus;
+    lines: {
+      description: string;
+      quantity: number;
+      rate: number;
+      timesheetId?: string | null;
+    }[];
+  };
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [clientId, setClientId] = useState(clients[0]?.id ?? "");
-  const [placementId, setPlacementId] = useState("");
-  const [periodStart, setPeriodStart] = useState("");
-  const [periodEnd, setPeriodEnd] = useState("");
-  const [status, setStatus] = useState<"draft" | "sent">("draft");
-  const [lines, setLines] = useState<LineDraft[]>([newLine()]);
+  const [clientId, setClientId] = useState(
+    initial?.clientId ?? clients[0]?.id ?? "",
+  );
+  const [placementId, setPlacementId] = useState(initial?.placementId ?? "");
+  const [periodStart, setPeriodStart] = useState(initial?.periodStart ?? "");
+  const [periodEnd, setPeriodEnd] = useState(initial?.periodEnd ?? "");
+  const [status, setStatus] = useState<InvoiceStatus>(
+    initial?.status ?? "draft",
+  );
+  const [lines, setLines] = useState<LineDraft[]>(() => {
+    if (initial?.lines?.length) {
+      return initial.lines.map((line) => ({
+        key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        description: line.description,
+        quantity: String(line.quantity),
+        rate: String(line.rate),
+      }));
+    }
+    return [newLine()];
+  });
 
   const filteredContracts = useMemo(
     () =>
@@ -111,19 +145,30 @@ export function CreateInvoiceForm({
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const linesPayload = lines.map((line) => ({
+      description: line.description,
+      quantity: Number(line.quantity),
+      rate: Number(line.rate),
+    }));
     startTransition(async () => {
-      const result = await createInvoice({
-        clientId,
-        placementId: placementId || null,
-        periodStart,
-        periodEnd,
-        status,
-        lines: lines.map((line) => ({
-          description: line.description,
-          quantity: Number(line.quantity),
-          rate: Number(line.rate),
-        })),
-      });
+      const result =
+        mode === "edit" && invoiceId
+          ? await updateInvoice(invoiceId, {
+              clientId,
+              placementId: placementId || null,
+              periodStart,
+              periodEnd,
+              status,
+              lines: linesPayload,
+            })
+          : await createInvoice({
+              clientId,
+              placementId: placementId || null,
+              periodStart,
+              periodEnd,
+              status: status === "draft" ? "draft" : "sent",
+              lines: linesPayload,
+            });
       if (!result.ok) {
         setError(result.error);
         return;
@@ -218,11 +263,18 @@ export function CreateInvoiceForm({
             </span>
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value as "draft" | "sent")}
+              onChange={(e) => setStatus(e.target.value as InvoiceStatus)}
               className={`${fieldClass} max-w-xs`}
             >
               <option value="draft">Draft</option>
               <option value="sent">Sent</option>
+              {mode === "edit" ? (
+                <>
+                  <option value="partial">Partial</option>
+                  <option value="paid">Paid</option>
+                  <option value="disputed">Disputed</option>
+                </>
+              ) : null}
             </select>
           </label>
         </div>
@@ -324,10 +376,20 @@ export function CreateInvoiceForm({
 
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={pending || !clientId}>
-          {pending ? "Creating…" : "Create invoice"}
+          {pending
+            ? mode === "edit"
+              ? "Saving…"
+              : "Creating…"
+            : mode === "edit"
+              ? "Save changes"
+              : "Create invoice"}
         </Button>
         <Link
-          href="/accounting/invoices"
+          href={
+            mode === "edit" && invoiceId
+              ? `/accounting/invoices/${invoiceId}`
+              : "/accounting/invoices"
+          }
           className="text-sm font-medium text-[var(--cf-ink)] hover:underline"
         >
           Cancel

@@ -3,7 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getAppUser } from "@/lib/auth/get-app-user";
-import { roundMoney } from "@/lib/accounting/calculations";
+import {
+  isRecognizedExpense,
+  roundMoney,
+} from "@/lib/accounting/calculations";
+import {
+  buildOperatingExpenseJournal,
+  buildPlacementExpenseJournal,
+} from "@/lib/accounting/journal-posting";
+import { insertJournalDraft } from "@/lib/accounting/sync-journal-entries";
 import {
   EXPENSE_TYPES,
   OPERATING_EXPENSE_CATEGORIES,
@@ -13,6 +21,16 @@ import type {
   ExpenseType,
   OperatingExpenseCategory,
 } from "@/lib/types/database";
+
+function revalidateExpensePaths(placementId?: string | null) {
+  revalidatePath("/accounting/expenses");
+  revalidatePath("/accounting/dashboard");
+  revalidatePath("/accounting/profitability");
+  revalidatePath("/accounting/audit-trail");
+  revalidatePath("/accounting/journal-entries");
+  revalidatePath("/accounting/reports");
+  if (placementId) revalidatePath(`/accounting/contracts/${placementId}`);
+}
 
 export type CreateExpenseResult =
   | { ok: true; kind: "placement" | "operating"; id: string }
@@ -110,12 +128,19 @@ export async function createExpense(input: {
       };
     }
 
-    revalidatePath("/accounting/expenses");
-    revalidatePath("/accounting/dashboard");
-    revalidatePath("/accounting/profitability");
-    revalidatePath("/accounting/audit-trail");
-    revalidatePath(`/accounting/contracts/${placementId}`);
+    if (isRecognizedExpense(status)) {
+      const draft = buildPlacementExpenseJournal({
+        id: data.id as string,
+        expenseType,
+        description,
+        amount,
+        expenseDate,
+        status,
+      });
+      if (draft) await insertJournalDraft(draft, user.id);
+    }
 
+    revalidateExpensePaths(placementId);
     return { ok: true, kind: "placement", id: data.id as string };
   }
 
@@ -146,10 +171,15 @@ export async function createExpense(input: {
     };
   }
 
-  revalidatePath("/accounting/expenses");
-  revalidatePath("/accounting/dashboard");
-  revalidatePath("/accounting/profitability");
-  revalidatePath("/accounting/audit-trail");
+  const draft = buildOperatingExpenseJournal({
+    id: data.id as string,
+    category,
+    description,
+    amount,
+    expenseDate,
+  });
+  if (draft) await insertJournalDraft(draft, user.id);
 
+  revalidateExpensePaths();
   return { ok: true, kind: "operating", id: data.id as string };
 }

@@ -17,7 +17,8 @@ export type AuditEventType =
   | "payment"
   | "timesheet"
   | "expense"
-  | "contract";
+  | "contract"
+  | "journal";
 
 export type AuditEvent = {
   id: string;
@@ -166,6 +167,31 @@ export function buildContractAuditEvent(input: {
     href: `/accounting/contracts/${input.id}`,
     placementId: input.id,
     clientId: input.clientId ?? null,
+  };
+}
+
+export function buildJournalAuditEvent(input: {
+  id: string;
+  entryDate: string;
+  memo: string;
+  reference: string;
+  status: string;
+  amount: number;
+  sourceType?: string | null;
+  updatedAt?: string | null;
+}): AuditEvent {
+  const source = input.sourceType
+    ? ` · ${input.sourceType.replaceAll("_", " ")}`
+    : "";
+  return {
+    id: `je-${input.id}`,
+    at: dateKey(input.entryDate),
+    sortKey: input.updatedAt || input.entryDate,
+    type: "journal",
+    title: `Journal ${shortId(input.id)} · ${input.status}`,
+    detail: `${input.memo || "Journal entry"}${input.reference ? ` · ${input.reference}` : ""}${source}`,
+    href: `/accounting/journal-entries/${input.id}`,
+    amount: input.amount,
   };
 }
 

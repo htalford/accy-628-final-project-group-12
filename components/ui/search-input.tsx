@@ -1,13 +1,15 @@
 import { Search } from "lucide-react";
 import type { InputHTMLAttributes } from "react";
 
+type SearchInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "size"> & {
+  size?: "md" | "lg";
+};
+
 export function SearchInput({
   className = "",
   size = "md",
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & {
-  size?: "md" | "lg";
-}) {
+}: SearchInputProps) {
   const large = size === "lg";
 
   return (

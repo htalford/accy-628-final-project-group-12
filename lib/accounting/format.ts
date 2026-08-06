@@ -2,6 +2,7 @@ import type {
   ExpenseStatus,
   ExpenseType,
   InvoiceStatus,
+  JournalEntryStatus,
   OperatingExpenseCategory,
   PlacementStatus,
   PlacementType,
@@ -117,6 +118,27 @@ export function expenseCategoryLabel(
 export function expenseStatusLabel(status: ExpenseStatus | string): string {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
+
+export function journalEntryStatusLabel(
+  status: JournalEntryStatus | string,
+): string {
+  switch (status) {
+    case "draft":
+      return "Draft";
+    case "posted":
+      return "Posted";
+    case "void":
+      return "Void";
+    default:
+      return String(status);
+  }
+}
+
+export const JOURNAL_ENTRY_STATUSES: JournalEntryStatus[] = [
+  "draft",
+  "posted",
+  "void",
+];
 
 export function placementTypeLabel(type: PlacementType | string): string {
   return type === "permanent" ? "Permanent" : "Temp / Hourly";

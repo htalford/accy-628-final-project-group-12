@@ -59,6 +59,7 @@ export default async function AuditTrailPage({
             <option value="timesheet">Timesheets</option>
             <option value="expense">Expenses</option>
             <option value="contract">Contracts</option>
+            <option value="journal">Journal entries</option>
           </select>
         </label>
         <div className="flex items-end">

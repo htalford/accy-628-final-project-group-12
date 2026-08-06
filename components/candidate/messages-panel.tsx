@@ -439,7 +439,8 @@ export function MessagesPanel({
     startTransition(async () => {
       const result = await sendCandidateMessage({
         body,
-        counterpartRole: active.role,
+        counterpartRole:
+          active.role === "accounting" ? "accounting" : "recruiter",
         subject:
           active.role === "accounting"
             ? "Chat with accounting"

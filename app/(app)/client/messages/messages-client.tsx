@@ -271,6 +271,19 @@ export function MessagesClient({
                             : "bg-[var(--cf-surface)] text-[var(--cf-ink)]"
                         }`}
                       >
+                        <p
+                          className={`mb-1 text-[10px] font-medium ${
+                            m.sender_role === "client"
+                              ? "text-white/80"
+                              : "text-[var(--cf-muted)]"
+                          }`}
+                        >
+                          {m.sender_role === "staff"
+                            ? "Accounting"
+                            : m.sender_role === "recruiter"
+                              ? "Recruiter"
+                              : "You"}
+                        </p>
                         <p>{m.body}</p>
                         <p
                           className={`mt-1 text-[10px] ${

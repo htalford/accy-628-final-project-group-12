@@ -57,24 +57,34 @@ export default async function AccountingHomePage() {
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-4 gap-4">
         <StatCard
+          compact
           label="Collected"
           value={money(data.cards.collected)}
           hint="Completed payments only"
           href="/accounting/accounts-receivable"
         />
         <StatCard
+          compact
           label="Active Contracts"
           value={String(data.cards.activeContracts)}
           hint="Active placements"
           href="/accounting/contracts"
         />
         <StatCard
+          compact
           label="Gross Margin"
           value={`${data.cards.grossMarginPercent.toFixed(1)}%`}
           hint="Gross profit ÷ billed revenue"
           href="/accounting/profitability"
+        />
+        <StatCard
+          compact
+          label="Timesheets Awaiting Approval"
+          value={String(data.cards.timesheetsAwaitingApproval)}
+          hint="Submitted timesheets pending review"
+          href="/accounting/timesheets?status=submitted"
         />
       </div>
 

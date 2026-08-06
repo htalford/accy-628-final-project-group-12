@@ -9,7 +9,6 @@ import {
   InvoiceLink,
   PayrollEmployeeLink,
 } from "@/components/accounting/entity-links";
-import { PinContractButton } from "@/components/portal-pins/pin-contract-button";
 import {
   getAuditTrail,
   getContractById,
@@ -65,16 +64,8 @@ export default async function ContractDetailPage({
             Full audit trail
           </Link>
         </div>
-        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+        <div className="mt-2">
           <PageHeader title={`Contract ${contractNumber}`} />
-          <PinContractButton
-            scope="accounting"
-            contractId={contract.id}
-            contractNumber={contractNumber}
-            employeeName={employeeName ?? undefined}
-            positionTitle={contract.client?.name}
-            size="md"
-          />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <StatusBadge
