@@ -1,9 +1,9 @@
 /** Canonical contact names for employer DMs (never mix these). */
 export const EMPLOYER_RECRUITER_CONTACT = "Morgan Recruiter";
-export const EMPLOYER_ACCOUNTING_CONTACT = "Avery Accounting";
+export const EMPLOYER_ACCOUNTING_CONTACT = "Avery Manager";
 
 function isAccountingContactName(name: string): boolean {
-  return /account|avery|finance|billing|payroll/i.test(name);
+  return /account|avery|finance|billing|payroll|manager/i.test(name);
 }
 
 /** Normalize seed / free-text names onto one recruiter or one accounting person. */

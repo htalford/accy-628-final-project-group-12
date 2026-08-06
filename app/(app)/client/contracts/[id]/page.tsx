@@ -54,7 +54,7 @@ export default async function ContractDetailPage({
           <CardTitle className="mb-3">Contract Summary</CardTitle>
           <p className="text-sm text-[var(--cf-ink)]">
             Live placement record shared with accounting. Contract number and
-            billing rates match the Accounting portal for this assignment.
+            billing rates match the Manager portal for this assignment.
           </p>
           <dl className="mt-4 space-y-2 text-sm">
             <div className="flex justify-between">

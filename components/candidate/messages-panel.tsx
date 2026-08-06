@@ -29,8 +29,8 @@ const STAFF_CONTACTS: {
   },
   {
     role: "accounting",
-    name: "Avery Accounting",
-    subtitle: "Accounting · pay & timesheets",
+    name: "Avery Manager",
+    subtitle: "Manager · pay & timesheets",
   },
 ];
 

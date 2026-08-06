@@ -31,7 +31,7 @@ export const RECRUITER_PAGE_COPY = {
   messages: {
     title: "Messages",
     subtitle:
-      "Conversations with Employers, Candidates, and Accounting. Deleted items stay in Deleted for 30 days.",
+      "Conversations with Employers, Candidates, and Manager. Deleted items stay in Deleted for 30 days.",
   },
 } as const;
 

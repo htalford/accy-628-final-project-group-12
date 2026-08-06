@@ -26,9 +26,8 @@ export {
 } from "@/lib/client-portal/chrome-shared";
 
 const CLIENT_NAV_ROOTS = getNavForRole("employer").map((i) => i.href);
-/** All /client/candidates/* routes share the Interested candidates tab. */
 const CLIENT_NAV_ALIASES = [
-  { prefix: "/client/candidates", root: "/client/candidates/interested" },
+  { prefix: "/client/candidates", root: "/client/dashboard" },
 ] as const;
 
 /** Live bell feed + search index for employer top bar (portal data only). */

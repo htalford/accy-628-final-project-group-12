@@ -4,7 +4,7 @@ import { StaffLoginForm } from "./staff-login-form";
 
 export const metadata = {
   title: "Employee Sign In · TalentQuest",
-  description: "Demo sign in for Talent Quest accounting and recruiter staff.",
+  description: "Demo sign in for Talent Quest manager and recruiter staff.",
 };
 
 export default function StaffLoginPage() {
@@ -29,7 +29,7 @@ export default function StaffLoginPage() {
             Demo sign in for Talent Quest staff. Any username and password will
             work — use{" "}
             <span className="font-medium text-[var(--ot-navy)]">accounting</span>{" "}
-            for the accounting portal; otherwise you enter as a recruiter.
+            for the manager portal; otherwise you enter as a recruiter.
           </p>
         </div>
         <div className="rounded-xl border border-[var(--ot-border)] bg-white p-6 shadow-sm">

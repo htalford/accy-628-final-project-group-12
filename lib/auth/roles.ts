@@ -58,7 +58,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   employer: "Employer",
   candidate: "Candidate",
   recruiter: "Recruiter",
-  accounting: "Accounting",
+  accounting: "Manager",
 };
 
 export const DEMO_ACCOUNTS: Record<
@@ -70,7 +70,7 @@ export const DEMO_ACCOUNTS: Record<
   recruiter: { email: "recruiter@talentquest.demo", label: "Morgan Recruiter" },
   accounting: {
     email: "accounting@talentquest.demo",
-    label: "Avery Accounting",
+    label: "Avery Manager",
   },
 };
 
@@ -248,11 +248,6 @@ export function getNavForRole(role: UserRole): NavItem[] {
     case "employer":
       return [
         { href: "/client/dashboard", label: "Dashboard", icon: "layout-dashboard" },
-        {
-          href: "/client/candidates/interested",
-          label: "Interested candidates",
-          icon: "users",
-        },
         { href: "/client/contracts", label: "Contracts", icon: "file-signature" },
         { href: "/client/employees", label: "Employees", icon: "user-round" },
         { href: "/client/invoices", label: "Invoices", icon: "receipt" },
@@ -326,7 +321,6 @@ export function getPageTitle(pathname: string): string {
     "/accounting/messages": "Messages",
     "/accounting/profile": "Profile",
     "/client/dashboard": "Dashboard",
-    "/client/candidates/interested": "Interested candidates",
     "/client/contracts": "Contracts",
     "/client/employees": "Employees",
     "/client/invoices": "Invoices",
@@ -382,8 +376,6 @@ export function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/candidate/contracts/")) return "Contract detail";
   if (pathname.startsWith("/client/job-requests/new")) return "New Job Request";
   if (pathname.startsWith("/client/job-requests/")) return "Job Request";
-  if (pathname.startsWith("/client/candidates/interested"))
-    return "Interested candidates";
   if (pathname.startsWith("/client/candidates/")) return "Candidate Profile";
   if (pathname.startsWith("/client/employees/")) return "Employee";
   if (pathname.startsWith("/client/contracts/")) return "Contract";

@@ -1014,7 +1014,7 @@ export async function listMessageThreads(): Promise<RecruiterMessageThread[]> {
         id: String(m.id),
         sender:
           m.sender_role === "staff"
-            ? "Accounting"
+            ? "Manager"
             : m.sender_role === "recruiter"
               ? String(t.recruiter_name || "Recruiter")
               : company,
@@ -1065,7 +1065,7 @@ export async function listMessageThreads(): Promise<RecruiterMessageThread[]> {
       const msgs = msgsByStaff.get(id) ?? [];
       const last = msgs[msgs.length - 1];
       const accountingId = String(t.accounting_user_id ?? "");
-      const accountingName = userName.get(accountingId) ?? "Accounting";
+      const accountingName = userName.get(accountingId) ?? "Manager";
       return {
         id,
         participantType: "accounting" as const,
@@ -1079,7 +1079,7 @@ export async function listMessageThreads(): Promise<RecruiterMessageThread[]> {
           id: String(m.id),
           sender:
             userName.get(String(m.sender_user_id)) ??
-            (m.sender_role === "accounting" ? "Accounting" : "Recruiter"),
+            (m.sender_role === "accounting" ? "Manager" : "Recruiter"),
           senderRole: String(m.sender_role),
           body: String(m.body),
           createdAt: String(m.created_at),

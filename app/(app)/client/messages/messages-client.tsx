@@ -250,7 +250,7 @@ export function MessagesClient({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <PageHeader
           title="Messages"
-          description="Conversations with Recruiter and Accounting. Deleted items stay in Deleted for 30 days."
+          description="Conversations with Recruiter and Manager. Deleted items stay in Deleted for 30 days."
         />
         {folder === "inbox" ? (
           <Button type="button" onClick={() => setShowNew((v) => !v)}>
@@ -273,7 +273,7 @@ export function MessagesClient({
               className="mt-1 w-full rounded-lg border border-[var(--cf-border)] bg-white px-3 py-2 text-sm focus:border-[var(--cf-navy)] focus:ring-2 focus:ring-[var(--cf-navy)]/15 focus:outline-none"
             >
               <option value="Morgan Recruiter">Morgan Recruiter</option>
-              <option value="Avery Accounting">Avery Accounting</option>
+              <option value="Avery Manager">Avery Manager</option>
             </select>
           </div>
           <div>
@@ -473,7 +473,10 @@ export function MessagesClient({
                   {(active.messages ?? [])
                     .filter((m) => {
                       const person = active.recruiter_name.toLowerCase();
-                      const isAccounting = person.includes("account");
+                      const isAccounting =
+                        person.includes("account") ||
+                        person.includes("manager") ||
+                        person.includes("avery");
                       if (m.sender_role === "client") return true;
                       if (isAccounting) return m.sender_role === "staff";
                       return m.sender_role === "recruiter";
@@ -500,7 +503,7 @@ export function MessagesClient({
                             {m.sender_role === "client"
                               ? "You"
                               : m.sender_role === "staff"
-                                ? "Avery Accounting"
+                                ? "Avery Manager"
                                 : "Morgan Recruiter"}
                           </p>
                           <p className="whitespace-pre-wrap">{m.body}</p>

@@ -27,8 +27,6 @@ function pageTitleFromPath(pathname: string): string {
   if (pathname.startsWith("/client/job-requests/new")) return "New Job Request";
   if (pathname.startsWith("/client/job-requests/")) return "Job Request";
   if (pathname.startsWith("/client/job-requests")) return "Job Requests";
-  if (pathname.startsWith("/client/candidates/interested"))
-    return "Interested candidates";
   if (pathname.startsWith("/client/candidates/compare"))
     return "Compare candidates";
   if (pathname.startsWith("/client/candidates/applications/"))

@@ -1,7 +1,6 @@
-import { listInterestedCandidatesForClient } from "@/lib/client-portal/portal-data";
-import { InterestedCandidatesClient } from "./interested-client";
+import { redirect } from "next/navigation";
 
-export default async function InterestedCandidatesPage() {
-  const rows = await listInterestedCandidatesForClient();
-  return <InterestedCandidatesClient initial={rows} />;
+/** Interested candidates removed from the Employer Portal. */
+export default function InterestedCandidatesPage() {
+  redirect("/client/dashboard");
 }

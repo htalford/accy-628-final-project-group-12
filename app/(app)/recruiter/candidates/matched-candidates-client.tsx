@@ -12,7 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination } from "@/components/ui/form";
 import { ConfirmActionDialog } from "@/components/client-portal/confirm-action-dialog";
 import { ToastProvider, useToast } from "@/components/client-portal/toast";
-import { updateApplicationStatus, removeRejectedCandidate } from "@/app/actions/recruiter";
+import { updateApplicationStatus, removeRejectedCandidate, scheduleInterview } from "@/app/actions/recruiter";
 import type { ClientCandidate, SubmittalStage } from "@/lib/types/database";
 import {
   seedStatusTone,
@@ -24,6 +24,7 @@ import {
   MatchedSkills,
 } from "@/components/matching/match-score-badge";
 import { MATCH_RECRUITER_THRESHOLD } from "@/lib/matching/threshold";
+import { InterviewScheduleDialog } from "@/components/recruiter/interview-schedule-dialog";
 
 const MAX_COMPARE = 3;
 
@@ -48,6 +49,10 @@ function MatchedCandidatesBoard({
     next: Extract<SubmittalStage, "accepted" | "rejected">;
   } | null>(null);
   const [removeDialog, setRemoveDialog] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [scheduleTarget, setScheduleTarget] = useState<{
     id: string;
     name: string;
   } | null>(null);
@@ -158,6 +163,32 @@ function MatchedCandidatesBoard({
     } else {
       toast.push(result.error ?? "Failed to remove candidate.", "error");
     }
+  }
+
+  async function confirmSchedule(input: {
+    datetime: string;
+    interviewType: string;
+    notes?: string;
+  }) {
+    if (!scheduleTarget) return;
+    startTransition(async () => {
+      const result = await scheduleInterview({
+        applicationId: scheduleTarget.id,
+        datetime: input.datetime,
+        interviewType: input.interviewType,
+        notes: input.notes,
+      });
+      if (result.ok) {
+        toast.push(
+          result.message ?? `Interview scheduled for ${scheduleTarget.name}.`,
+          "success",
+        );
+        setScheduleTarget(null);
+        router.refresh();
+      } else {
+        toast.push(result.error ?? "Failed to schedule interview.", "error");
+      }
+    });
   }
 
   return (
@@ -362,6 +393,23 @@ function MatchedCandidatesBoard({
                     <Button size="sm" variant="secondary" href={c.detail_href}>
                       View Profile
                     </Button>
+                    {routed &&
+                    c.stage !== "rejected" &&
+                    c.stage !== "accepted" ? (
+                      <Button
+                        size="sm"
+                        type="button"
+                        disabled={pending}
+                        onClick={() =>
+                          setScheduleTarget({
+                            id: c.id,
+                            name: c.candidate_name,
+                          })
+                        }
+                      >
+                        Schedule interview
+                      </Button>
+                    ) : null}
                     {c.stage === "rejected" ? (
                       <Button
                         size="sm"
@@ -474,6 +522,14 @@ function MatchedCandidatesBoard({
         busy={pending}
         onConfirm={() => void confirmRemove()}
         showReason={false}
+      />
+
+      <InterviewScheduleDialog
+        open={scheduleTarget != null}
+        candidateName={scheduleTarget?.name ?? ""}
+        busy={pending}
+        onClose={() => setScheduleTarget(null)}
+        onConfirm={(input) => void confirmSchedule(input)}
       />
     </div>
   );

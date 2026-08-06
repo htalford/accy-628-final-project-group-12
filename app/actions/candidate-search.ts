@@ -28,10 +28,10 @@ export async function searchCandidatePortal(
       href: `/candidate/messages?with=${encodeURIComponent("Morgan Recruiter")}`,
     },
     {
-      type: "Accounting",
+      type: "Manager",
       id: "contact-accounting",
-      label: "Avery Accounting",
-      href: `/candidate/messages?with=${encodeURIComponent("Avery Accounting")}`,
+      label: "Avery Manager",
+      href: `/candidate/messages?with=${encodeURIComponent("Avery Manager")}`,
     },
   ];
 
@@ -65,7 +65,7 @@ export async function searchCandidatePortal(
     seen.add(key);
     const role =
       row.counterpart_role === "accounting" || row.sender_role === "accounting"
-        ? "Accounting"
+        ? "Manager"
         : row.counterpart_role === "system"
           ? "Support"
           : "Recruiter";

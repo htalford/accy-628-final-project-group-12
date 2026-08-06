@@ -266,9 +266,6 @@ export function CandidatesClient({
             <span className="ml-1.5 text-xs opacity-80">({likedIds.size})</span>
           ) : null}
         </Button>
-        <Button href="/client/candidates/interested" variant="secondary">
-          Interested candidates
-        </Button>
         {selected.length > 0 ? (
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
             <span className="text-sm text-[var(--cf-muted)]">

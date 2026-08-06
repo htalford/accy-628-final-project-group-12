@@ -21,7 +21,7 @@ export default async function MessagesPage({
     <div className="space-y-6">
       <PageHeader
         title="Messages"
-        description="Conversations with Employers, Candidates, and Accounting. Deleted items stay in Deleted for 30 days."
+        description="Conversations with Employers, Candidates, and Manager. Deleted items stay in Deleted for 30 days."
       />
       <MessagesCenter
         inboxThreads={inboxThreads}

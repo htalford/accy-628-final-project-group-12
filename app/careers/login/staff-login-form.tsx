@@ -53,7 +53,7 @@ export function StaffLoginForm() {
         </div>
         <span className="text-xs text-[var(--ot-muted)]">
           Demo mode: any username and password work. Use accounting for the
-          accounting portal; otherwise you enter as a recruiter.
+          manager portal; otherwise you enter as a recruiter.
         </span>
       </label>
       <label className="flex flex-col gap-1.5 text-sm">

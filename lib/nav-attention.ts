@@ -8,7 +8,7 @@ export function stripHrefPath(href: string): string {
 }
 
 /**
- * Prefer longer nav roots so nested items (e.g. /client/candidates/interested)
+ * Prefer longer nav roots so nested items highlight correctly.
  * win over shorter prefixes when both could match.
  */
 export function navRootFromHref(

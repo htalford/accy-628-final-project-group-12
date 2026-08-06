@@ -132,6 +132,12 @@ export const RECRUITER_FAQ_BY_PATH: { prefix: string; items: FaqItem[] }[] = [
           "Rejected applications stay visible until you remove them. Use Remove on a rejected card (with confirmation) to permanently delete that application from lists and dashboard counts.",
       },
       {
+        id: "rec-cand-2b",
+        question: "How do I interview a low match score candidate?",
+        answer:
+          "Matches below 60% show a Needs review badge. Use Schedule interview on the card to pick an available date/time and confirm the appointment — it appears on Interviews Scheduled.",
+      },
+      {
         id: "rec-cand-3",
         question: "Can I compare candidates?",
         answer:
@@ -179,9 +185,9 @@ export const RECRUITER_FAQ_BY_PATH: { prefix: string; items: FaqItem[] }[] = [
       },
       {
         id: "rec-pl-3",
-        question: "How does this connect to Accounting?",
+        question: "How does this connect to the Manager Portal?",
         answer:
-          "Once a placement is active, timesheets and billing flow to Accounting. Use this tab to confirm who started and when before payroll and invoices run.",
+          "Once a placement is active, timesheets and billing flow to the Manager Portal. Use this tab to confirm who started and when before payroll and invoices run.",
       },
     ],
   },
@@ -215,7 +221,7 @@ export const RECRUITER_FAQ_BY_PATH: { prefix: string; items: FaqItem[] }[] = [
         id: "rec-msg-1",
         question: "Who can I message?",
         answer:
-          "Inbox covers Employers, Candidates, and Accounting. Use the filters under Inbox to narrow the conversation list.",
+          "Inbox covers Employers, Candidates, and Manager. Use the filters under Inbox to narrow the conversation list.",
       },
       {
         id: "rec-msg-2",
@@ -227,7 +233,7 @@ export const RECRUITER_FAQ_BY_PATH: { prefix: string; items: FaqItem[] }[] = [
         id: "rec-msg-3",
         question: "Are messages shared with other portals?",
         answer:
-          "Yes—employer threads sync with the Client Portal, candidate threads with the Candidate Portal, and Accounting threads with staff Accounting chat.",
+          "Yes—employer threads sync with the Client Portal, candidate threads with the Candidate Portal, and Manager threads with the Manager Portal staff chat.",
       },
     ],
   },

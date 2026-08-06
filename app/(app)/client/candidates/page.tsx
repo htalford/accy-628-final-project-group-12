@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Matched applications live on the recruiter dashboard. */
+/** Employer candidate matching lives on the Recruiter Portal. */
 export default function CandidatesPage() {
-  redirect("/client/candidates/interested");
+  redirect("/client/dashboard");
 }

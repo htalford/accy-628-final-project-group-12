@@ -314,13 +314,19 @@ export function MessagesCenter({
                     key={f}
                     type="button"
                     onClick={() => setFilter(f)}
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize ${
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium ${
                       filter === f
                         ? "bg-[var(--cf-navy)] text-white"
                         : "text-[var(--cf-muted)] hover:bg-[var(--cf-surface)]"
                     }`}
                   >
-                    {f}
+                    {f === "all"
+                      ? "All"
+                      : f === "employer"
+                        ? "Employers"
+                        : f === "candidate"
+                          ? "Candidates"
+                          : "Manager"}
                   </button>
                 ),
               )}

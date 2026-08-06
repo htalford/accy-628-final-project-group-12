@@ -17,13 +17,13 @@ export default async function CandidateContractsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Contracts"
-        description="Your placement agreements from TalentQuest Accounting — same contract records your agency tracks."
+        description="Your placement agreements from the TalentQuest Manager Portal — same contract records your agency tracks."
       />
       <DataTable
         rows={contracts}
         rowHref={(row) => `/candidate/contracts/${row.id}`}
         emptyTitle="No contracts yet"
-        emptyDescription="When Accounting books a placement for you, it will appear here with the same contract number."
+        emptyDescription="When the Manager Portal books a placement for you, it will appear here with the same contract number."
         columns={[
           {
             key: "number",
@@ -79,7 +79,7 @@ export default async function CandidateContractsPage() {
       />
       {contracts.length > 0 ? (
         <p className="text-xs text-[var(--cf-muted)]">
-          Contract numbers match Accounting → Contracts.{" "}
+          Contract numbers match Manager Portal → Contracts.{" "}
           <Link
             href="/candidate/timesheets"
             className="font-medium text-[var(--cf-accent)] hover:underline"

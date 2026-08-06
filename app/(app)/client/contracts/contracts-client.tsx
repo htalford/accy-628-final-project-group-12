@@ -355,7 +355,7 @@ export function ContractsClient({
                       <Link
                         href={`/client/contracts/${p.id}`}
                         className="font-mono text-xs font-medium text-[var(--cf-navy)] hover:underline"
-                        title="Same contract number as Accounting portal"
+                        title="Same contract number as Manager portal"
                       >
                         {number}
                       </Link>
