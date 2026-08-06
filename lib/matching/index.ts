@@ -36,6 +36,12 @@ export {
   profileFieldsFromSnapshot,
 } from "@/lib/matching/profile-from-employee";
 
+export {
+  MATCH_RECRUITER_THRESHOLD,
+  shouldRouteToRecruiter,
+  routeToRecruiterNote,
+} from "@/lib/matching/threshold";
+
 /**
  * Candidate matching signals from the candidate-portal employee row:
  * certifications, education, previous employment, and extracted resume text.
@@ -79,6 +85,7 @@ export function jobInputFromPublicJob(
     | "pay_rate_max"
   >,
   requiredSkills: string[] = [],
+  requiredCertifications: string[] = [],
 ): MatchJobInput {
   return {
     title: job.title,
@@ -86,6 +93,7 @@ export function jobInputFromPublicJob(
     location: job.location,
     employmentType: job.employment_type,
     requiredSkills,
+    requiredCertifications,
     payMin: job.pay_rate_min,
     payMax: job.pay_rate_max,
   };
@@ -103,6 +111,7 @@ export function jobInputFromRecruiterOrder(job: RecruiterJobOrder): MatchJobInpu
     location: job.location,
     employmentType: typeHint,
     requiredSkills: job.requiredSkills ?? [],
+    requiredCertifications: job.requiredCertifications ?? [],
     payMin: job.payRate,
     payMax: job.billRate,
   };
@@ -171,23 +180,41 @@ export function rankCandidatesForJob(
 }
 
 /**
- * Load skill tags for public.jobs when linked via job_requests.source_job_id.
+ * Load skill + certification requirements for public.jobs linked via
+ * job_requests.source_job_id.
  */
-export async function skillsForPublicJobs(
+export type JobRequirements = {
+  skills: string[];
+  certifications: string[];
+};
+
+export async function requirementsForPublicJobs(
   jobIds: string[],
-): Promise<Map<string, string[]>> {
-  const map = new Map<string, string[]>();
+): Promise<Map<string, JobRequirements>> {
+  const map = new Map<string, JobRequirements>();
   if (jobIds.length === 0) return map;
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("job_requests")
-    .select("source_job_id, skills")
+    .select("source_job_id, skills, certifications")
     .in("source_job_id", jobIds);
 
   if (error) {
-    // Column may not exist on all envs — fail soft.
-    console.error("job_requests skills by source_job_id", error.message);
+    console.error("job_requests requirements by source_job_id", error.message);
+    // Fallback: skills-only if certifications column missing
+    const { data: skillOnly } = await supabase
+      .from("job_requests")
+      .select("source_job_id, skills")
+      .in("source_job_id", jobIds);
+    for (const row of skillOnly ?? []) {
+      const jid = row.source_job_id != null ? String(row.source_job_id) : "";
+      if (!jid) continue;
+      const skills = Array.isArray(row.skills)
+        ? row.skills.map(String)
+        : splitSkills(row.skills as string | null);
+      map.set(jid, { skills, certifications: [] });
+    }
     return map;
   }
 
@@ -197,8 +224,21 @@ export async function skillsForPublicJobs(
     const skills = Array.isArray(row.skills)
       ? row.skills.map(String)
       : splitSkills(row.skills as string | null);
-    if (skills.length) map.set(jid, skills);
+    const certifications = Array.isArray(row.certifications)
+      ? row.certifications.map(String)
+      : splitSkills(row.certifications as string | null);
+    map.set(jid, { skills, certifications });
   }
+  return map;
+}
+
+/** @deprecated Prefer requirementsForPublicJobs */
+export async function skillsForPublicJobs(
+  jobIds: string[],
+): Promise<Map<string, string[]>> {
+  const full = await requirementsForPublicJobs(jobIds);
+  const map = new Map<string, string[]>();
+  for (const [id, req] of full) map.set(id, req.skills);
   return map;
 }
 

@@ -27,6 +27,7 @@ export default function NewJobRequestPage() {
     payRate: "",
     startDate: "",
     skills: "",
+    certifications: "",
     description: "",
     notes: "",
   });
@@ -47,6 +48,7 @@ export default function NewJobRequestPage() {
       payRate: form.payRate,
       startDate: form.startDate,
       skills: form.skills,
+      certifications: form.certifications,
       description: form.description,
       notes: form.notes,
     });
@@ -174,8 +176,25 @@ export default function NewJobRequestPage() {
               onChange={(e) =>
                 setForm((f) => ({ ...f, skills: e.target.value }))
               }
-              placeholder="Comma-separated skills"
+              placeholder="Comma-separated skills (e.g. Excel, Invoice processing)"
             />
+            <p className="mt-1 text-xs text-[var(--cf-muted)]">
+              Used for automated candidate skill matching.
+            </p>
+          </div>
+          <div className="sm:col-span-2">
+            <Label htmlFor="certifications">Required Certifications</Label>
+            <FieldInput
+              id="certifications"
+              value={form.certifications}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, certifications: e.target.value }))
+              }
+              placeholder="Comma-separated certs (e.g. CPA, OSHA Forklift, QuickBooks Certified)"
+            />
+            <p className="mt-1 text-xs text-[var(--cf-muted)]">
+              Matched against certifications on the candidate profile.
+            </p>
           </div>
           <div className="sm:col-span-2">
             <Label htmlFor="description">Job Description</Label>

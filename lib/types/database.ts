@@ -83,6 +83,8 @@ export type PortalJobRequest = {
   pay_rate_text: string | null;
   start_date: string | null;
   skills: string[];
+  /** Required certifications for matching (comma list on create form). */
+  certifications: string[];
   description: string | null;
   notes: string | null;
   recruiter_name: string | null;
@@ -160,6 +162,13 @@ export type ClientCandidate = {
   match_reasons?: string[];
   /** Skills/keywords that contributed to the automated match. */
   match_skills?: string[];
+  /** Certifications that contributed to the automated match. */
+  match_certifications?: string[];
+  /**
+   * True when automated match is below the recruiter-review threshold
+   * (application should be handled / reviewed by a recruiter).
+   */
+  routed_to_recruiter?: boolean;
   job_location?: string | null;
 };
 
@@ -175,6 +184,11 @@ export type ClientMessageThread = {
   preview?: string;
   unread?: number;
   messages?: ClientPortalMessage[];
+  /**
+   * Underlying subject-thread ids merged into this person conversation.
+   * Delete/restore acts on all of them; replies go to the primary `id`.
+   */
+  related_thread_ids?: string[];
 };
 
 export type ClientPortalMessage = {

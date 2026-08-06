@@ -88,6 +88,20 @@ export default async function JobRequestDetailPage({
             )}
           </div>
         </Card>
+        <Card>
+          <CardTitle className="mb-3">Required certifications</CardTitle>
+          <div className="flex flex-wrap gap-2">
+            {(job.certifications ?? []).length === 0 ? (
+              <p className="text-sm text-[var(--cf-muted)]">None listed</p>
+            ) : (
+              (job.certifications ?? []).map((c) => (
+                <Badge key={c} tone="success">
+                  {c}
+                </Badge>
+              ))
+            )}
+          </div>
+        </Card>
         <Card className="md:col-span-2">
           <CardTitle className="mb-3">Job description</CardTitle>
           <p className="text-sm text-[var(--cf-ink)]">

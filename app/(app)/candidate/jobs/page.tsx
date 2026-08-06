@@ -15,7 +15,7 @@ import {
   candidateInputFromEmployee,
   jobInputFromPublicJob,
   rankJobsForCandidate,
-  skillsForPublicJobs,
+  requirementsForPublicJobs,
 } from "@/lib/matching";
 
 export default async function CandidateJobsPage() {
@@ -29,7 +29,7 @@ export default async function CandidateJobsPage() {
   const interestedJobIds = new Set(interests);
   const profileResumeUrl = employee?.resume_url ?? null;
 
-  const skillMap = await skillsForPublicJobs(jobs.map((j) => j.id));
+  const reqMap = await requirementsForPublicJobs(jobs.map((j) => j.id));
   const candidateProfile = candidateInputFromEmployee(employee, {
     titles: jobs
       .filter((j) => appliedJobIds.has(j.id))
@@ -38,9 +38,10 @@ export default async function CandidateJobsPage() {
   });
 
   const ranked = rankJobsForCandidate(
-    jobs.map((j) =>
-      jobInputFromPublicJob(j, skillMap.get(j.id) ?? []),
-    ),
+    jobs.map((j) => {
+      const req = reqMap.get(j.id) ?? { skills: [], certifications: [] };
+      return jobInputFromPublicJob(j, req.skills, req.certifications);
+    }),
     jobs.map((j) => j.id),
     candidateProfile,
   );
@@ -87,6 +88,7 @@ export default async function CandidateJobsPage() {
       matchBand: match?.band ?? "low",
       matchReasons: match?.reasons ?? [],
       matchSkills: match?.skillHits ?? [],
+      matchCerts: match?.certHits ?? [],
     };
   });
 

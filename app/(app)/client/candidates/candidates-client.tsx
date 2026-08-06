@@ -24,6 +24,7 @@ import {
 } from "@/lib/client-portal/labels";
 import { paginate } from "@/lib/client-portal/pagination";
 import { MatchScoreBadge, MatchedSkills } from "@/components/matching/match-score-badge";
+import { MATCH_RECRUITER_THRESHOLD } from "@/lib/matching/threshold";
 
 const MAX_COMPARE = 3;
 
@@ -41,7 +42,8 @@ export function CandidatesClient({
   const [position, setPosition] = useState("All");
   const [status, setStatus] = useState("All");
   const [likedOnly, setLikedOnly] = useState(false);
-  const [matchMin, setMatchMin] = useState("all");
+  /** all | high (>=60) | recruiter (<60) */
+  const [matchBucket, setMatchBucket] = useState("all");
   const [page, setPage] = useState(1);
   const [likedIds, setLikedIds] = useState<Set<string>>(
     () => new Set(initialLikedIds),
@@ -81,10 +83,12 @@ export function CandidatesClient({
         !q || c.candidate_name.toLowerCase().includes(q.toLowerCase());
       const matchesLiked = !likedOnly || likedIds.has(c.id);
       const score = c.match_score ?? 0;
+      const routed =
+        c.routed_to_recruiter ?? score < MATCH_RECRUITER_THRESHOLD;
       const matchesScore =
-        matchMin === "all" ||
-        (matchMin === "50" && score >= 50) ||
-        (matchMin === "70" && score >= 70);
+        matchBucket === "all" ||
+        (matchBucket === "high" && !routed && score >= MATCH_RECRUITER_THRESHOLD) ||
+        (matchBucket === "recruiter" && routed);
       return (
         matchesQ &&
         matchesLiked &&
@@ -94,7 +98,7 @@ export function CandidatesClient({
       );
     });
     return [...list].sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0));
-  }, [candidatesOnly, q, likedOnly, likedIds, matchMin, position, status]);
+  }, [candidatesOnly, q, likedOnly, likedIds, matchBucket, position, status]);
 
   const paged = paginate(filtered, page);
   const hasFilters =
@@ -102,8 +106,12 @@ export function CandidatesClient({
     position !== "All" ||
     status !== "All" ||
     likedOnly ||
-    matchMin !== "all";
-
+    matchBucket !== "all";
+  const routedCount = candidatesOnly.filter(
+    (c) =>
+      c.routed_to_recruiter ??
+      (c.match_score != null && c.match_score < MATCH_RECRUITER_THRESHOLD),
+  ).length;
   function toggleSelect(id: string) {
     setSelected((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
@@ -176,7 +184,7 @@ export function CandidatesClient({
     <div className="space-y-6">
       <PageHeader
         title="Candidates"
-        description="People who applied to your open jobs. Automatic fit scores rank who matches each role best. Like candidates to shortlist them."
+        description={`People who applied to your open jobs. Fit scores use required skills; matches below ${MATCH_RECRUITER_THRESHOLD}% are auto-sent to a recruiter for review.`}
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -218,16 +226,21 @@ export function CandidatesClient({
           <option value="rejected">Rejected</option>
         </Select>
         <Select
-          value={matchMin}
+          value={matchBucket}
           onChange={(e) => {
-            setMatchMin(e.target.value);
+            setMatchBucket(e.target.value);
             setPage(1);
           }}
-          className="sm:max-w-[11rem]"
+          className="sm:max-w-[14rem]"
         >
           <option value="all">Any match score</option>
-          <option value="50">50%+ fit</option>
-          <option value="70">70%+ strong</option>
+          <option value="high">
+            Strong / good ({MATCH_RECRUITER_THRESHOLD}%+)
+          </option>
+          <option value="recruiter">
+            Sent to recruiter
+            {routedCount > 0 ? ` (${routedCount})` : ""}
+          </option>
         </Select>
         <Button
           type="button"
@@ -307,7 +320,7 @@ export function CandidatesClient({
                   setPosition("All");
                   setStatus("All");
                   setLikedOnly(false);
-                  setMatchMin("all");
+                  setMatchBucket("all");
                   setPage(1);
                 }}
               >
@@ -326,6 +339,10 @@ export function CandidatesClient({
             {paged.items.map((c) => {
               const isSelected = selected.includes(c.id);
               const isLiked = likedIds.has(c.id);
+              const routed =
+                c.routed_to_recruiter ??
+                (c.match_score != null &&
+                  c.match_score < MATCH_RECRUITER_THRESHOLD);
               return (
                 <Card
                   key={`${c.source}-${c.id}`}
@@ -385,6 +402,9 @@ export function CandidatesClient({
                           compact
                         />
                       ) : null}
+                      {routed ? (
+                        <Badge tone="warning">Sent to recruiter</Badge>
+                      ) : null}
                       <Badge tone={seedStatusTone(c.stage)}>
                         {submittalStageLabel(c.stage)}
                       </Badge>
@@ -400,10 +420,21 @@ export function CandidatesClient({
                   ) : null}
                   <MatchedSkills
                     skills={c.match_skills}
+                    className="mb-1.5"
+                    emptyLabel={
+                      c.match_score != null
+                        ? "No matching skill tags yet"
+                        : ""
+                    }
+                  />
+                  <MatchedSkills
+                    skills={c.match_certifications}
+                    label="Matched certifications"
+                    tone="certs"
                     className="mb-3"
                     emptyLabel={
                       c.match_score != null
-                        ? "No matching skill tags on this profile yet"
+                        ? "No matching certifications yet"
                         : ""
                     }
                   />

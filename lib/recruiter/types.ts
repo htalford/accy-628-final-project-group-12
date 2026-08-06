@@ -105,6 +105,8 @@ export type RecruiterJobOrder = {
   priority: JobPriority;
   description: string;
   requiredSkills: string[];
+  /** Required certs from employer job_requests when linked. */
+  requiredCertifications: string[];
   payRate: number;
   billRate: number;
   assignedRecruiter: string;

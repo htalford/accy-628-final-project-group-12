@@ -27,6 +27,7 @@ export type CandidateJobRow = {
   matchBand?: MatchBand;
   matchReasons?: string[];
   matchSkills?: string[];
+  matchCerts?: string[];
 };
 
 function uniqueSorted(values: string[]) {
@@ -50,6 +51,7 @@ function matchesSearch(row: CandidateJobRow, q: string) {
     row.matchScore != null ? `${row.matchScore} match` : "",
     ...(row.matchReasons ?? []),
     ...(row.matchSkills ?? []),
+    ...(row.matchCerts ?? []),
   ]
     .join(" ")
     .toLowerCase();
@@ -327,7 +329,15 @@ export function CandidateJobsBoard({ jobs }: { jobs: CandidateJobRow[] }) {
                   className="mt-1.5 max-w-[12rem]"
                   emptyLabel=""
                 />
+                <MatchedSkills
+                  skills={job.matchCerts}
+                  label="Matched certifications"
+                  tone="certs"
+                  className="mt-1 max-w-[12rem]"
+                  emptyLabel=""
+                />
                 {(job.matchSkills?.length ?? 0) === 0 &&
+                (job.matchCerts?.length ?? 0) === 0 &&
                 (job.matchReasons?.length ?? 0) > 0 ? (
                   <p className="mt-1 max-w-[12rem] text-[10px] leading-snug text-[var(--cf-muted)]">
                     {job.matchReasons![0]}
