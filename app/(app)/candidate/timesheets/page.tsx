@@ -1,3 +1,4 @@
+import { AlertCircle } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TimesheetForm } from "@/components/candidate/timesheet-form";
@@ -8,14 +9,50 @@ import {
   getCandidateTimesheets,
 } from "@/lib/candidate/data";
 
+/** Most recent Saturday (common staffing week-ending). */
+function currentWeekEndingDate() {
+  const d = new Date();
+  const day = d.getDay(); // 0 Sun … 6 Sat
+  const daysSinceSaturday = (day + 1) % 7;
+  d.setDate(d.getDate() - daysSinceSaturday);
+  return d.toISOString().slice(0, 10);
+}
+
 export default async function CandidateTimesheetsPage() {
   const [placements, timesheets] = await Promise.all([
     getCandidatePlacements(),
     getCandidateTimesheets(),
   ]);
 
+  const hasActivePlacement = placements.some((p) => p.status === "active");
+  const weekEnding = currentWeekEndingDate();
+  const hasThisWeekTimesheet = timesheets.some(
+    (ts) => ts.week_ending_date === weekEnding,
+  );
+  const needsAction = hasActivePlacement && !hasThisWeekTimesheet;
+
   return (
     <div>
+      {needsAction ? (
+        <div
+          role="alert"
+          className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-900 shadow-sm"
+        >
+          <AlertCircle
+            className="mt-0.5 h-5 w-5 shrink-0 text-red-600"
+            aria-hidden
+          />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Timesheet needs action</p>
+            <p className="mt-0.5 text-sm text-red-800/90">
+              You haven’t submitted hours for week ending{" "}
+              <span className="font-semibold">{formatDate(weekEnding)}</span>.
+              Submit below to stay current for payroll.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       <PageHeader
         title="Timesheets"
         description="Enter regular and overtime hours for your active placement."
