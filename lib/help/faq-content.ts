@@ -62,9 +62,9 @@ export const FAQ_BY_ROLE: Record<UserRole, FaqItem[]> = {
     },
     {
       id: "rec-pipeline",
-      question: "How do I move a candidate through the pipeline?",
+      question: "How do I review matched candidates?",
       answer:
-        "Open Candidates in Pipeline, then a candidate’s detail page. From there you can update application status, schedule interviews, and assign approved candidates to open job orders.",
+        "Open Matched candidates, then a candidate’s detail page. From there you can update application status, schedule interviews, and assign approved candidates to open job orders.",
     },
   ],
   accounting: [

@@ -86,7 +86,7 @@ export async function applyToJob(formData: FormData): Promise<ActionResult> {
     const { data: employee } = await supabase
       .from("employees")
       .select(
-        "first_name, last_name, email, phone, certifications, resume_url, resume_text, emergency_contact_name, emergency_contact_phone, education_background, previous_employments, employment_type, status",
+        "first_name, last_name, email, phone, industry, skills, years_experience, certifications, resume_url, resume_text, emergency_contact_name, emergency_contact_phone, education_background, previous_employments, employment_type, status",
       )
       .eq("id", employeeId)
       .maybeSingle();
@@ -120,6 +120,16 @@ export async function applyToJob(formData: FormData): Promise<ActionResult> {
             employeeRow?.certifications == null
               ? null
               : String(employeeRow.certifications),
+          skills:
+            employeeRow?.skills == null ? null : String(employeeRow.skills),
+          years_experience:
+            employeeRow?.years_experience == null
+              ? null
+              : String(employeeRow.years_experience),
+          industry:
+            employeeRow?.industry == null
+              ? null
+              : String(employeeRow.industry),
           employment_type:
             employeeRow?.employment_type == null
               ? null
@@ -528,61 +538,19 @@ export async function updateCandidateProfile(
   const lastName = String(formData.get("lastName") ?? "").trim();
   const displayName = String(formData.get("displayName") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
+  const industry = String(formData.get("industry") ?? "").trim();
   const certifications = String(formData.get("certifications") ?? "").trim();
+  const skills = String(formData.get("skills") ?? "").trim();
+  const yearsExperience = String(formData.get("yearsExperience") ?? "").trim();
   const educationBackground = String(
     formData.get("educationBackground") ?? "",
   ).trim();
-  const emergencyContactName = String(
-    formData.get("emergencyContactName") ?? "",
-  ).trim();
-  const emergencyContactPhone = String(
-    formData.get("emergencyContactPhone") ?? "",
-  ).trim();
+  const otherTags = String(formData.get("otherTags") ?? "").trim();
   const keepExistingResume = formData.get("keepExistingResume") === "on";
   const resumeFile = formData.get("resumeFile");
-  const previousEmploymentsRaw = String(
-    formData.get("previousEmployments") ?? "[]",
-  );
 
   if (!firstName || !lastName || !displayName) {
     return { ok: false, error: "Name fields are required." };
-  }
-
-  let previousEmployments: Array<{
-    company: string;
-    title: string;
-    startDate: string;
-    endDate: string;
-    description: string;
-  }> = [];
-  try {
-    const parsed = JSON.parse(previousEmploymentsRaw) as unknown;
-    if (!Array.isArray(parsed)) {
-      return { ok: false, error: "Previous employments format is invalid." };
-    }
-    previousEmployments = parsed
-      .slice(0, 3)
-      .map((row) => {
-        const r = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
-        return {
-          company: String(r.company ?? "").trim(),
-          title: String(r.title ?? "").trim(),
-          startDate: String(r.startDate ?? "").trim(),
-          endDate: String(r.endDate ?? "").trim(),
-          description: String(r.description ?? "").trim(),
-        };
-      });
-    while (previousEmployments.length < 3) {
-      previousEmployments.push({
-        company: "",
-        title: "",
-        startDate: "",
-        endDate: "",
-        description: "",
-      });
-    }
-  } catch {
-    return { ok: false, error: "Previous employments format is invalid." };
   }
 
   const supabase = await createClient();
@@ -623,15 +591,21 @@ export async function updateCandidateProfile(
     resumeText = null;
   }
 
+  // Fold industry “other” tags into skills so matching still sees them.
+  const skillsJoined = [skills, otherTags]
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(", ");
+
   const employeeUpdate: Record<string, unknown> = {
     first_name: firstName,
     last_name: lastName,
     phone: phone || null,
+    industry: industry || null,
+    skills: skillsJoined || null,
+    years_experience: yearsExperience || null,
     certifications: certifications || null,
     education_background: educationBackground || null,
-    previous_employments: previousEmployments,
-    emergency_contact_name: emergencyContactName || null,
-    emergency_contact_phone: emergencyContactPhone || null,
     updated_at: new Date().toISOString(),
   };
   if (resumeUrl !== undefined) {

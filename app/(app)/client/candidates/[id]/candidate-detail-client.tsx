@@ -13,6 +13,7 @@ import {
   updateApplicationStatusAction,
   updateSubmittalStageAction,
 } from "@/app/actions/client-portal";
+import { updateApplicationStatus } from "@/app/actions/recruiter";
 import type { ClientCandidate, SubmittalStage } from "@/lib/types/database";
 import {
   seedStatusTone,
@@ -21,8 +22,12 @@ import {
 
 export function CandidateDetailClient({
   initial,
+  listHref = "/client/candidates",
+  listLabel = "Candidates",
 }: {
   initial: ClientCandidate;
+  listHref?: string;
+  listLabel?: string;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -31,11 +36,40 @@ export function CandidateDetailClient({
     Extract<SubmittalStage, "accepted" | "rejected"> | null
   >(null);
   const [candidate, setCandidate] = useState(initial);
+  const isRecruiterView = listHref.startsWith("/recruiter");
 
   async function decide(
     stage: Extract<SubmittalStage, "accepted" | "rejected">,
     note: string,
   ) {
+    if (isRecruiterView && candidate.source === "application") {
+      const nextStatus = stage === "accepted" ? "offered" : "rejected";
+      const result = await updateApplicationStatus(candidate.id, nextStatus);
+      if (result.ok) {
+        toast.push(
+          stage === "accepted"
+            ? result.message
+            : `${candidate.candidate_name} rejected.${note.trim() ? ` (${note.trim()})` : ""}`,
+          stage === "accepted" ? "success" : "info",
+        );
+        setCandidate((c) => ({
+          ...c,
+          stage: stage === "accepted" ? "offer" : "rejected",
+          interview_notes: note
+            ? `${c.interview_notes ?? ""} · Decision note: ${note}`.replace(
+                /^ · /,
+                "",
+              )
+            : c.interview_notes,
+        }));
+        setDialog(null);
+        startTransition(() => router.refresh());
+      } else {
+        toast.push(result.error, "error");
+      }
+      return;
+    }
+
     const result =
       candidate.source === "application"
         ? await updateApplicationStatusAction(candidate.id, stage, note)
@@ -68,7 +102,7 @@ export function CandidateDetailClient({
     <div className="space-y-6">
       <Breadcrumbs
         items={[
-          { label: "Candidates", href: "/client/candidates" },
+          { label: listLabel, href: listHref },
           { label: candidate.candidate_name },
         ]}
       />
@@ -100,7 +134,7 @@ export function CandidateDetailClient({
               </Button>
             </>
           ) : null}
-          <Button size="sm" variant="secondary" href="/client/candidates">
+          <Button size="sm" variant="secondary" href={listHref}>
             Back
           </Button>
         </div>

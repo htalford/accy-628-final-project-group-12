@@ -248,7 +248,11 @@ export function getNavForRole(role: UserRole): NavItem[] {
     case "employer":
       return [
         { href: "/client/dashboard", label: "Dashboard", icon: "layout-dashboard" },
-        { href: "/client/candidates", label: "Candidates", icon: "users" },
+        {
+          href: "/client/candidates/interested",
+          label: "Interested candidates",
+          icon: "users",
+        },
         { href: "/client/contracts", label: "Contracts", icon: "file-signature" },
         { href: "/client/employees", label: "Employees", icon: "user-round" },
         { href: "/client/invoices", label: "Invoices", icon: "receipt" },
@@ -274,7 +278,7 @@ export function getNavForRole(role: UserRole): NavItem[] {
       return [
         { href: "/recruiter/dashboard", label: "Dashboard", icon: "layout-dashboard" },
         { href: "/recruiter/job-orders", label: "Job Orders", icon: "briefcase-business" },
-        { href: "/recruiter/candidates", label: "Candidates in Pipeline", icon: "users" },
+        { href: "/recruiter/candidates", label: "Matched candidates", icon: "users" },
         { href: "/recruiter/interviews", label: "Interviews Scheduled", icon: "calendar" },
         { href: "/recruiter/placements", label: "Placements This Month", icon: "briefcase" },
         { href: "/recruiter/clients", label: "Clients", icon: "building-2" },
@@ -323,7 +327,7 @@ export function getPageTitle(pathname: string): string {
     "/accounting/messages": "Messages",
     "/accounting/profile": "Profile",
     "/client/dashboard": "Dashboard",
-    "/client/candidates": "Candidates",
+    "/client/candidates/interested": "Interested candidates",
     "/client/contracts": "Contracts",
     "/client/employees": "Employees",
     "/client/invoices": "Invoices",
@@ -344,7 +348,7 @@ export function getPageTitle(pathname: string): string {
     "/candidate/profile": "Profile",
     "/candidate/timesheets": "Timesheets",
     "/recruiter/dashboard": "Dashboard",
-    "/recruiter/candidates": "Candidates in Pipeline",
+    "/recruiter/candidates": "Matched candidates",
     "/recruiter/job-orders": "Job Orders",
     "/recruiter/interviews": "Interviews Scheduled",
     "/recruiter/placements": "Placements This Month",
@@ -381,11 +385,16 @@ export function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/candidate/completions/")) return "Completion detail";
   if (pathname.startsWith("/client/job-requests/new")) return "New Job Request";
   if (pathname.startsWith("/client/job-requests/")) return "Job Request";
+  if (pathname.startsWith("/client/candidates/interested"))
+    return "Interested candidates";
   if (pathname.startsWith("/client/candidates/")) return "Candidate Profile";
   if (pathname.startsWith("/client/employees/")) return "Employee";
   if (pathname.startsWith("/client/contracts/")) return "Contract";
   if (pathname.startsWith("/client/timesheets/")) return "Timesheet";
   if (pathname.startsWith("/client/invoices/")) return "Invoice";
+  if (pathname.startsWith("/recruiter/candidates/compare")) return "Compare candidates";
+  if (pathname.startsWith("/recruiter/candidates/applications/"))
+    return "Matched candidate";
   if (pathname.startsWith("/recruiter/candidates/")) return "Candidate details";
   if (pathname.startsWith("/recruiter/job-orders/")) return "Job order details";
   if (pathname.startsWith("/recruiter/clients/")) return "Client details";

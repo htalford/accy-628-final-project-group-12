@@ -1,15 +1,6 @@
-import {
-  listClientCandidates,
-  listLikedApplicationIdsForClient,
-} from "@/lib/client-portal/portal-data";
-import { CandidatesClient } from "./candidates-client";
+import { redirect } from "next/navigation";
 
-export default async function CandidatesPage() {
-  const [candidates, likedIds] = await Promise.all([
-    listClientCandidates(),
-    listLikedApplicationIdsForClient(),
-  ]);
-  return (
-    <CandidatesClient initial={candidates} initialLikedIds={likedIds} />
-  );
+/** Matched applications live on the recruiter dashboard. */
+export default function CandidatesPage() {
+  redirect("/client/candidates/interested");
 }

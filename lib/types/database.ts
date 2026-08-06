@@ -82,6 +82,10 @@ export type PortalJobRequest = {
   location: string | null;
   pay_rate_text: string | null;
   start_date: string | null;
+  /** Industry slug from shared checklist. */
+  industry?: string | null;
+  /** Preferred years-of-experience range label. */
+  years_experience?: string | null;
   skills: string[];
   /** Required certifications for matching (comma list on create form). */
   certifications: string[];
@@ -225,6 +229,12 @@ export type Employee = {
   phone: string | null;
   employment_type: EmploymentType;
   status: EntityStatus;
+  /** Industry slug from candidate profile checklist. */
+  industry?: string | null;
+  /** Comma-separated skill tags from industry checklist. */
+  skills?: string | null;
+  /** Selected years-of-experience range label. */
+  years_experience?: string | null;
   certifications: string | null;
   resume_url: string | null;
   /** Plain text extracted from resume file for automated matching. */
