@@ -584,7 +584,7 @@ export async function getOperatingExpenses() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("operating_expenses")
-    .select("id, category, description, amount, expense_date, month")
+    .select("id, category, description, amount, expense_date, month, status")
     .order("expense_date", { ascending: false });
 
   if (error) {
@@ -599,6 +599,7 @@ export async function getOperatingExpenses() {
     amount: Number(row.amount),
     expenseDate: row.expense_date as string,
     month: row.month as string,
+    status: (row.status as ExpenseStatus) ?? "approved",
   }));
 }
 
@@ -652,13 +653,14 @@ export async function getAccountsReceivable() {
 
 export async function getDashboardData() {
   const supabase = await createClient();
-  const [invoices, payments, placements, timesheets, operatingExpenseRows] =
+  const [invoices, payments, placements, timesheets, operatingExpenseRows, placementExpenseRows] =
     await Promise.all([
       getInvoices(),
       supabase.from("payments").select("invoice_id, amount, status, payment_date, created_at"),
       getContracts(),
       getPayrollRows(),
       getOperatingExpenses(),
+      getExpenses(),
     ]);
 
   const recognizedInvoices = invoices.filter((i) =>
@@ -682,8 +684,14 @@ export async function getDashboardData() {
       .filter((e) => isWithinLastDays(e.expenseDate, 30))
       .map((e) => e.amount),
   );
+  const employeeBenefitsLast30Days = sumMoney(
+    placementExpenseRows
+      .filter((e) => e.expenseType === "benefits")
+      .filter((e) => isWithinLastDays(e.expenseDate, 30))
+      .map((e) => e.amount),
+  );
   const payrollLast30Days = roundMoney(
-    contractLaborLast30Days + staffSalariesLast30Days,
+    contractLaborLast30Days + staffSalariesLast30Days + employeeBenefitsLast30Days,
   );
 
   const paidByInvoice = new Map<string, number>();

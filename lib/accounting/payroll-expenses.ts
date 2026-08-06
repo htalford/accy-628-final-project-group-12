@@ -17,12 +17,18 @@ export const PAYROLL_OPERATING_CATEGORIES = [
 const payrollOperatingSet = new Set<string>(PAYROLL_OPERATING_CATEGORIES);
 
 /**
- * Placement expense types that are payroll-adjacent costs
+ * Placement expense types for staffed employees that belong on Payroll
  * (public.expenses.expense_type).
  */
 export const PAYROLL_PLACEMENT_EXPENSE_TYPES = [
-  "payroll_tax",
+  "benefits",
 ] as const satisfies readonly ExpenseType[];
+
+export function isStaffedEmployeeBenefitsType(
+  type: ExpenseType | string,
+): boolean {
+  return type === "benefits";
+}
 
 const payrollPlacementSet = new Set<string>(PAYROLL_PLACEMENT_EXPENSE_TYPES);
 

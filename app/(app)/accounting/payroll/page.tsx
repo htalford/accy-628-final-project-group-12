@@ -11,10 +11,13 @@ import {
   TimesheetLink,
 } from "@/components/accounting/entity-links";
 import {
+  getExpenses,
   getOperatingExpenses,
   getTimesheets,
 } from "@/lib/accounting/queries";
 import {
+  expenseStatusLabel,
+  expenseTypeLabel,
   money,
   moneyExact,
   operatingExpenseCategoryLabel,
@@ -22,7 +25,11 @@ import {
 import { PayrollToolbar } from "@/components/accounting/payroll-toolbar";
 import { timesheetsHref } from "@/lib/accounting/timesheet-links";
 import { yearMonth } from "@/lib/accounting/calculations";
-import { isPayrollOperatingCategory } from "@/lib/accounting/payroll-expenses";
+import { rangeCutoff } from "@/lib/accounting/date-range-filter";
+import {
+  isPayrollOperatingCategory,
+  isStaffedEmployeeBenefitsType,
+} from "@/lib/accounting/payroll-expenses";
 
 export default async function PayrollPage({
   searchParams,
@@ -32,12 +39,14 @@ export default async function PayrollPage({
     employee?: string;
     status?: string;
     from?: string;
+    range?: string;
   }>;
 }) {
   const params = await searchParams;
-  const [rows, operatingExpenses] = await Promise.all([
+  const [rows, operatingExpenses, placementExpenses] = await Promise.all([
     getTimesheets(),
     getOperatingExpenses(),
+    getExpenses(),
   ]);
   const employees = [...new Set(rows.map((r) => r.employeeName))].sort();
   const periods = [...new Set(rows.map((r) => r.weekEnding))].sort().reverse();
@@ -48,9 +57,10 @@ export default async function PayrollPage({
     ? decodeURIComponent(params.employee)
     : undefined;
   const fromParam =
-    params.from && /^\d{4}-\d{2}-\d{2}$/.test(params.from)
+    rangeCutoff(params.range) ??
+    (params.from && /^\d{4}-\d{2}-\d{2}$/.test(params.from)
       ? params.from
-      : undefined;
+      : undefined);
 
   const filtered = rows.filter((r) => {
     if (params.period && params.period !== "all" && r.weekEnding !== params.period)
@@ -92,8 +102,24 @@ export default async function PayrollPage({
       return label.includes(q) || e.description.toLowerCase().includes(q);
     });
 
+  const employeeBenefits = placementExpenses
+    .filter((e) => isStaffedEmployeeBenefitsType(e.expenseType))
+    .filter((e) =>
+      matchesExpenseDateFilters(e.expenseDate, yearMonth(e.expenseDate)),
+    )
+    .filter((e) => {
+      if (!employeeParam || employeeParam === "all") return true;
+      const q = employeeParam.toLowerCase();
+      return (
+        e.description.toLowerCase().includes(q) ||
+        e.clientName.toLowerCase().includes(q) ||
+        expenseTypeLabel(e.expenseType).toLowerCase().includes(q)
+      );
+    });
+
   const contractLaborTotal = filtered.reduce((s, r) => s + r.grossPay, 0);
   const staffPayrollTotal = staffPayrollExpenses.reduce((s, e) => s + e.amount, 0);
+  const employeeBenefitsTotal = employeeBenefits.reduce((s, e) => s + e.amount, 0);
 
   const sharedFilters = {
     period: params.period,
@@ -134,9 +160,6 @@ export default async function PayrollPage({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button href="/accounting/expenses" variant="secondary">
-            Open Expenses
-          </Button>
           <Button href={timesheetsHref(sharedFilters)} variant="secondary">
             View timesheets
           </Button>
@@ -214,7 +237,7 @@ export default async function PayrollPage({
               header: "Hours Worked",
               render: (row) => (
                 <EntityLink href={`/accounting/timesheets/${row.id}`}>
-                  {`${row.hoursWorked} (R ${row.hoursRegular} / OT ${row.hoursOvertime})`}
+                  {row.hoursWorked}
                 </EntityLink>
               ),
             },
@@ -308,6 +331,82 @@ export default async function PayrollPage({
               key: "amount",
               header: "Amount",
               render: (row) => moneyExact(row.amount),
+            },
+          ]}
+        />
+      </CollapsiblePanel>
+
+      <CollapsiblePanel
+        id="employee-benefits"
+        title="Employee Benefits"
+        defaultOpen={employeeBenefits.length > 0}
+        action={
+          <span className="flex items-center gap-3 text-sm">
+            <Link
+              href="/accounting/expenses#payroll"
+              className="font-medium text-[var(--cf-ink)] hover:underline"
+            >
+              View on Expenses →
+            </Link>
+            <span className="font-semibold text-[var(--cf-ink)]">
+              {money(employeeBenefitsTotal)}
+            </span>
+          </span>
+        }
+      >
+        <DataTable
+          rows={employeeBenefits}
+          emptyTitle="No employee benefits"
+          emptyDescription="Benefits for staffed employees are recorded on Expenses and appear here."
+          columns={[
+            {
+              key: "date",
+              header: "Expense Date",
+              render: (row) => row.expenseDate,
+            },
+            {
+              key: "category",
+              header: "Category",
+              render: (row) => expenseTypeLabel(row.expenseType),
+            },
+            {
+              key: "description",
+              header: "Description",
+              render: (row) => (
+                <EntityLink href={`/accounting/expenses?focus=${row.id}#payroll`}>
+                  {row.description}
+                </EntityLink>
+              ),
+            },
+            {
+              key: "client",
+              header: "Client",
+              render: (row) => row.clientName,
+            },
+            {
+              key: "placement",
+              header: "Placement",
+              render: (row) =>
+                row.placementId ? (
+                  <ContractLink id={row.placementId} />
+                ) : (
+                  "—"
+                ),
+            },
+            {
+              key: "amount",
+              header: "Amount",
+              render: (row) => moneyExact(row.amount),
+            },
+            {
+              key: "status",
+              header: "Status",
+              render: (row) => (
+                <StatusBadge
+                  label={expenseStatusLabel(row.status)}
+                  tone={statusTone(row.status)}
+                />
+              ),
             },
           ]}
         />

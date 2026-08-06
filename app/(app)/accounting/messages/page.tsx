@@ -19,10 +19,7 @@ export default async function AccountingMessagesPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Messages"
-        description="Chat with recruiters, employers, and candidates. Deleted conversations stay in Deleted for 30 days."
-      />
+      <PageHeader title="Messages" />
       <AccountingMessagesCenter
         inboxThreads={inboxThreads}
         deletedThreads={deletedThreads}
