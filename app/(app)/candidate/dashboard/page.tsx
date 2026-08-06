@@ -20,7 +20,7 @@ import {
   candidateInputFromEmployee,
   jobInputFromPublicJob,
   rankJobsForCandidate,
-  skillsForPublicJobs,
+  requirementsForPublicJobs,
 } from "@/lib/matching";
 
 function firstNameFrom(displayName: string | null | undefined, fallback: string) {
@@ -101,16 +101,17 @@ export default async function CandidateDashboardPage() {
     active && !hasThisWeekTimesheet ? 1 : 0;
 
   const appliedJobIds = new Set(applications.map((a) => a.job_id));
-  const skillMap = await skillsForPublicJobs(jobs.map((j) => j.id));
+  const reqMap = await requirementsForPublicJobs(jobs.map((j) => j.id));
   const candidateProfile = candidateInputFromEmployee(employee, {
     titles: applications
       .map((a) => a.jobs?.title)
       .filter(Boolean) as string[],
   });
   const ranked = rankJobsForCandidate(
-    jobs.map((j) =>
-      jobInputFromPublicJob(j, skillMap.get(j.id) ?? []),
-    ),
+    jobs.map((j) => {
+      const req = reqMap.get(j.id) ?? { skills: [], certifications: [] };
+      return jobInputFromPublicJob(j, req.skills, req.certifications);
+    }),
     jobs.map((j) => j.id),
     candidateProfile,
     { minScore: 50 },
@@ -231,6 +232,13 @@ export default async function CandidateDashboardPage() {
                       <MatchedSkills
                         skills={m.result.skillHits}
                         className="mt-1.5"
+                        emptyLabel=""
+                      />
+                      <MatchedSkills
+                        skills={m.result.certHits}
+                        label="Matched certifications"
+                        tone="certs"
+                        className="mt-1"
                         emptyLabel=""
                       />
                     </div>

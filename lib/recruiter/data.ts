@@ -9,6 +9,14 @@ import { getAppUser } from "@/lib/auth/get-app-user";
 import { filterCandidates, filterJobOrders } from "@/lib/recruiter/filters";
 import { mapJobRequest, mapSubmittal } from "@/lib/client-portal/portal-data";
 import {
+  candidateInputFromEmployee,
+  candidateInputFromRecruiter,
+  jobInputFromPublicJob,
+  jobInputFromRecruiterOrder,
+  skillsForPublicJobs,
+} from "@/lib/matching";
+import { scoreMatch, type MatchBand } from "@/lib/matching/score";
+import {
   applicationStatusToPipeline,
   jobRequestStatusToDb,
   jobRequestStatusToUi,
@@ -36,6 +44,9 @@ import type {
   PlacementStatus,
   PlacementType,
 } from "@/lib/types/database";
+
+/** Automated matches below this % are surfaced for recruiter review. */
+const LOW_MATCH_REVIEW_THRESHOLD = 60;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object") return null;
@@ -135,6 +146,7 @@ function mapEmployerRequestToJobOrder(
     priority: status === "open" ? "High" : "Medium",
     description: mapped.description || mapped.notes || "",
     requiredSkills: mapped.skills,
+    requiredCertifications: mapped.certifications ?? [],
     payRate: 0,
     billRate: 0,
     assignedRecruiter: mapped.recruiter_name || "Morgan Recruiter",
@@ -245,6 +257,223 @@ function mapEmployerSubmittalToCandidate(
   };
 }
 
+function applyMatchScore(
+  candidate: RecruiterCandidate,
+  score: number,
+  band: MatchBand,
+): RecruiterCandidate {
+  return {
+    ...candidate,
+    matchPercent: score,
+    matchBand: band,
+  };
+}
+
+/**
+ * Score pipeline rows against their linked job / job request, and append
+ * job_interest rows with match < 60% so recruiters can review weak fits.
+ */
+async function withMatchScoresAndLowInterestReviews(
+  rows: RecruiterCandidate[],
+): Promise<RecruiterCandidate[]> {
+  const jobOrders = await listJobOrders();
+  const orderById = new Map(jobOrders.map((j) => [j.id, j]));
+
+  const publicJobIds = [
+    ...new Set(
+      rows
+        .filter((c) => c.source === "application" && c.jobId)
+        .map((c) => c.jobId as string),
+    ),
+  ];
+  const skillsByPublicJob = await skillsForPublicJobs(publicJobIds);
+
+  const scored = rows.map((c) => {
+    if (!c.jobId) return { ...c, matchPercent: null, matchBand: null };
+    const order = orderById.get(c.jobId);
+    if (order) {
+      const skills =
+        order.requiredSkills.length > 0
+          ? order.requiredSkills
+          : (skillsByPublicJob.get(c.jobId) ?? []);
+      const result = scoreMatch(
+        {
+          ...jobInputFromRecruiterOrder(order),
+          requiredSkills: skills,
+        },
+        candidateInputFromRecruiter(c),
+      );
+      return applyMatchScore(c, result.score, result.band);
+    }
+    // Public job may only have skills via job_requests.source_job_id
+    const skills = skillsByPublicJob.get(c.jobId) ?? [];
+    if (skills.length === 0 && c.source !== "application") {
+      return { ...c, matchPercent: null, matchBand: null };
+    }
+    const result = scoreMatch(
+      {
+        title: c.jobTitle || c.positionApplied,
+        description: c.notes,
+        location: c.location,
+        employmentType: null,
+        requiredSkills: skills,
+      },
+      candidateInputFromRecruiter(c),
+    );
+    return applyMatchScore(c, result.score, result.band);
+  });
+
+  const interestRows = await listLowMatchJobInterests({
+    existing: scored,
+    orderById,
+    skillsByPublicJob,
+  });
+
+  const combined = [...scored, ...interestRows];
+  // Needs-review (<60%) first, then higher scores, then unscored.
+  combined.sort((a, b) => {
+    const aPct = a.matchPercent;
+    const bPct = b.matchPercent;
+    const aLow = aPct != null && aPct < LOW_MATCH_REVIEW_THRESHOLD;
+    const bLow = bPct != null && bPct < LOW_MATCH_REVIEW_THRESHOLD;
+    if (aLow !== bLow) return aLow ? -1 : 1;
+    if (aLow && bLow) return (aPct ?? 0) - (bPct ?? 0);
+    if (aPct == null && bPct == null) {
+      return b.lastUpdated.localeCompare(a.lastUpdated);
+    }
+    if (aPct == null) return 1;
+    if (bPct == null) return -1;
+    return bPct - aPct;
+  });
+
+  return combined;
+}
+
+async function listLowMatchJobInterests(opts: {
+  existing: RecruiterCandidate[];
+  orderById: Map<string, RecruiterJobOrder>;
+  skillsByPublicJob: Map<string, string[]>;
+}): Promise<RecruiterCandidate[]> {
+  const supabase = await createClient();
+  const { data: interests, error } = await supabase
+    .from("job_interests")
+    .select(
+      `id, job_id, employee_id, created_at,
+       jobs(id, title, description, location, employment_type, employer_name, pay_rate_min, pay_rate_max, status),
+       employees(id, first_name, last_name, email, phone, employment_type, status, resume_url, resume_text, certifications, education_background, previous_employments)`,
+    )
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("listLowMatchJobInterests", error.message);
+    return [];
+  }
+
+  const alreadyInPipeline = new Set(
+    opts.existing.map((c) => `${c.employeeId}:${c.jobId ?? ""}`),
+  );
+
+  const out: RecruiterCandidate[] = [];
+  for (const row of interests ?? []) {
+    const emp = asRecord(row.employees);
+    const job = asRecord(row.jobs);
+    const jobId = String(row.job_id);
+    const employeeId = String(row.employee_id);
+    if (alreadyInPipeline.has(`${employeeId}:${jobId}`)) continue;
+    if (!job || str(job.status) !== "open") continue;
+
+    const order = opts.orderById.get(jobId);
+    const skills =
+      order?.requiredSkills ??
+      opts.skillsByPublicJob.get(jobId) ??
+      [];
+
+    const candidateInput = candidateInputFromEmployee(
+      emp as Parameters<typeof candidateInputFromEmployee>[0],
+      {
+        titles: [str(job.title)].filter(Boolean),
+        locations: str(job.location) ? [str(job.location)] : [],
+      },
+    );
+
+    const jobInput = order
+      ? jobInputFromRecruiterOrder(order)
+      : jobInputFromPublicJob(
+          {
+            title: str(job.title),
+            description: str(job.description),
+            location: str(job.location) || null,
+            employment_type:
+              (job.employment_type as "temp" | "permanent") ?? "temp",
+            pay_rate_min:
+              job.pay_rate_min != null ? Number(job.pay_rate_min) : null,
+            pay_rate_max:
+              job.pay_rate_max != null ? Number(job.pay_rate_max) : null,
+          },
+          skills,
+        );
+
+    const result = scoreMatch(jobInput, candidateInput);
+    if (result.score >= LOW_MATCH_REVIEW_THRESHOLD) continue;
+
+    const education =
+      emp?.education_background != null &&
+      String(emp.education_background).trim()
+        ? String(emp.education_background)
+        : "—";
+    const certSkills = emp?.certifications
+      ? String(emp.certifications)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+
+    out.push(
+      applyMatchScore(
+        {
+          id: `interest-${row.id}`,
+          applicationId: null,
+          employeeId,
+          name: emp
+            ? fullName(str(emp.first_name), str(emp.last_name))
+            : "Unknown",
+          email: str(emp?.email, "—"),
+          phone: str(emp?.phone, "—"),
+          positionApplied: str(job.title, "Open role"),
+          jobId,
+          jobTitle: str(job.title) || null,
+          experienceYears: emp?.employment_type === "permanent" ? 5 : 2,
+          status: "Applied",
+          applicationStatus: "submitted",
+          skills: certSkills.length
+            ? certSkills
+            : [str(job.employer_name, "General")].filter(Boolean),
+          location: str(job.location, "—"),
+          recruiter: "Morgan Recruiter",
+          lastUpdated: String(row.created_at).slice(0, 10),
+          education,
+          notes: `Marked interested · ${result.score}% match — needs recruiter review.`,
+          resumeUrl: str(emp?.resume_url) || null,
+          resumeText:
+            emp?.resume_text != null ? String(emp.resume_text) : null,
+          previousEmployments: Array.isArray(emp?.previous_employments)
+            ? (emp?.previous_employments as import("@/lib/types/database").PreviousEmployment[])
+            : null,
+          interviewAt: null,
+          interviewType: null,
+          interviewNotes: null,
+          interviewHistory: [],
+          source: "job_interest",
+        },
+        result.score,
+        result.band,
+      ),
+    );
+  }
+
+  return out;
+}
+
 export async function listCandidates(
   filters: CandidateFilters = {},
 ): Promise<RecruiterCandidate[]> {
@@ -254,7 +483,7 @@ export async function listCandidates(
     .select(
       `id, job_id, employee_id, status, note, cover_letter, resume_url, updated_at, created_at,
        interview_at, interview_type, interview_notes,
-       jobs(id, title, employer_name, location),
+       jobs(id, title, description, employer_name, location, employment_type, pay_rate_min, pay_rate_max, status),
        employees(id, first_name, last_name, email, phone, employment_type, status, resume_url, resume_text, certifications, education_background, previous_employments)`,
     )
     .order("updated_at", { ascending: false });
@@ -335,14 +564,25 @@ export async function listCandidates(
     mapEmployerSubmittalToCandidate(row as Record<string, unknown>),
   );
 
-  return filterCandidates([...rows, ...employerRows], filters);
+  const withMatches = await withMatchScoresAndLowInterestReviews([
+    ...rows,
+    ...employerRows,
+  ]);
+
+  return filterCandidates(withMatches, filters);
 }
 
 export async function getCandidate(
   id: string,
 ): Promise<RecruiterCandidate | undefined> {
+  const decoded = decodeURIComponent(id);
   const all = await listCandidates();
-  return all.find((c) => c.id === id || c.employeeId === id);
+  return all.find(
+    (c) =>
+      c.id === decoded ||
+      c.employeeId === decoded ||
+      c.applicationId === decoded,
+  );
 }
 
 export async function listApprovedCandidates(): Promise<RecruiterCandidate[]> {
@@ -415,6 +655,7 @@ export async function listJobOrders(
       priority: dbStatus === "open" ? "High" : "Medium",
       description: (job.description as string) || "",
       requiredSkills: [],
+      requiredCertifications: [],
       payRate: Number(job.pay_rate_min ?? 0),
       billRate: Number(job.pay_rate_max ?? job.pay_rate_min ?? 0),
       assignedRecruiter: "Morgan Recruiter",
@@ -448,6 +689,13 @@ export async function listJobOrders(
   for (const order of employerOrders) {
     order.assignedCandidateIds = byRequest.get(order.id) ?? [];
     order.interviewProgress = `${order.assignedCandidateIds.length} submittal(s) · Employer request`;
+  }
+
+  const publicIds = rows.map((j) => j.id);
+  const skillsMap = await skillsForPublicJobs(publicIds);
+  for (const order of rows) {
+    const linked = skillsMap.get(order.id);
+    if (linked?.length) order.requiredSkills = linked;
   }
 
   return filterJobOrders([...rows, ...employerOrders], filters);

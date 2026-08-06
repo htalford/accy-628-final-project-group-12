@@ -11,7 +11,6 @@ export default async function TimesheetsPage() {
   return (
     <Suspense fallback={<p className="text-sm text-[var(--cf-muted)]">Loading…</p>}>
       <TimesheetsClient
-        companyName={data.client?.name ?? "your company"}
         timesheets={data.timesheets}
         employeeNames={employeeNames}
       />

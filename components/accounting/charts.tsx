@@ -47,7 +47,7 @@ export function RevenueChart({
           <CartesianGrid strokeDasharray="3 3" stroke="#d7e0e6" />
           <XAxis dataKey="month" tick={{ fontSize: 12 }} />
           <YAxis tick={{ fontSize: 12 }} />
-          <Tooltip formatter={(v) => money(Number(v))} />
+          <Tooltip cursor={false} formatter={(v) => money(Number(v))} />
           <Bar dataKey="amount" fill="#0b3a53" radius={[6, 6, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>

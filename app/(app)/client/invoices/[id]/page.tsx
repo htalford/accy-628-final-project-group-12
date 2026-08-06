@@ -37,10 +37,7 @@ export default async function ClientInvoiceDetailPage({
         ]}
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between print:hidden">
-        <PageHeader
-          title={`Invoice ${number}`}
-          description={`${invoice.clientName} · ${invoice.period_start.slice(0, 10)} – ${invoice.period_end.slice(0, 10)}`}
-        />
+        <PageHeader title={`Invoice ${number}`} />
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={seedStatusTone(invoice.status)}>
             {invoiceStatusLabel(invoice.status)}

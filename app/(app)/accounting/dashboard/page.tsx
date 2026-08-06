@@ -20,37 +20,31 @@ export default async function AccountingHomePage() {
         <StatCard
           label="Earned Revenue"
           value={money(data.cards.earnedRevenue)}
-          hint="Approved hours × bill rate (OT @ 1.5×)"
           href="/accounting/payroll"
         />
         <StatCard
           label="Billed Revenue"
           value={money(data.cards.billedRevenue)}
-          hint="Recognized invoices (excludes drafts)"
           href="/accounting/invoices"
         />
         <StatCard
           label="Accounts Receivable"
           value={money(data.cards.outstandingInvoices)}
-          hint="Open invoices net of completed payments"
           href="/accounting/accounts-receivable"
         />
         <StatCard
           label="Payroll (Last 30 Days)"
           value={money(data.cards.payrollLast30Days)}
-          hint="Contract labor, staff salaries, and employee benefits (last 30 days)"
           href={`/accounting/payroll?range=month`}
         />
         <StatCard
           label="Gross Profit"
           value={money(data.cards.grossProfit)}
-          hint="Billed revenue − direct labor (COS)"
           href="/accounting/profitability"
         />
         <StatCard
           label="Operating Income"
           value={money(data.cards.operatingIncome)}
-          hint="Gross profit − recognized operating expenses"
           href="/accounting/expenses"
         />
       </div>
@@ -94,34 +88,12 @@ export default async function AccountingHomePage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Panel
-          title="Revenue Overview"
-          description="Billed amounts by invoice period month"
-          action={
-            <Link
-              href="/accounting/invoices"
-              className="text-sm font-medium text-[var(--cf-ink)] hover:underline"
-            >
-              Open Invoices →
-            </Link>
-          }
-        >
+        <Panel title="Revenue Overview">
           <Link href="/accounting/invoices" className="block">
             <RevenueChart data={data.revenueByMonth} />
           </Link>
         </Panel>
-        <Panel
-          title="Invoice Status"
-          description="Same statuses as the Invoices list (drafts excluded)"
-          action={
-            <Link
-              href="/accounting/invoices"
-              className="text-sm font-medium text-[var(--cf-ink)] hover:underline"
-            >
-              Open Invoices →
-            </Link>
-          }
-        >
+        <Panel title="Invoice Status">
           <Link href="/accounting/invoices" className="block">
             <InvoiceStatusChart data={data.invoiceStatusChart} />
           </Link>

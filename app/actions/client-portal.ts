@@ -152,6 +152,7 @@ export async function createJobRequestAction(formData: {
   payRate: string;
   startDate: string;
   skills: string;
+  certifications: string;
   description: string;
   notes: string;
 }): Promise<ActionResult> {
@@ -163,6 +164,10 @@ export async function createJobRequestAction(formData: {
 
   const positions = Math.max(1, Math.floor(Number(formData.openings) || 1));
   const skills = formData.skills
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const certifications = (formData.certifications ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
@@ -181,6 +186,7 @@ export async function createJobRequestAction(formData: {
       pay_rate_text: formData.payRate.trim() || null,
       start_date: formData.startDate || null,
       skills,
+      certifications,
       description: formData.description.trim() || null,
       notes: formData.notes.trim() || null,
       recruiter_name: "Morgan Recruiter",
@@ -319,11 +325,12 @@ export async function updateApplicationStatusAction(
 }
 
 /**
- * Insert into client_messages only (not public.messages).
+ * Reply in a person conversation. Recruiter and accounting use separate threads.
  */
 export async function sendClientMessageAction(
   threadId: string,
   body: string,
+  contactName?: string,
 ): Promise<ActionResult> {
   const auth = await requireEmployerClientId();
   if (!auth.ok) return auth;
@@ -331,23 +338,60 @@ export async function sendClientMessageAction(
   const text = body.trim();
   if (!text) return { ok: false, message: "Message cannot be empty." };
 
+  const { normalizeEmployerContact } = await import(
+    "@/lib/client-portal/message-contacts"
+  );
   const supabase = await createClient();
-  const { data: thread, error: tError } = await supabase
+  const { data: seedThread, error: tError } = await supabase
     .from("client_message_threads")
-    .select("id, deleted_at")
+    .select("id, recruiter_name")
     .eq("id", threadId)
     .eq("client_id", auth.clientId)
     .maybeSingle();
 
-  if (tError || !thread) {
+  if (tError || !seedThread) {
     return {
       ok: false,
       message: tError?.message ?? "Conversation not found for your company.",
     };
   }
 
+  const person = normalizeEmployerContact(
+    contactName || String(seedThread.recruiter_name),
+  );
+
+  const { data: owned } = await supabase
+    .from("client_message_threads")
+    .select("id")
+    .eq("client_id", auth.clientId)
+    .eq("recruiter_name", person)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let replyThreadId = owned?.id ? String(owned.id) : "";
+  if (!replyThreadId) {
+    const { data: created, error: createError } = await supabase
+      .from("client_message_threads")
+      .insert({
+        client_id: auth.clientId,
+        subject: `Messages with ${person}`,
+        recruiter_name: person,
+        updated_at: new Date().toISOString(),
+      })
+      .select("id")
+      .maybeSingle();
+    if (createError || !created) {
+      return {
+        ok: false,
+        message: createError?.message ?? "Could not open conversation.",
+      };
+    }
+    replyThreadId = String(created.id);
+  }
+
   const { error } = await supabase.from("client_messages").insert({
-    thread_id: threadId,
+    thread_id: replyThreadId,
     sender_role: "client",
     body: text,
   });
@@ -358,77 +402,160 @@ export async function sendClientMessageAction(
     .from("client_message_threads")
     .update({
       updated_at: new Date().toISOString(),
-      // Replying restores a soft-deleted thread to the inbox.
       deleted_at: null,
     })
-    .eq("id", threadId)
-    .eq("client_id", auth.clientId);
+    .eq("client_id", auth.clientId)
+    .eq("recruiter_name", person);
 
   revalidatePath("/client/messages");
-
   return { ok: true, message: "Message sent." };
 }
 
 /**
- * Start a new client↔recruiter thread (client_message_threads + first message).
- * Never writes to candidate public.messages.
+ * Message one person — reuses that contact’s conversation only.
  */
 export async function createClientMessageThreadAction(formData: {
-  subject: string;
+  subject?: string;
   body: string;
   recruiterName?: string;
 }): Promise<ActionResult> {
   const auth = await requireEmployerClientId();
   if (!auth.ok) return auth;
 
-  const subject = formData.subject.trim();
   const body = formData.body.trim();
-  if (!subject) return { ok: false, message: "Subject is required." };
   if (!body) return { ok: false, message: "Message cannot be empty." };
 
-  const recruiter =
-    formData.recruiterName?.trim() || "Morgan Recruiter";
-
+  const { normalizeEmployerContact } = await import(
+    "@/lib/client-portal/message-contacts"
+  );
+  const recruiter = normalizeEmployerContact(
+    formData.recruiterName || "Morgan Recruiter",
+  );
+  const subject = formData.subject?.trim() || `Messages with ${recruiter}`;
   const supabase = await createClient();
-  const { data: thread, error: threadError } = await supabase
+
+  const { data: existingOpen } = await supabase
     .from("client_message_threads")
-    .insert({
-      client_id: auth.clientId,
-      subject,
-      recruiter_name: recruiter,
-      updated_at: new Date().toISOString(),
-    })
     .select("id")
+    .eq("client_id", auth.clientId)
+    .eq("recruiter_name", recruiter)
+    .is("deleted_at", null)
+    .order("updated_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
-  if (threadError || !thread) {
-    return {
-      ok: false,
-      message: threadError?.message ?? "Could not create conversation.",
-    };
+  let threadId = existingOpen?.id ? String(existingOpen.id) : "";
+
+  if (!threadId) {
+    const { data: existingDeleted } = await supabase
+      .from("client_message_threads")
+      .select("id")
+      .eq("client_id", auth.clientId)
+      .eq("recruiter_name", recruiter)
+      .not("deleted_at", "is", null)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingDeleted?.id) {
+      threadId = String(existingDeleted.id);
+      await supabase
+        .from("client_message_threads")
+        .update({
+          deleted_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", threadId)
+        .eq("client_id", auth.clientId);
+    }
+  }
+
+  if (!threadId) {
+    const { data: thread, error: threadError } = await supabase
+      .from("client_message_threads")
+      .insert({
+        client_id: auth.clientId,
+        subject,
+        recruiter_name: recruiter,
+        updated_at: new Date().toISOString(),
+      })
+      .select("id")
+      .maybeSingle();
+
+    if (threadError || !thread) {
+      return {
+        ok: false,
+        message: threadError?.message ?? "Could not create conversation.",
+      };
+    }
+    threadId = String(thread.id);
+  } else if (existingOpen?.id) {
+    await supabase
+      .from("client_message_threads")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", threadId)
+      .eq("client_id", auth.clientId);
   }
 
   const { error: msgError } = await supabase.from("client_messages").insert({
-    thread_id: thread.id,
+    thread_id: threadId,
     sender_role: "client",
     body,
   });
 
-  if (msgError) {
-    return { ok: false, message: msgError.message };
-  }
+  if (msgError) return { ok: false, message: msgError.message };
 
   revalidatePath("/client/messages");
-
   return {
     ok: true,
-    message: "Conversation started.",
-    id: String(thread.id),
+    message: existingOpen?.id ? "Message sent." : "Conversation started.",
+    id: threadId,
   };
 }
 
+async function threadsForPerson(
+  clientId: string,
+  threadId: string,
+): Promise<
+  | { ok: true; recruiterName: string; ids: string[] }
+  | { ok: false; message: string }
+> {
+  const { normalizeEmployerContact } = await import(
+    "@/lib/client-portal/message-contacts"
+  );
+  const supabase = await createClient();
+  const { data: thread, error: findError } = await supabase
+    .from("client_message_threads")
+    .select("id, recruiter_name")
+    .eq("id", threadId)
+    .eq("client_id", clientId)
+    .maybeSingle();
+
+  if (findError || !thread) {
+    return {
+      ok: false,
+      message: findError?.message ?? "Conversation not found for your company.",
+    };
+  }
+
+  const person = normalizeEmployerContact(String(thread.recruiter_name));
+  const { data: siblings } = await supabase
+    .from("client_message_threads")
+    .select("id, recruiter_name")
+    .eq("client_id", clientId);
+
+  const ids = (siblings ?? [])
+    .filter(
+      (r) => normalizeEmployerContact(String(r.recruiter_name)) === person,
+    )
+    .map((r) => String(r.id));
+  if (ids.length === 0) ids.push(String(thread.id));
+
+  return { ok: true, recruiterName: person, ids };
+}
+
 /**
- * Soft-delete: move conversation to Deleted folder (visible 30 days).
+ * Soft-delete: move this person’s full conversation to Deleted (30 days).
  */
 export async function deleteClientMessageThreadAction(
   threadId: string,
@@ -436,30 +563,16 @@ export async function deleteClientMessageThreadAction(
   const auth = await requireEmployerClientId();
   if (!auth.ok) return auth;
 
+  const resolved = await threadsForPerson(auth.clientId, threadId);
+  if (!resolved.ok) return resolved;
+
   const supabase = await createClient();
-  const { data: thread, error: findError } = await supabase
-    .from("client_message_threads")
-    .select("id, subject, deleted_at")
-    .eq("id", threadId)
-    .eq("client_id", auth.clientId)
-    .maybeSingle();
-
-  if (findError || !thread) {
-    return {
-      ok: false,
-      message: findError?.message ?? "Conversation not found for your company.",
-    };
-  }
-
-  if (thread.deleted_at) {
-    return { ok: false, message: "Conversation is already in Deleted." };
-  }
-
   const { error } = await supabase
     .from("client_message_threads")
     .update({ deleted_at: new Date().toISOString() })
-    .eq("id", threadId)
-    .eq("client_id", auth.clientId);
+    .eq("client_id", auth.clientId)
+    .in("id", resolved.ids)
+    .is("deleted_at", null);
 
   if (error) return { ok: false, message: error.message };
 
@@ -468,14 +581,12 @@ export async function deleteClientMessageThreadAction(
 
   return {
     ok: true,
-    message: thread.subject
-      ? `Moved “${String(thread.subject)}” to Deleted.`
-      : "Conversation moved to Deleted.",
+    message: `Moved conversation with ${resolved.recruiterName} to Deleted.`,
   };
 }
 
 /**
- * Restore a soft-deleted conversation to the Inbox.
+ * Restore a soft-deleted person conversation to the Inbox.
  */
 export async function restoreClientMessageThreadAction(
   threadId: string,
@@ -483,30 +594,15 @@ export async function restoreClientMessageThreadAction(
   const auth = await requireEmployerClientId();
   if (!auth.ok) return auth;
 
+  const resolved = await threadsForPerson(auth.clientId, threadId);
+  if (!resolved.ok) return resolved;
+
   const supabase = await createClient();
-  const { data: thread, error: findError } = await supabase
-    .from("client_message_threads")
-    .select("id, subject, deleted_at")
-    .eq("id", threadId)
-    .eq("client_id", auth.clientId)
-    .maybeSingle();
-
-  if (findError || !thread) {
-    return {
-      ok: false,
-      message: findError?.message ?? "Conversation not found for your company.",
-    };
-  }
-
-  if (!thread.deleted_at) {
-    return { ok: false, message: "Conversation is not in Deleted." };
-  }
-
   const { error } = await supabase
     .from("client_message_threads")
     .update({ deleted_at: null })
-    .eq("id", threadId)
-    .eq("client_id", auth.clientId);
+    .eq("client_id", auth.clientId)
+    .in("id", resolved.ids);
 
   if (error) return { ok: false, message: error.message };
 
@@ -515,14 +611,12 @@ export async function restoreClientMessageThreadAction(
 
   return {
     ok: true,
-    message: thread.subject
-      ? `Restored “${String(thread.subject)}” to Inbox.`
-      : "Conversation restored to Inbox.",
+    message: `Restored conversation with ${resolved.recruiterName} to Inbox.`,
   };
 }
 
 /**
- * Permanently remove a soft-deleted conversation (cascades messages).
+ * Permanently remove a soft-deleted person conversation (cascades messages).
  */
 export async function permanentlyDeleteClientMessageThreadAction(
   threadId: string,
@@ -530,22 +624,20 @@ export async function permanentlyDeleteClientMessageThreadAction(
   const auth = await requireEmployerClientId();
   if (!auth.ok) return auth;
 
+  const resolved = await threadsForPerson(auth.clientId, threadId);
+  if (!resolved.ok) return resolved;
+
   const supabase = await createClient();
-  const { data: thread, error: findError } = await supabase
+  // Only permanently delete soft-deleted sibling threads.
+  const { data: deletable } = await supabase
     .from("client_message_threads")
-    .select("id, subject, deleted_at")
-    .eq("id", threadId)
+    .select("id")
     .eq("client_id", auth.clientId)
-    .maybeSingle();
+    .in("id", resolved.ids)
+    .not("deleted_at", "is", null);
 
-  if (findError || !thread) {
-    return {
-      ok: false,
-      message: findError?.message ?? "Conversation not found for your company.",
-    };
-  }
-
-  if (!thread.deleted_at) {
+  const ids = (deletable ?? []).map((r) => String(r.id));
+  if (ids.length === 0) {
     return {
       ok: false,
       message: "Move the conversation to Deleted first, then delete permanently.",
@@ -555,8 +647,8 @@ export async function permanentlyDeleteClientMessageThreadAction(
   const { error } = await supabase
     .from("client_message_threads")
     .delete()
-    .eq("id", threadId)
-    .eq("client_id", auth.clientId);
+    .eq("client_id", auth.clientId)
+    .in("id", ids);
 
   if (error) return { ok: false, message: error.message };
 
@@ -565,9 +657,7 @@ export async function permanentlyDeleteClientMessageThreadAction(
 
   return {
     ok: true,
-    message: thread.subject
-      ? `Permanently deleted “${String(thread.subject)}”.`
-      : "Conversation permanently deleted.",
+    message: `Permanently deleted conversation with ${resolved.recruiterName}.`,
   };
 }
 

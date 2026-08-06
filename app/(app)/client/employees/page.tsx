@@ -16,10 +16,5 @@ export default async function EmployeesPage() {
     };
   });
 
-  return (
-    <EmployeesListClient
-      companyName={data.client?.name ?? "your company"}
-      rows={rows}
-    />
-  );
+  return <EmployeesListClient rows={rows} />;
 }

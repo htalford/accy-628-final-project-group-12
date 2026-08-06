@@ -167,10 +167,7 @@ export function CandidateCompareClient({
             { label: "Compare" },
           ]}
         />
-        <PageHeader
-          title="Compare candidates"
-          description="Select 2–3 candidates on the Candidates page to compare side by side."
-        />
+        <PageHeader title="Compare candidates" />
         <Button href="/client/candidates" variant="secondary">
           Back to candidates
         </Button>
@@ -187,10 +184,7 @@ export function CandidateCompareClient({
         ]}
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <PageHeader
-          title={title}
-          description="Side-by-side review of pipeline candidates for the same or different roles."
-        />
+        <PageHeader title={title} />
         <Button href="/client/candidates" variant="secondary" size="sm">
           Change selection
         </Button>

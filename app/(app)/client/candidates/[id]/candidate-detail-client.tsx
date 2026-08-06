@@ -73,10 +73,7 @@ export function CandidateDetailClient({
         ]}
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <PageHeader
-          title={candidate.candidate_name}
-          description={`${candidate.position_title || candidate.job_title || "Candidate"} · ${candidate.source_label}`}
-        />
+        <PageHeader title={candidate.candidate_name} />
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={seedStatusTone(candidate.stage)}>
             {submittalStageLabel(candidate.stage)}

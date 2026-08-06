@@ -186,7 +186,11 @@ export function JobOrderDetail({
                     </Link>
                     <p className="text-xs text-[var(--cf-muted)]">
                       {c.positionApplied}
-                      {c.jobId === job.id ? " · applied to this order" : " · pool match"}
+                      {c.jobId === job.id
+                        ? " · applied to this order"
+                        : result.score < 60
+                          ? " · pool match · needs review"
+                          : " · pool match"}
                     </p>
                     {result.reasons[0] ? (
                       <p className="mt-0.5 text-xs text-[var(--cf-muted)]">
@@ -196,7 +200,18 @@ export function JobOrderDetail({
                     <MatchedSkills
                       skills={result.skillHits}
                       className="mt-1.5"
-                      emptyLabel="No skill chips matched — score is from title/location only"
+                      emptyLabel=""
+                    />
+                    <MatchedSkills
+                      skills={result.certHits}
+                      label="Matched certifications"
+                      tone="certs"
+                      className="mt-1"
+                      emptyLabel={
+                        result.skillHits.length === 0
+                          ? "No skill/cert chips matched yet"
+                          : ""
+                      }
                     />
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
@@ -277,6 +292,25 @@ export function JobOrderDetail({
                   className="rounded-full border border-[var(--cf-border)] bg-[var(--cf-surface)] px-2.5 py-0.5 text-xs font-medium text-[var(--cf-ink)]"
                 >
                   {s}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+        <Card title="Required certifications (match inputs)">
+          {(job.requiredCertifications ?? []).length === 0 ? (
+            <p className="text-sm text-[var(--cf-muted)]">
+              No certifications listed. Add them on the employer job request to
+              improve cert matching.
+            </p>
+          ) : (
+            <ul className="flex flex-wrap gap-1.5">
+              {(job.requiredCertifications ?? []).map((c) => (
+                <li
+                  key={c}
+                  className="rounded-full border border-[var(--cf-navy)]/20 bg-[var(--cf-navy)]/10 px-2.5 py-0.5 text-xs font-medium text-[var(--cf-navy)]"
+                >
+                  {c}
                 </li>
               ))}
             </ul>

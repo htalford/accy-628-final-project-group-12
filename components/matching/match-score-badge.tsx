@@ -31,17 +31,19 @@ export function MatchScoreBadge({
   );
 }
 
-/** Chips for skills / keywords that contributed to a match score. */
+/** Chips for skills / certifications that contributed to a match score. */
 export function MatchedSkills({
   skills,
   label = "Matched skills",
   emptyLabel = "No skill tags matched yet",
   className = "",
+  tone = "skills",
 }: {
   skills?: string[] | null;
   label?: string;
   emptyLabel?: string;
   className?: string;
+  tone?: "skills" | "certs";
 }) {
   const list = (skills ?? []).map((s) => s.trim()).filter(Boolean);
   if (list.length === 0) {
@@ -53,6 +55,11 @@ export function MatchedSkills({
     );
   }
 
+  const chip =
+    tone === "certs"
+      ? "rounded-full border border-[var(--cf-navy)]/20 bg-[var(--cf-navy)]/10 px-2 py-0.5 text-[11px] font-medium text-[var(--cf-navy)]"
+      : "rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-900";
+
   return (
     <div className={className}>
       <p className="mb-1 text-[10px] font-semibold tracking-wide text-[var(--cf-muted)] uppercase">
@@ -60,10 +67,7 @@ export function MatchedSkills({
       </p>
       <ul className="flex flex-wrap gap-1">
         {list.map((skill) => (
-          <li
-            key={skill}
-            className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-900"
-          >
+          <li key={skill} className={chip}>
             {skill}
           </li>
         ))}

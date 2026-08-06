@@ -16,10 +16,7 @@ export function InterestedCandidatesClient({
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <PageHeader
-          title="Interested candidates"
-        description="People who marked interest on your open jobs in the candidate portal, before or instead of applying."
-      />
+        <PageHeader title="Interested candidates" />
         <Button href="/client/candidates" variant="secondary">
           Back to applications
         </Button>

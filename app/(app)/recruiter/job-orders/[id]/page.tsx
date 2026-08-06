@@ -49,13 +49,14 @@ export default async function JobOrderDetailPage({
       source: c.source,
       input: candidateInputFromRecruiter(c),
     })),
-    { minScore: 35, limit: 8 },
+    { minScore: 0, limit: 12 },
   ).filter((m) => {
-    // Keep applicants for this job or high matches from the wider pool
+    // Keep applicants for this job, plus pool matches (including under 60% for review)
     const c = allCandidates.find((x) => x.id === m.candidateId);
     if (!c) return false;
     if (c.jobId === job.id) return true;
-    return m.result.score >= 50;
+    // Surface weak pool fits for recruiter review; still skip empty scores
+    return m.result.score > 0;
   });
 
   const suggestedWithProfiles = suggestedMatches

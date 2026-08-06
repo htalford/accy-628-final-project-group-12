@@ -67,10 +67,7 @@ export function TimesheetDetailClient({
         ]}
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <PageHeader
-          title={t.employee_name}
-          description={`${t.position_title} · Week ending ${t.week_ending_date.slice(0, 10)}`}
-        />
+        <PageHeader title={t.employee_name} />
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={seedStatusTone(t.status)}>
             {timesheetStatusLabel(t.status)}

@@ -291,7 +291,6 @@ export function ClientSidebar({
                   priority
                 />
               </Link>
-              <p className="mt-2 text-sm text-white/60">Employer Portal</p>
             </div>
           </div>
         )}
