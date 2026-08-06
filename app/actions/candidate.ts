@@ -59,7 +59,7 @@ export async function applyToJob(formData: FormData): Promise<ActionResult> {
     const { data: employee } = await supabase
       .from("employees")
       .select(
-        "first_name, last_name, email, phone, certifications, resume_url, emergency_contact_name, emergency_contact_phone, employment_type, status",
+        "first_name, last_name, email, phone, certifications, resume_url, emergency_contact_name, emergency_contact_phone, education_background, previous_employments, employment_type, status",
       )
       .eq("id", employeeId)
       .maybeSingle();
@@ -342,40 +342,123 @@ export async function restoreCandidateThreads(
   return { ok: true };
 }
 
-export async function updateCandidateProfile(formData: {
-  firstName: string;
-  lastName: string;
-  phone: string;
-  displayName: string;
-  certifications: string;
-  resumeUrl: string;
-  emergencyContactName: string;
-  emergencyContactPhone: string;
-}): Promise<ActionResult> {
+export async function updateCandidateProfile(
+  formData: FormData,
+): Promise<ActionResult> {
   const user = await requireCandidateContext();
   if (!user) return { ok: false, error: "Candidate session required." };
 
-  const firstName = formData.firstName.trim();
-  const lastName = formData.lastName.trim();
-  const displayName = formData.displayName.trim();
+  const firstName = String(formData.get("firstName") ?? "").trim();
+  const lastName = String(formData.get("lastName") ?? "").trim();
+  const displayName = String(formData.get("displayName") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const certifications = String(formData.get("certifications") ?? "").trim();
+  const educationBackground = String(
+    formData.get("educationBackground") ?? "",
+  ).trim();
+  const emergencyContactName = String(
+    formData.get("emergencyContactName") ?? "",
+  ).trim();
+  const emergencyContactPhone = String(
+    formData.get("emergencyContactPhone") ?? "",
+  ).trim();
+  const keepExistingResume = formData.get("keepExistingResume") === "on";
+  const resumeFile = formData.get("resumeFile");
+  const previousEmploymentsRaw = String(
+    formData.get("previousEmployments") ?? "[]",
+  );
+
   if (!firstName || !lastName || !displayName) {
     return { ok: false, error: "Name fields are required." };
   }
 
+  let previousEmployments: Array<{
+    company: string;
+    title: string;
+    startDate: string;
+    endDate: string;
+    description: string;
+  }> = [];
+  try {
+    const parsed = JSON.parse(previousEmploymentsRaw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return { ok: false, error: "Previous employments format is invalid." };
+    }
+    previousEmployments = parsed
+      .slice(0, 3)
+      .map((row) => {
+        const r = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
+        return {
+          company: String(r.company ?? "").trim(),
+          title: String(r.title ?? "").trim(),
+          startDate: String(r.startDate ?? "").trim(),
+          endDate: String(r.endDate ?? "").trim(),
+          description: String(r.description ?? "").trim(),
+        };
+      });
+    while (previousEmployments.length < 3) {
+      previousEmployments.push({
+        company: "",
+        title: "",
+        startDate: "",
+        endDate: "",
+        description: "",
+      });
+    }
+  } catch {
+    return { ok: false, error: "Previous employments format is invalid." };
+  }
+
   const supabase = await createClient();
+  const employeeId = user.linked_employee_id!;
+
+  let resumeUrl: string | null | undefined;
+  if (resumeFile instanceof File && resumeFile.size > 0) {
+    const safeName = resumeFile.name.replace(/[^\w.\-()+ ]+/g, "_");
+    const path = `${employeeId}/profile-${Date.now()}-${safeName}`;
+    const bytes = new Uint8Array(await resumeFile.arrayBuffer());
+    const { error: uploadError } = await supabase.storage
+      .from("candidate-resumes")
+      .upload(path, bytes, {
+        contentType: resumeFile.type || "application/octet-stream",
+        upsert: false,
+      });
+    if (uploadError) {
+      return { ok: false, error: `Resume upload failed: ${uploadError.message}` };
+    }
+    const { data: signed, error: signError } = await supabase.storage
+      .from("candidate-resumes")
+      .createSignedUrl(path, 60 * 60 * 24 * 365);
+    if (signError || !signed?.signedUrl) {
+      return {
+        ok: false,
+        error: signError?.message ?? "Could not create resume link.",
+      };
+    }
+    resumeUrl = signed.signedUrl;
+  } else if (!keepExistingResume) {
+    resumeUrl = null;
+  }
+
+  const employeeUpdate: Record<string, unknown> = {
+    first_name: firstName,
+    last_name: lastName,
+    phone: phone || null,
+    certifications: certifications || null,
+    education_background: educationBackground || null,
+    previous_employments: previousEmployments,
+    emergency_contact_name: emergencyContactName || null,
+    emergency_contact_phone: emergencyContactPhone || null,
+    updated_at: new Date().toISOString(),
+  };
+  if (resumeUrl !== undefined) {
+    employeeUpdate.resume_url = resumeUrl;
+  }
+
   const { error: empError } = await supabase
     .from("employees")
-    .update({
-      first_name: firstName,
-      last_name: lastName,
-      phone: formData.phone.trim() || null,
-      certifications: formData.certifications?.trim() || null,
-      resume_url: formData.resumeUrl?.trim() || null,
-      emergency_contact_name: formData.emergencyContactName?.trim() || null,
-      emergency_contact_phone: formData.emergencyContactPhone?.trim() || null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", user.linked_employee_id!);
+    .update(employeeUpdate)
+    .eq("id", employeeId);
 
   if (empError) return { ok: false, error: empError.message };
 
@@ -391,5 +474,6 @@ export async function updateCandidateProfile(formData: {
 
   revalidatePath("/candidate/profile");
   revalidatePath("/candidate/dashboard");
+  revalidatePath("/candidate/jobs");
   return { ok: true };
 }

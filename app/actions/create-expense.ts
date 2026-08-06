@@ -150,6 +150,11 @@ export async function createExpense(input: {
     return { ok: false, error: "Select a valid operating expense category." };
   }
 
+  const status = (input.status?.trim() || "approved") as ExpenseStatus;
+  if (!EXPENSE_STATUSES.includes(status)) {
+    return { ok: false, error: "Select a valid status." };
+  }
+
   const monthRaw = input.month?.trim() || expenseDate;
   const month = firstOfMonth(monthRaw.length === 7 ? `${monthRaw}-01` : monthRaw);
 
@@ -161,6 +166,7 @@ export async function createExpense(input: {
       amount,
       expense_date: expenseDate,
       month,
+      status,
     })
     .select("id")
     .single();

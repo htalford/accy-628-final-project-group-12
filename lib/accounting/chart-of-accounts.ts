@@ -18,6 +18,7 @@ export const CHART_OF_ACCOUNTS: ChartAccount[] = [
   { code: "5100", name: "Contract Labor Expense", type: "expense" },
   { code: "5200", name: "Recruiting Expense", type: "expense" },
   { code: "5300", name: "Payroll Tax Expense", type: "expense" },
+  { code: "5400", name: "Employee Benefits Expense", type: "expense" },
   { code: "6100", name: "Rent Expense", type: "expense" },
   { code: "6200", name: "Software Expense", type: "expense" },
   { code: "6300", name: "Marketing Expense", type: "expense" },

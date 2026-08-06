@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { CandidateFiltersPanel } from "@/components/recruiter/candidate-filters";
+import { RECRUITER_PAGE_COPY } from "@/components/recruiter/summary-cards";
 import { candidateFilterOptions, listCandidates } from "@/lib/recruiter/data";
 
 export default async function CandidatesPage() {
@@ -7,12 +8,13 @@ export default async function CandidatesPage() {
     candidateFilterOptions(),
     listCandidates(),
   ]);
+  const copy = RECRUITER_PAGE_COPY.candidates;
 
   return (
     <div>
       <PageHeader
         title="Candidates in Pipeline"
-        description="Live talent pool from seeded employees and placements."
+        description={copy.subtitle}
       />
       <CandidateFiltersPanel
         initialRows={rows}

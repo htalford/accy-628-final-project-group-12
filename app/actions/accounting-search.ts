@@ -1,6 +1,10 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import {
+  expenseTypeLabel,
+  operatingExpenseCategoryLabel,
+} from "@/lib/accounting/format";
 
 export type SearchHit = {
   type: string;
@@ -60,7 +64,7 @@ export async function searchAccounting(query: string): Promise<SearchHit[]> {
       type: "Employee",
       id: row.id,
       label: name,
-      href: `/accounting/timesheets?employee=${encodeURIComponent(name)}`,
+      href: `/accounting/employees/${row.id}`,
     });
   }
 
@@ -69,7 +73,7 @@ export async function searchAccounting(query: string): Promise<SearchHit[]> {
     const clientName = Array.isArray(row.clients)
       ? row.clients[0]?.name
       : (row.clients as { name?: string } | null)?.name;
-    const label = `${clientName ?? "Client"} · $${Number(row.amount).toLocaleString()} · ${row.status}`;
+    const label = `${clientName ?? "Client"} - $${Number(row.amount).toLocaleString()} - ${row.status}`;
     if (
       label.toLowerCase().includes(qLower) ||
       row.id.toLowerCase().includes(qLower) ||
@@ -94,7 +98,7 @@ export async function searchAccounting(query: string): Promise<SearchHit[]> {
     const empName = emp
       ? `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim()
       : "Candidate";
-    const label = `${clientName ?? "Client"} · ${empName} · ${row.placement_type}`;
+    const label = `${clientName ?? "Client"} - ${empName} - ${row.placement_type}`;
     if (label.toLowerCase().includes(qLower) || row.status.includes(qLower)) {
       hits.push({
         type: "Contract",
@@ -109,7 +113,7 @@ export async function searchAccounting(query: string): Promise<SearchHit[]> {
     hits.push({
       type: "Placement expense",
       id: row.id,
-      label: `${row.expense_type} · ${row.description} · $${Number(row.amount).toLocaleString()} · ${row.expense_date}`,
+      label: `${expenseTypeLabel(row.expense_type as string)} - ${row.description} - $${Number(row.amount).toLocaleString()} - ${row.expense_date}`,
       href: `/accounting/expenses?focus=${row.id}`,
     });
   }
@@ -118,7 +122,7 @@ export async function searchAccounting(query: string): Promise<SearchHit[]> {
     hits.push({
       type: "Operating expense",
       id: row.id,
-      label: `${row.category} · ${row.description} · $${Number(row.amount).toLocaleString()} · ${row.expense_date}`,
+      label: `${operatingExpenseCategoryLabel(row.category as string)} - ${row.description} - $${Number(row.amount).toLocaleString()} - ${row.expense_date}`,
       href: `/accounting/expenses?focus=${row.id}`,
     });
   }

@@ -186,6 +186,14 @@ export type Client = {
   updated_at: string;
 };
 
+export type PreviousEmployment = {
+  company: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+};
+
 export type Employee = {
   id: string;
   first_name: string;
@@ -198,6 +206,8 @@ export type Employee = {
   resume_url: string | null;
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
+  education_background?: string | null;
+  previous_employments?: PreviousEmployment[] | null;
   created_at: string;
   updated_at: string;
 };

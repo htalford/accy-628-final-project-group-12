@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
+import { DATE_RANGE_OPTIONS } from "@/lib/accounting/date-range-filter";
 
 export function PayrollToolbar({
   employees,
@@ -19,6 +20,7 @@ export function PayrollToolbar({
     const params = new URLSearchParams(searchParams.toString());
     if (!value || value === "all") params.delete(key);
     else params.set(key, value);
+    if (key === "range") params.delete("from");
     startTransition(() => router.push(`${pathname}?${params.toString()}`));
   }
 
@@ -36,7 +38,18 @@ export function PayrollToolbar({
         </button>
       ) : null}
       <select
-        className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-sm"
+        className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-sm text-[var(--cf-ink)]"
+        defaultValue={searchParams.get("range") ?? "all"}
+        onChange={(e) => update("range", e.target.value)}
+      >
+        {DATE_RANGE_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+      <select
+        className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-sm text-[var(--cf-ink)]"
         defaultValue={searchParams.get("period") ?? "all"}
         onChange={(e) => update("period", e.target.value)}
       >
@@ -48,7 +61,7 @@ export function PayrollToolbar({
         ))}
       </select>
       <select
-        className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-sm"
+        className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-sm text-[var(--cf-ink)]"
         defaultValue={searchParams.get("employee") ?? "all"}
         onChange={(e) => update("employee", e.target.value)}
       >
@@ -60,7 +73,7 @@ export function PayrollToolbar({
         ))}
       </select>
       <select
-        className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-sm"
+        className="rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-sm text-[var(--cf-ink)]"
         defaultValue={searchParams.get("status") ?? "all"}
         onChange={(e) => update("status", e.target.value)}
       >

@@ -96,11 +96,6 @@ export default async function InvoicesPage({
               ),
           },
           {
-            key: "period",
-            header: "Billing Period",
-            render: (row) => `${row.periodStart} → ${row.periodEnd}`,
-          },
-          {
             key: "invoiceDate",
             header: "Invoice Date",
             render: (row) => row.invoiceDate,

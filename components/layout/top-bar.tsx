@@ -188,16 +188,16 @@ export function TopBar({
                   ? "Search messages"
                   : pathname.startsWith("/candidate/contracts")
                     ? "Search by employer"
-                    : "Search by recruiterΓÇª"
-                : "Search clients, invoices, contractsΓÇª"
+                    : "Search by recruiter..."
+                : "Search clients, invoices, contracts..."
             }
-            className="w-full rounded-md border border-[var(--cf-border)] bg-[var(--cf-surface)] py-2 pr-3 pl-9 text-sm outline-none ring-[var(--cf-accent)] focus:bg-white focus:ring-2"
+            className="w-full rounded-md border border-[var(--cf-border)] bg-white py-2 pr-3 pl-9 text-sm text-[var(--cf-ink)] outline-none ring-[var(--cf-accent)] placeholder:text-[var(--cf-muted)] focus:ring-2"
           />
           {searchOpen && (hits.length > 0 || pending) ? (
             <div className="absolute top-full right-0 left-0 z-50 mt-1 max-h-72 overflow-auto rounded-lg border border-[var(--cf-border)] bg-white shadow-lg">
               {pending && hits.length === 0 ? (
                 <p className="px-3 py-2 text-xs text-[var(--cf-muted)]">
-                  SearchingΓÇª
+                  Searching...
                 </p>
               ) : null}
               {hits.map((hit) => (

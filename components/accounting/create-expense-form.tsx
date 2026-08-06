@@ -6,13 +6,12 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/accounting/panel";
 import { createExpense } from "@/app/actions/create-expense";
+import { expenseStatusLabel } from "@/lib/accounting/format";
 import {
-  EXPENSE_TYPES,
-  OPERATING_EXPENSE_CATEGORIES,
-  expenseStatusLabel,
-  expenseTypeLabel,
-  operatingExpenseCategoryLabel,
-} from "@/lib/accounting/format";
+  GENERALIZED_OPERATING_CATEGORIES,
+  GENERALIZED_PAYROLL_CATEGORIES,
+  GENERALIZED_PLACEMENT_CATEGORIES,
+} from "@/lib/accounting/expense-categories";
 
 type ContractOption = {
   id: string;
@@ -22,6 +21,11 @@ type ContractOption = {
 
 const fieldClass =
   "w-full rounded-md border border-[var(--cf-border)] bg-white px-3 py-2 text-sm text-[var(--cf-ink)] outline-none focus:ring-2 focus:ring-[var(--cf-accent)]";
+
+const OPERATING_CREATE_OPTIONS = [
+  ...GENERALIZED_PAYROLL_CATEGORIES,
+  ...GENERALIZED_OPERATING_CATEGORIES,
+];
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -40,10 +44,12 @@ export function CreateExpenseForm({
   const [amount, setAmount] = useState("");
   const [expenseDate, setExpenseDate] = useState(todayIso());
   const [placementId, setPlacementId] = useState(contracts[0]?.id ?? "");
-  const [expenseType, setExpenseType] = useState(EXPENSE_TYPES[0] ?? "other");
+  const [placementCategory, setPlacementCategory] = useState(
+    GENERALIZED_PLACEMENT_CATEGORIES[0]?.value ?? "other_placement",
+  );
   const [status, setStatus] = useState("pending");
-  const [category, setCategory] = useState(
-    OPERATING_EXPENSE_CATEGORIES[0] ?? "other",
+  const [operatingCategory, setOperatingCategory] = useState(
+    OPERATING_CREATE_OPTIONS[0]?.value ?? "other_operating",
   );
 
   const monthValue = useMemo(() => {
@@ -55,15 +61,21 @@ export function CreateExpenseForm({
     e.preventDefault();
     setError(null);
     startTransition(async () => {
+      const placementGroup = GENERALIZED_PLACEMENT_CATEGORIES.find(
+        (g) => g.value === placementCategory,
+      );
+      const operatingGroup = OPERATING_CREATE_OPTIONS.find(
+        (g) => g.value === operatingCategory,
+      );
       const result = await createExpense({
         kind,
         description,
         amount: Number(amount),
         expenseDate,
         placementId: kind === "placement" ? placementId : null,
-        expenseType: kind === "placement" ? expenseType : null,
-        status: kind === "placement" ? status : null,
-        category: kind === "operating" ? category : null,
+        expenseType: kind === "placement" ? placementGroup?.storeAs ?? null : null,
+        status,
+        category: kind === "operating" ? operatingGroup?.storeAs ?? null : null,
         month: kind === "operating" ? `${monthValue}-01` : null,
       });
       if (!result.ok) {
@@ -135,37 +147,19 @@ export function CreateExpenseForm({
               </label>
               <label className="block text-sm">
                 <span className="mb-1 block font-medium text-[var(--cf-ink)]">
-                  Type
+                  Category
                 </span>
                 <select
                   required
-                  value={expenseType}
-                  onChange={(e) => setExpenseType(e.target.value as typeof expenseType)}
+                  value={placementCategory}
+                  onChange={(e) => setPlacementCategory(e.target.value)}
                   className={fieldClass}
                 >
-                  {EXPENSE_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {expenseTypeLabel(t)}
+                  {GENERALIZED_PLACEMENT_CATEGORIES.map((g) => (
+                    <option key={g.value} value={g.value}>
+                      {g.label}
                     </option>
                   ))}
-                </select>
-              </label>
-              <label className="block text-sm">
-                <span className="mb-1 block font-medium text-[var(--cf-ink)]">
-                  Status
-                </span>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className={fieldClass}
-                >
-                  {(["pending", "approved", "rejected", "reimbursed"] as const).map(
-                    (s) => (
-                      <option key={s} value={s}>
-                        {expenseStatusLabel(s)}
-                      </option>
-                    ),
-                  )}
                 </select>
               </label>
             </>
@@ -176,20 +170,45 @@ export function CreateExpenseForm({
               </span>
               <select
                 required
-                value={category}
-                onChange={(e) =>
-                  setCategory(e.target.value as typeof category)
-                }
+                value={operatingCategory}
+                onChange={(e) => setOperatingCategory(e.target.value)}
                 className={fieldClass}
               >
-                {OPERATING_EXPENSE_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {operatingExpenseCategoryLabel(c)}
-                  </option>
-                ))}
+                <optgroup label="Payroll">
+                  {GENERALIZED_PAYROLL_CATEGORIES.map((g) => (
+                    <option key={g.value} value={g.value}>
+                      {g.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Operating">
+                  {GENERALIZED_OPERATING_CATEGORIES.map((g) => (
+                    <option key={g.value} value={g.value}>
+                      {g.label}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
             </label>
           )}
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-[var(--cf-ink)]">
+              Status
+            </span>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className={fieldClass}
+            >
+              {(["pending", "approved", "rejected", "reimbursed"] as const).map(
+                (s) => (
+                  <option key={s} value={s}>
+                    {expenseStatusLabel(s)}
+                  </option>
+                ),
+              )}
+            </select>
+          </label>
 
           <label className="block text-sm sm:col-span-2">
             <span className="mb-1 block font-medium text-[var(--cf-ink)]">
