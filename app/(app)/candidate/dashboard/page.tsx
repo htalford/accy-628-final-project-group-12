@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Panel, StatusPill } from "@/components/candidate/ui";
 import { ProfileCompletionCard } from "@/components/candidate/profile-completion-card";
 import { OfferReceivedModal } from "@/components/candidate/offer-received-modal";
+import { TimesheetApprovedModal } from "@/components/candidate/timesheet-approved-modal";
 import { getProfileCompletion } from "@/lib/candidate/profile-completion";
 import { MatchScoreBadge, MatchedSkills } from "@/components/matching/match-score-badge";
 import {
@@ -62,7 +63,14 @@ function ActionLink({
   );
 }
 
-export default async function CandidateDashboardPage() {
+export default async function CandidateDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ celebrate?: string }>;
+}) {
+  const params = await searchParams;
+  const celebrateTimesheet = params.celebrate === "timesheet";
+
   const [
     { user, employee },
     placements,
@@ -155,7 +163,7 @@ export default async function CandidateDashboardPage() {
   }
 
   const offers = applications
-    .filter((a) => a.status === "offered")
+    .filter((a) => a.status === "offered" && !a.candidate_decision)
     .map((a) => ({
       id: a.id,
       title: a.jobs?.title ?? "Role",
@@ -170,9 +178,31 @@ export default async function CandidateDashboardPage() {
     );
   }
 
+  const employerByPlacement = new Map(
+    placements.map((p) => [p.id, p.clients?.name ?? null]),
+  );
+  const approvedTimesheets = timesheets
+    .filter((ts) => ts.status === "approved")
+    .map((ts) => ({
+      id: ts.id,
+      weekEnding: formatDate(ts.week_ending_date),
+      hours: Number(ts.hours_regular) + Number(ts.hours_overtime),
+      employer: employerByPlacement.get(ts.placement_id) ?? null,
+    }));
+
+  if (approvedTimesheets.length > 0) {
+    todos.unshift(
+      `${approvedTimesheets.length} approved timesheet${approvedTimesheets.length === 1 ? "" : "s"} to review`,
+    );
+  }
+
   return (
     <div>
-      <OfferReceivedModal offers={offers} />
+      {!celebrateTimesheet ? <OfferReceivedModal offers={offers} /> : null}
+      <TimesheetApprovedModal
+        timesheets={approvedTimesheets}
+        forcePreview={celebrateTimesheet}
+      />
       <section className="mb-8 rounded-2xl border border-[var(--cf-border)] bg-white p-6 shadow-sm sm:p-8">
         <p className="text-xs font-semibold tracking-[0.14em] text-[var(--cf-accent)] uppercase">
           Candidate home

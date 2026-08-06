@@ -20,6 +20,7 @@ import type { AppUser } from "@/lib/types/database";
 import { searchAccounting } from "@/app/actions/accounting-search";
 import { searchCandidatePortal } from "@/app/actions/candidate-search";
 import type { CandidateNotification } from "@/lib/candidate/notification-types";
+import type { RecruiterNotification } from "@/lib/recruiter/notifications";
 
 type SearchHit = {
   type: string;
@@ -28,7 +29,10 @@ type SearchHit = {
   href: string;
 };
 
-type LiveNotification = CandidateNotification | AccountingNotification;
+type LiveNotification =
+  | CandidateNotification
+  | AccountingNotification
+  | RecruiterNotification;
 
 type TopBarNotification = {
   id: string;

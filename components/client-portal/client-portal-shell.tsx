@@ -18,11 +18,13 @@ export function ClientPortalShell({
   user,
   notifications = [],
   searchIndex = [],
+  attentionHrefs = [],
   children,
 }: {
   user: AppUser;
   notifications?: ClientNotification[];
   searchIndex?: ClientSearchHit[];
+  attentionHrefs?: string[];
   children: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -51,6 +53,7 @@ export function ClientPortalShell({
             onToggleCollapse={toggleIconsOnly}
             mobileOpen={mobileOpen}
             onMobileClose={() => setMobileOpen(false)}
+            attentionHrefs={attentionHrefs}
           />
         ) : (
           <div

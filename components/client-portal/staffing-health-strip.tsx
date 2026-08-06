@@ -1,6 +1,5 @@
 import Link from "next/link";
 import {
-  AlertTriangle,
   ClipboardCheck,
   FileWarning,
   Receipt,
@@ -51,7 +50,6 @@ const ICONS = {
   candidates: Users,
   timesheets: ClipboardCheck,
   invoices: Receipt,
-  atrisk: AlertTriangle,
 } as const;
 
 /** Horizontal snapshot strip for the client dashboard. */
@@ -62,7 +60,7 @@ export function StaffingHealthStrip({
 }) {
   return (
     <section aria-label="Staffing health">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((item) => {
           const styles = toneStyles[item.tone];
           const Icon = ICONS[item.icon ?? "roles"] ?? FileWarning;

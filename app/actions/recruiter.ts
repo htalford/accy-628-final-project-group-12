@@ -75,6 +75,69 @@ export async function rejectApplication(applicationId: string) {
   return { ok: true as const, message: "Employer submittal rejected." };
 }
 
+/** Permanently remove an employer-rejected (or recruiter-rejected) application/submittal. */
+export async function removeRejectedCandidate(applicationId: string) {
+  const { error: authError } = await requireRecruiter();
+  if (authError) return { ok: false as const, error: authError };
+
+  const supabase = await createClient();
+
+  const { data: app } = await supabase
+    .from("applications")
+    .select("id, status")
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (app) {
+    if (String(app.status) !== "rejected") {
+      return {
+        ok: false as const,
+        error: "Only rejected candidates can be removed.",
+      };
+    }
+    const { error } = await supabase
+      .from("applications")
+      .delete()
+      .eq("id", applicationId);
+    if (error) return { ok: false as const, error: error.message };
+    revalidateRecruiter();
+    revalidatePath("/client", "layout");
+    return {
+      ok: true as const,
+      message: "Rejected candidate permanently removed.",
+    };
+  }
+
+  const { data: sub } = await supabase
+    .from("submittals")
+    .select("id, stage")
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (!sub) {
+    return { ok: false as const, error: "Candidate record not found." };
+  }
+  if (String(sub.stage) !== "rejected") {
+    return {
+      ok: false as const,
+      error: "Only rejected candidates can be removed.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("submittals")
+    .delete()
+    .eq("id", applicationId);
+  if (error) return { ok: false as const, error: error.message };
+
+  revalidateRecruiter();
+  revalidatePath("/client", "layout");
+  return {
+    ok: true as const,
+    message: "Rejected candidate permanently removed.",
+  };
+}
+
 export async function updateApplicationStatus(
   applicationId: string,
   status: ApplicationStatus,

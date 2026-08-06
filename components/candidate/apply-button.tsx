@@ -7,12 +7,14 @@ type Props = {
   jobId: string;
   jobTitle?: string;
   profileResumeUrl?: string | null;
+  fullWidth?: boolean;
 };
 
 export function ApplyButton({
   jobId,
   jobTitle,
   profileResumeUrl,
+  fullWidth = false,
 }: Props) {
   const titleId = useId();
   const [open, setOpen] = useState(false);
@@ -45,14 +47,18 @@ export function ApplyButton({
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div
+      className={`flex flex-col gap-1 ${fullWidth ? "w-full" : "items-end"}`}
+    >
       <button
         type="button"
         onClick={() => {
           resetForm();
           setOpen(true);
         }}
-        className="rounded-md bg-[var(--cf-navy)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--cf-navy-hover)]"
+        className={`rounded-md bg-[var(--cf-navy)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--cf-navy-hover)] ${
+          fullWidth ? "w-full py-2.5 text-sm" : ""
+        }`}
       >
         Apply
       </button>

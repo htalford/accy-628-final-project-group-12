@@ -93,6 +93,7 @@ function NavLink({
   showPinControls,
   onTogglePin,
   lockPin,
+  showDot,
 }: {
   item: NavItem;
   iconsOnly: boolean;
@@ -102,6 +103,7 @@ function NavLink({
   onTogglePin?: () => void;
   /** Dashboard cannot be unpinned. */
   lockPin?: boolean;
+  showDot?: boolean;
 }) {
   const pathname = usePathname();
   const active =
@@ -117,15 +119,26 @@ function NavLink({
     >
       <Link
         href={item.href}
-        title={item.label}
+        title={showDot ? `${item.label} (needs attention)` : item.label}
         onClick={onNavigate}
-        className={`flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-sm font-medium transition ${
+        className={`relative flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-sm font-medium transition ${
           iconsOnly ? "justify-center px-2" : ""
         } ${active ? "text-white" : "text-white/70 group-hover:text-white"}`}
       >
-        <Icon className="h-4 w-4 shrink-0" aria-hidden />
+        <span className="relative shrink-0">
+          <Icon className="h-4 w-4 shrink-0" aria-hidden />
+          {showDot ? (
+            <span
+              className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-[var(--cf-navy)]"
+              aria-hidden
+            />
+          ) : null}
+        </span>
         {!iconsOnly ? <span className="truncate">{item.label}</span> : null}
         {iconsOnly ? <span className="sr-only">{item.label}</span> : null}
+        {showDot && !iconsOnly ? (
+          <span className="sr-only">Needs attention</span>
+        ) : null}
       </Link>
       {showPinControls && onTogglePin && !iconsOnly && !lockPin ? (
         <button
@@ -164,17 +177,23 @@ export function ClientSidebar({
   onToggleCollapse,
   mobileOpen,
   onMobileClose,
+  attentionHrefs = [],
 }: {
   collapsed: boolean;
   onToggleCollapse: () => void;
   mobileOpen: boolean;
   onMobileClose: () => void;
+  attentionHrefs?: string[];
 }) {
   const items = getNavForRole("employer");
   const [pinnedHrefs, setPinnedHrefs] = useState<string[]>([
     ...DEFAULT_CLIENT_PINS,
   ]);
   const [ready, setReady] = useState(false);
+  const attentionSet = useMemo(
+    () => new Set(attentionHrefs),
+    [attentionHrefs],
+  );
 
   // On mobile drawer we always show labels even if desktop is icons-only.
   const iconsOnly = collapsed && !mobileOpen;
@@ -314,6 +333,7 @@ export function ClientSidebar({
                   lockPin={item.href === CLIENT_DASHBOARD}
                   onTogglePin={() => togglePin(item.href)}
                   onNavigate={onMobileClose}
+                  showDot={attentionSet.has(item.href)}
                 />
               ))}
             </div>
@@ -335,6 +355,7 @@ export function ClientSidebar({
                   showPinControls
                   onTogglePin={() => togglePin(item.href)}
                   onNavigate={onMobileClose}
+                  showDot={attentionSet.has(item.href)}
                 />
               ))}
             </div>

@@ -7,10 +7,7 @@ export default async function ProfilePage() {
 
   return (
     <div>
-      <PageHeader
-        title="Profile"
-        description="Your recruiter profile and performance metrics."
-      />
+      <PageHeader title="Profile" />
       <RecruiterProfileView profile={profile} />
     </div>
   );

@@ -16,6 +16,7 @@ import {
   jobInputFromPublicJob,
   rankJobsForCandidate,
   requirementsForPublicJobs,
+  MATCH_RECRUITER_THRESHOLD,
 } from "@/lib/matching";
 
 export default async function CandidateJobsPage() {
@@ -93,7 +94,7 @@ export default async function CandidateJobsPage() {
   });
 
   const strongCount = rows.filter(
-    (r) => !r.applied && (r.matchScore ?? 0) >= 50,
+    (r) => !r.applied && (r.matchScore ?? 0) >= MATCH_RECRUITER_THRESHOLD,
   ).length;
 
   return (
@@ -102,8 +103,8 @@ export default async function CandidateJobsPage() {
         title="Available jobs"
         description={
           strongCount > 0
-            ? `Open roles ranked for you automatically. ${strongCount} solid match${strongCount === 1 ? "" : "es"} based on your certifications, education, work history, and resume.`
-            : "Open roles ranked by how well they fit your profile. Add certifications, education, previous roles, and a resume for better matches."
+            ? `${strongCount} role${strongCount === 1 ? "" : "s"} matched to your profile. Apply or remove listings you don’t want to see.`
+            : "Roles that fit your profile appear here. Add certifications, education, previous roles, and a resume to improve matches."
         }
       />
       <CandidateJobsBoard jobs={rows} />

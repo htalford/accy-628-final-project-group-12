@@ -25,6 +25,8 @@ export type ClientSearchHit = {
 export type ClientPortalChrome = {
   notifications: ClientNotification[];
   searchIndex: ClientSearchHit[];
+  /** Sidebar nav roots that should show an attention dot. */
+  navAttentionHrefs: string[];
 };
 
 export type ClientSearchScope = {

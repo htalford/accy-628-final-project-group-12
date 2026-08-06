@@ -116,6 +116,12 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (isAuthFormRoute && isAuthenticated) {
+    // Get Started (/signup) should stay reachable from marketing job search,
+    // even during a demo session, so seekers see the signup form.
+    if (pathname === "/signup") {
+      return supabaseResponse;
+    }
+
     const { data: appUser } = await supabase
       .from("users")
       .select("role, email")
