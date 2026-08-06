@@ -73,10 +73,7 @@ export default function NewJobRequestPage() {
           { label: "New" },
         ]}
       />
-      <PageHeader
-        title="New Job Request"
-        description="Submit a staffing need to your TalentQuest recruiters. Saves to your company’s job_requests only (not the public board)."
-      />
+      <PageHeader title="New Job Request" />
       <Card>
         <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">

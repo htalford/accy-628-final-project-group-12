@@ -23,10 +23,8 @@ import { paginate } from "@/lib/client-portal/pagination";
 import { getClientInvoiceDetailAction } from "@/app/actions/client-portal";
 
 export function InvoicesClient({
-  companyName,
   invoices,
 }: {
-  companyName: string;
   invoices: Invoice[];
 }) {
   const router = useRouter();
@@ -101,10 +99,7 @@ export function InvoicesClient({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Invoices"
-        description={`Invoices for ${companyName}. Click a row for details, or open the full invoice for printing.`}
-      />
+      <PageHeader title="Invoices" />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard

@@ -53,10 +53,8 @@ type SortKey =
   | "employee_asc";
 
 export function ContractsClient({
-  companyName,
   placements,
 }: {
-  companyName: string;
   placements: PlacementWithEmployee[];
 }) {
   const searchParams = useSearchParams();
@@ -201,10 +199,7 @@ export function ContractsClient({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Contracts"
-        description={`${companyName} · same placements and contract numbers as the Accounting portal.`}
-      />
+      <PageHeader title="Contracts" />
 
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">

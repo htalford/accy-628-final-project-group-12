@@ -48,10 +48,7 @@ export function ProfileClient({ initial }: { initial: CompanyProfile }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <PageHeader
-          title="Profile"
-          description="Company profile saved to your linked client record (name, industry, billing email)."
-        />
+        <PageHeader title="Profile" />
         <Button
           type="button"
           variant={editing ? "secondary" : "primary"}

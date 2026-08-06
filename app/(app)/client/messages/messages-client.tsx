@@ -266,10 +266,7 @@ export function MessagesClient({
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <PageHeader
-          title="Messages"
-          description="Conversations with your TalentQuest recruiters. Deleted items stay in Deleted for 30 days."
-        />
+        <PageHeader title="Messages" />
         {folder === "inbox" ? (
           <Button type="button" onClick={() => setShowNew((v) => !v)}>
             {showNew ? "Cancel" : "New conversation"}

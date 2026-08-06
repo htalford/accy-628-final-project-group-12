@@ -174,10 +174,7 @@ export function CandidatesClient({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Candidates"
-        description="People who applied to your open jobs. Automatic fit scores rank who matches each role best. Like candidates to shortlist them."
-      />
+      <PageHeader title="Candidates" />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <SearchInput

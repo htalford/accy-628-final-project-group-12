@@ -28,10 +28,7 @@ export default async function JobRequestDetailPage({
         ]}
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <PageHeader
-          title={job.title}
-          description={`${job.department} · Requested ${job.created_at.slice(0, 10)}`}
-        />
+        <PageHeader title={job.title} />
         <div className="flex items-center gap-2">
           <Badge tone={seedStatusTone(job.status)}>
             {jobRequestStatusLabel(job.status)}
