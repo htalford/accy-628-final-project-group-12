@@ -16,11 +16,24 @@ import type {
 import { isClientDeletedThreadVisible } from "@/lib/client-portal/message-retention";
 import type { InterestedCandidateRow } from "@/lib/client-portal/types";
 import {
+  contactForEmployerMessage,
+  EMPLOYER_ACCOUNTING_CONTACT,
+  EMPLOYER_RECRUITER_CONTACT,
+  normalizeEmployerContact,
+} from "@/lib/client-portal/message-contacts";
+import {
   candidateInputFromProfile,
   profileFieldsFromSnapshot,
 } from "@/lib/matching/profile-from-employee";
 import { scoreMatch } from "@/lib/matching/score";
-import { skillsForPublicJobs } from "@/lib/matching";
+import { requirementsForPublicJobs } from "@/lib/matching";
+import { shouldRouteToRecruiter } from "@/lib/matching/threshold";
+
+export {
+  EMPLOYER_ACCOUNTING_CONTACT,
+  EMPLOYER_RECRUITER_CONTACT,
+  normalizeEmployerContact,
+} from "@/lib/client-portal/message-contacts";
 
 export type { InterestedCandidateRow } from "@/lib/client-portal/types";
 
@@ -54,6 +67,7 @@ export function mapJobRequest(row: Record<string, unknown>): PortalJobRequest {
     pay_rate_text: row.pay_rate_text == null ? null : String(row.pay_rate_text),
     start_date: row.start_date == null ? null : String(row.start_date),
     skills: asStringArray(row.skills),
+    certifications: asStringArray(row.certifications),
     description: row.description == null ? null : String(row.description),
     notes: row.notes == null ? null : String(row.notes),
     recruiter_name:
@@ -217,6 +231,7 @@ function submittalToCandidate(s: PortalSubmittal): ClientCandidate {
 function mapApplicationToCandidate(
   row: Record<string, unknown>,
   requiredSkills: string[] = [],
+  requiredCertifications: string[] = [],
 ): ClientCandidate {
   const job = (row.jobs ?? row.job) as Record<string, unknown> | null | undefined;
   const emp = (row.employees ?? row.employee) as
@@ -244,7 +259,6 @@ function mapApplicationToCandidate(
     resume_text: emp?.resume_text == null ? null : String(emp.resume_text),
   };
   const snapProfile = profileFieldsFromSnapshot(snap);
-  // Prefer live employee profile; fill gaps from the application snapshot.
   const mergedProfile = {
     certifications:
       liveProfile.certifications || snapProfile?.certifications || null,
@@ -273,6 +287,7 @@ function mapApplicationToCandidate(
   if (row.cover_letter) summaryParts.push(String(row.cover_letter));
   if (row.note) summaryParts.push(String(row.note));
 
+  // Candidate skill tags for skill scoring (cert labels also feed the profile text)
   const skills = Array.from(new Set([...certs]));
   const jobTitle = job?.title != null ? String(job.title) : "Open role";
   const candidateMatchInput = candidateInputFromProfile(mergedProfile, {
@@ -289,6 +304,7 @@ function mapApplicationToCandidate(
       employmentType:
         job?.employment_type != null ? String(job.employment_type) : null,
       requiredSkills,
+      requiredCertifications,
     },
     candidateMatchInput,
   );
@@ -340,6 +356,8 @@ function mapApplicationToCandidate(
     match_band: match.band,
     match_reasons: match.reasons,
     match_skills: match.skillHits,
+    match_certifications: match.certHits,
+    routed_to_recruiter: shouldRouteToRecruiter(match.score),
     job_location: job?.location != null ? String(job.location) : null,
   };
 }
@@ -369,12 +387,13 @@ export async function listApplicationsForClient(): Promise<ClientCandidate[]> {
       return job?.id != null ? String(job.id) : "";
     })
     .filter(Boolean);
-  const skillMap = await skillsForPublicJobs(jobIds);
+  const reqMap = await requirementsForPublicJobs(jobIds);
 
   return rows.map((r) => {
     const job = (r.jobs ?? r.job) as Record<string, unknown> | null | undefined;
     const jid = job?.id != null ? String(job.id) : "";
-    return mapApplicationToCandidate(r, skillMap.get(jid) ?? []);
+    const req = reqMap.get(jid) ?? { skills: [], certifications: [] };
+    return mapApplicationToCandidate(r, req.skills, req.certifications);
   });
 }
 
@@ -396,8 +415,9 @@ export async function getApplicationForClient(
   const row = data as Record<string, unknown>;
   const job = (row.jobs ?? row.job) as Record<string, unknown> | null | undefined;
   const jid = job?.id != null ? String(job.id) : "";
-  const skillMap = await skillsForPublicJobs(jid ? [jid] : []);
-  return mapApplicationToCandidate(row, skillMap.get(jid) ?? []);
+  const reqMap = await requirementsForPublicJobs(jid ? [jid] : []);
+  const req = reqMap.get(jid) ?? { skills: [], certifications: [] };
+  return mapApplicationToCandidate(row, req.skills, req.certifications);
 }
 
 /**
@@ -541,6 +561,147 @@ export async function getClientCandidate(
 
 type MessageThreadFolder = "inbox" | "deleted";
 
+function personKey(name: string): string {
+  return name.trim().toLowerCase() || "unknown";
+}
+
+type RawThreadRow = {
+  id: string;
+  client_id: string;
+  subject: string;
+  recruiter_name: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  messages: ClientPortalMessage[];
+};
+
+/**
+ * Build one conversation per person. Recruiter and accounting are never mixed.
+ * Historical subject threads are merged only within the same person.
+ */
+function buildPersonConversations(
+  threads: RawThreadRow[],
+): ClientMessageThread[] {
+  type Bucket = {
+    displayName: string;
+    messages: ClientPortalMessage[];
+    relatedIds: string[];
+    clientId: string;
+    createdAt: string;
+    updatedAt: string;
+    deletedFlags: Array<string | null>;
+  };
+
+  const buckets = new Map<string, Bucket>();
+
+  function ensure(name: string, seed: RawThreadRow): Bucket {
+    const key = personKey(name);
+    let b = buckets.get(key);
+    if (!b) {
+      b = {
+        displayName: name,
+        messages: [],
+        relatedIds: [],
+        clientId: seed.client_id,
+        createdAt: seed.created_at,
+        updatedAt: seed.updated_at,
+        deletedFlags: [],
+      };
+      buckets.set(key, b);
+    }
+    return b;
+  }
+
+  for (const thread of threads) {
+    const threadContact = normalizeEmployerContact(thread.recruiter_name);
+    const owner = ensure(threadContact, thread);
+    if (!owner.relatedIds.includes(thread.id)) {
+      owner.relatedIds.push(thread.id);
+    }
+    owner.deletedFlags.push(thread.deleted_at);
+    if (thread.created_at < owner.createdAt) owner.createdAt = thread.created_at;
+    if (thread.updated_at > owner.updatedAt) owner.updatedAt = thread.updated_at;
+
+    for (const m of thread.messages) {
+      const contact = contactForEmployerMessage(
+        m.sender_role,
+        thread.recruiter_name,
+      );
+      const bucket = ensure(contact, thread);
+      if (!bucket.relatedIds.includes(thread.id)) {
+        bucket.relatedIds.push(thread.id);
+      }
+      if (!bucket.messages.some((x) => x.id === m.id)) {
+        bucket.messages.push(m);
+      }
+      if (m.created_at > bucket.updatedAt) bucket.updatedAt = m.created_at;
+    }
+  }
+
+  // Ensure empty own-role threads do not create orphan recruiter+accounting mix
+  const merged: ClientMessageThread[] = [];
+  for (const b of buckets.values()) {
+    if (b.messages.length === 0) continue;
+
+    b.messages.sort(
+      (a, c) =>
+        new Date(a.created_at).getTime() - new Date(c.created_at).getTime(),
+    );
+
+    // Primary reply target: a thread that is *owned* by this contact
+    let preferredId =
+      b.relatedIds.find((id) => {
+        const t = threads.find((x) => x.id === id);
+        return (
+          t != null &&
+          normalizeEmployerContact(t.recruiter_name) === b.displayName
+        );
+      }) ?? null;
+
+    // If only reassigned staff messages (e.g. Avery bucket with no own thread row),
+    // still need an id so delete/send can resolve the person — use first related.
+    if (!preferredId) preferredId = b.relatedIds[0] ?? null;
+    if (!preferredId) continue;
+
+    const last = b.messages[b.messages.length - 1];
+    // For deleted folder membership, use threads that primarily belong to this contact
+    const ownedThreads = threads.filter(
+      (t) =>
+        b.relatedIds.includes(t.id) &&
+        (normalizeEmployerContact(t.recruiter_name) === b.displayName ||
+          b.displayName === EMPLOYER_ACCOUNTING_CONTACT ||
+          b.displayName === EMPLOYER_RECRUITER_CONTACT),
+    );
+    const ownershipDeleted =
+      ownedThreads.length > 0
+        ? ownedThreads.every((t) => t.deleted_at != null)
+        : b.deletedFlags.every((d) => d != null);
+    const deletedAt = ownershipDeleted
+      ? [...b.deletedFlags].filter(Boolean).sort().at(-1) ?? null
+      : null;
+
+    merged.push({
+      id: preferredId,
+      client_id: b.clientId,
+      subject: "",
+      recruiter_name: b.displayName,
+      created_at: b.createdAt,
+      updated_at: b.updatedAt,
+      deleted_at: deletedAt,
+      messages: b.messages,
+      preview: last?.body.slice(0, 64) ?? "No messages yet",
+      unread: 0,
+      related_thread_ids: b.relatedIds,
+    });
+  }
+
+  return merged.sort(
+    (a, c) =>
+      new Date(c.updated_at).getTime() - new Date(a.updated_at).getTime(),
+  );
+}
+
 async function mapClientMessageThreads(
   list: Array<Record<string, unknown>>,
 ): Promise<ClientMessageThread[]> {
@@ -569,11 +730,8 @@ async function mapClientMessageThreads(
     byThread.set(tid, arr);
   }
 
-  return list.map((t) => {
+  const raw: RawThreadRow[] = list.map((t) => {
     const id = String(t.id);
-    const messages = byThread.get(id) ?? [];
-    const last = messages[messages.length - 1];
-    const deletedAt = t.deleted_at != null ? String(t.deleted_at) : null;
     return {
       id,
       client_id: String(t.client_id),
@@ -581,17 +739,16 @@ async function mapClientMessageThreads(
       recruiter_name: String(t.recruiter_name),
       created_at: String(t.created_at),
       updated_at: String(t.updated_at),
-      deleted_at: deletedAt,
-      messages,
-      preview: last?.body.slice(0, 64) ?? "No messages yet",
-      unread: 0,
+      deleted_at: t.deleted_at != null ? String(t.deleted_at) : null,
+      messages: byThread.get(id) ?? [],
     };
   });
+
+  return buildPersonConversations(raw);
 }
 
 /**
- * Client↔recruiter threads for the employer inbox or Deleted folder.
- * Soft-deleted threads stay out of inbox; Deleted keeps last 30 days.
+ * One conversation per person. Recruiter ≠ accounting — never combined.
  */
 export async function listClientMessageThreads(
   folder: MessageThreadFolder = "inbox",
@@ -610,7 +767,7 @@ export async function listClientMessageThreads(
   }
 
   const raw = (threads ?? []) as Array<Record<string, unknown>>;
-  const filtered =
+  const folderFiltered =
     folder === "deleted"
       ? raw.filter(
           (t) =>
@@ -619,5 +776,10 @@ export async function listClientMessageThreads(
         )
       : raw.filter((t) => t.deleted_at == null);
 
-  return mapClientMessageThreads(filtered);
+  const people = await mapClientMessageThreads(folderFiltered);
+
+  if (folder === "deleted") {
+    return people.filter((p) => p.deleted_at != null);
+  }
+  return people.filter((p) => p.deleted_at == null);
 }

@@ -6,7 +6,7 @@ import { ArchiveRestore, FolderOpen, Inbox, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Label, FieldInput } from "@/components/ui/form";
+import { Label } from "@/components/ui/form";
 import { ConfirmActionDialog } from "@/components/client-portal/confirm-action-dialog";
 import { useToast } from "@/components/client-portal/toast";
 import {
@@ -51,7 +51,7 @@ export function MessagesClient({
   const [activeId, setActiveId] = useState(initialInbox[0]?.id ?? "");
   const [draft, setDraft] = useState("");
   const [showNew, setShowNew] = useState(false);
-  const [newSubject, setNewSubject] = useState("");
+  const [newContact, setNewContact] = useState("Morgan Recruiter");
   const [newBody, setNewBody] = useState("");
   const [confirmKind, setConfirmKind] = useState<"soft" | "permanent" | null>(
     null,
@@ -92,7 +92,11 @@ export function MessagesClient({
     e.preventDefault();
     if (!draft.trim() || !active) return;
     const body = draft.trim();
-    const result = await sendClientMessageAction(active.id, body);
+    const result = await sendClientMessageAction(
+      active.id,
+      body,
+      active.recruiter_name,
+    );
     if (!result.ok) {
       toast.push(result.message, "error");
       return;
@@ -142,9 +146,10 @@ export function MessagesClient({
 
   async function startConversation(e: FormEvent) {
     e.preventDefault();
+    const contact = newContact.trim() || "Morgan Recruiter";
     const result = await createClientMessageThreadAction({
-      subject: newSubject,
       body: newBody,
+      recruiterName: contact,
     });
     if (!result.ok) {
       toast.push(result.message, "error");
@@ -153,29 +158,55 @@ export function MessagesClient({
     toast.push(result.message, "success");
     const now = new Date().toISOString();
     const id = result.id ?? `local-${Date.now()}`;
-    const thread: ClientMessageThread = {
-      id,
-      client_id: "",
-      subject: newSubject.trim(),
-      recruiter_name: "Morgan Recruiter",
-      created_at: now,
-      updated_at: now,
-      deleted_at: null,
-      preview: newBody.trim().slice(0, 64),
-      messages: [
-        {
-          id: `local-msg-${Date.now()}`,
-          thread_id: id,
-          sender_role: "client",
-          body: newBody.trim(),
-          created_at: now,
-        },
-      ],
-    };
-    setInbox((prev) => [thread, ...prev]);
+    const existing = inbox.find(
+      (t) => t.recruiter_name.toLowerCase() === contact.toLowerCase(),
+    );
+    if (existing) {
+      const sentMsg = {
+        id: `local-msg-${Date.now()}`,
+        thread_id: existing.id,
+        sender_role: "client" as const,
+        body: newBody.trim(),
+        created_at: now,
+      };
+      setInbox((prev) => {
+        const rest = prev.filter((t) => t.id !== existing.id);
+        return [
+          {
+            ...existing,
+            preview: newBody.trim().slice(0, 64),
+            updated_at: now,
+            messages: [...(existing.messages ?? []), sentMsg],
+          },
+          ...rest,
+        ];
+      });
+      setActiveId(existing.id);
+    } else {
+      const thread: ClientMessageThread = {
+        id,
+        client_id: "",
+        subject: "",
+        recruiter_name: contact,
+        created_at: now,
+        updated_at: now,
+        deleted_at: null,
+        preview: newBody.trim().slice(0, 64),
+        related_thread_ids: [id],
+        messages: [
+          {
+            id: `local-msg-${Date.now()}`,
+            thread_id: id,
+            sender_role: "client",
+            body: newBody.trim(),
+            created_at: now,
+          },
+        ],
+      };
+      setInbox((prev) => [thread, ...prev]);
+      setActiveId(id);
+    }
     setFolder("inbox");
-    setActiveId(id);
-    setNewSubject("");
     setNewBody("");
     setShowNew(false);
     startTransition(() => router.refresh());
@@ -266,10 +297,13 @@ export function MessagesClient({
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <PageHeader title="Messages" />
+        <PageHeader
+          title="Messages"
+          description="Conversations with each person who messages you. Recruiter and accounting stay separate."
+        />
         {folder === "inbox" ? (
           <Button type="button" onClick={() => setShowNew((v) => !v)}>
-            {showNew ? "Cancel" : "New conversation"}
+            {showNew ? "Cancel" : "Message someone"}
           </Button>
         ) : null}
       </div>
@@ -280,14 +314,20 @@ export function MessagesClient({
           className="space-y-3 rounded-xl border border-[var(--cf-border)] bg-white p-4 shadow-sm"
         >
           <div>
-            <Label htmlFor="new-subject">Subject</Label>
-            <FieldInput
-              id="new-subject"
-              value={newSubject}
-              onChange={(e) => setNewSubject(e.target.value)}
-              placeholder="e.g. Warehouse Associate - interview times"
-              required
-            />
+            <Label htmlFor="new-contact">Who</Label>
+            <select
+              id="new-contact"
+              value={newContact}
+              onChange={(e) => setNewContact(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-[var(--cf-border)] bg-white px-3 py-2 text-sm focus:border-[var(--cf-navy)] focus:ring-2 focus:ring-[var(--cf-navy)]/15 focus:outline-none"
+            >
+              <option value="Morgan Recruiter">Morgan Recruiter</option>
+              <option value="Avery Accounting">Avery Accounting</option>
+            </select>
+            <p className="mt-1 text-xs text-[var(--cf-muted)]">
+              If you already message this person, your note is added to that
+              conversation.
+            </p>
           </div>
           <div>
             <Label htmlFor="new-body">Message</Label>
@@ -297,12 +337,12 @@ export function MessagesClient({
               onChange={(e) => setNewBody(e.target.value)}
               required
               rows={3}
-              placeholder="Write your first message…"
+              placeholder="Write your message…"
               className="mt-1 w-full rounded-lg border border-[var(--cf-border)] px-3 py-2 text-sm focus:border-[var(--cf-navy)] focus:ring-2 focus:ring-[var(--cf-navy)]/15 focus:outline-none"
             />
           </div>
           <Button type="submit" disabled={pending}>
-            Start conversation
+            Send
           </Button>
         </form>
       ) : null}
@@ -319,7 +359,7 @@ export function MessagesClient({
           {emptyInbox ? (
             <EmptyState
               title="No conversations yet"
-              description="Start a conversation with your recruiter, or open the Deleted folder to find conversations you removed in the last 30 days."
+              description="Message your recruiter or accounting contact. Each person gets their own conversation thread."
             />
           ) : (
             <EmptyState
@@ -357,7 +397,7 @@ export function MessagesClient({
                       {t.recruiter_name}
                     </span>
                     <span className="truncate text-xs text-[var(--cf-muted)]">
-                      {t.subject || t.preview}
+                      {t.preview || "No messages yet"}
                     </span>
                     {folder === "deleted" && t.deleted_at ? (
                       <span className="text-[10px] text-[var(--cf-muted)]">
@@ -380,11 +420,11 @@ export function MessagesClient({
                     <p className="text-sm font-semibold text-[var(--cf-ink)]">
                       {active.recruiter_name}
                     </p>
-                    {active.subject ? (
-                      <p className="text-xs text-[var(--cf-muted)]">
-                        {active.subject}
-                      </p>
-                    ) : null}
+                    <p className="text-xs text-[var(--cf-muted)]">
+                      Chat with {active.recruiter_name} only ·{" "}
+                      {(active.messages ?? []).length} message
+                      {(active.messages ?? []).length === 1 ? "" : "s"}
+                    </p>
                     {folder === "deleted" && active.deleted_at ? (
                       <p className="mt-0.5 text-[11px] text-amber-800">
                         Deleted · {daysLeftInDeletedFolder(active.deleted_at)}{" "}
@@ -441,7 +481,15 @@ export function MessagesClient({
                   </div>
                 </div>
                 <div className="flex-1 space-y-3 overflow-y-auto p-4">
-                  {(active.messages ?? []).map((m) => (
+                  {(active.messages ?? [])
+                    .filter((m) => {
+                      const person = active.recruiter_name.toLowerCase();
+                      const isAccounting = person.includes("account");
+                      if (m.sender_role === "client") return true;
+                      if (isAccounting) return m.sender_role === "staff";
+                      return m.sender_role === "recruiter";
+                    })
+                    .map((m) => (
                     <div
                       key={m.id}
                       className={`flex ${m.sender_role === "client" ? "justify-end" : "justify-start"}`}
@@ -460,11 +508,13 @@ export function MessagesClient({
                               : "text-[var(--cf-muted)]"
                           }`}
                         >
-                          {m.sender_role === "staff"
-                            ? "Accounting"
-                            : m.sender_role === "recruiter"
-                              ? "Recruiter"
-                              : "You"}
+                          {m.sender_role === "client"
+                            ? "You"
+                            : m.sender_role === "staff"
+                              ? "Avery Accounting"
+                              : m.sender_role === "recruiter"
+                                ? "Morgan Recruiter"
+                                : active.recruiter_name}
                         </p>
                         <p>{m.body}</p>
                         <p
@@ -518,7 +568,7 @@ export function MessagesClient({
         title="Move to Deleted?"
         description={
           active
-            ? `“${active.subject || "This conversation"}” with ${active.recruiter_name} will move to the Deleted folder for 30 days. You can restore it anytime during that window.`
+            ? `Your conversation with ${active.recruiter_name} will move to the Deleted folder for 30 days. You can restore it anytime during that window.`
             : ""
         }
         confirmLabel="Move to Deleted"
@@ -535,7 +585,7 @@ export function MessagesClient({
         title="Delete permanently?"
         description={
           active
-            ? `Permanently remove “${active.subject || "this conversation"}” and all messages. This cannot be undone.`
+            ? `Permanently remove your conversation with ${active.recruiter_name} and all messages. This cannot be undone.`
             : ""
         }
         confirmLabel="Delete forever"
