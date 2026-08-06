@@ -26,12 +26,15 @@ export function SectionSkeleton() {
 export function Label({
   children,
   htmlFor,
+  id,
 }: {
   children: ReactNode;
   htmlFor?: string;
+  id?: string;
 }) {
   return (
     <label
+      id={id}
       htmlFor={htmlFor}
       className="mb-1.5 block text-xs font-semibold tracking-wide text-[var(--cf-muted)] uppercase"
     >
