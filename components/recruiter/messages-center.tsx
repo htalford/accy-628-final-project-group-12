@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArchiveRestore, Trash2 } from "lucide-react";
 import {
+  deleteRecruiterThread,
+  deleteRecruiterThreads,
   markRecruiterCandidateThreadRead,
+  restoreRecruiterThread,
+  restoreRecruiterThreads,
   sendAccountingStaffMessage,
   sendEmployerMessage,
   sendRecruiterMessage,
@@ -13,113 +17,80 @@ import type { RecruiterMessageThread } from "@/lib/recruiter/types";
 
 type Filter = "all" | "employer" | "candidate" | "accounting";
 type Folder = "inbox" | "deleted";
+type ParticipantType = RecruiterMessageThread["participantType"];
 
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "employer", label: "Employers" },
-  { id: "candidate", label: "Candidates" },
-  { id: "accounting", label: "Accounting" },
-];
+type Thread = RecruiterMessageThread & { deletedAt?: string };
 
-const PLACEHOLDER = "Write a message…";
-const STORAGE_KEY = "recruiter-deleted-threads-v1";
-const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+type ThreadRef = {
+  participantType: ParticipantType;
+  threadId: string;
+};
 
-type DeletedMap = Record<string, string>; // threadKey -> ISO deletedAt
-
-function threadKey(t: Pick<RecruiterMessageThread, "participantType" | "id">) {
+function threadKey(t: Pick<Thread, "participantType" | "id">) {
   return `${t.participantType}:${t.id}`;
 }
 
+function isParticipantType(value: string | undefined): value is ParticipantType {
+  return value === "candidate" || value === "employer" || value === "accounting";
+}
+
 function daysLeft(deletedAt: string) {
-  const end = new Date(deletedAt).getTime() + RETENTION_MS;
+  const end = new Date(deletedAt).getTime() + 30 * 24 * 60 * 60 * 1000;
   const left = Math.ceil((end - Date.now()) / (24 * 60 * 60 * 1000));
   return Math.max(0, left);
 }
 
-function readDeletedMap(): DeletedMap {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as DeletedMap;
-    const now = Date.now();
-    const pruned: DeletedMap = {};
-    for (const [key, deletedAt] of Object.entries(parsed)) {
-      if (now - new Date(deletedAt).getTime() < RETENTION_MS) {
-        pruned[key] = deletedAt;
-      }
-    }
-    if (Object.keys(pruned).length !== Object.keys(parsed).length) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
-    }
-    return pruned;
-  } catch {
-    return {};
-  }
-}
-
-function writeDeletedMap(map: DeletedMap) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
-}
-
 export function MessagesCenter({
-  threads,
+  inboxThreads = [],
+  deletedThreads = [],
+  folder,
 }: {
-  threads: RecruiterMessageThread[];
+  inboxThreads?: RecruiterMessageThread[];
+  deletedThreads?: (RecruiterMessageThread & { deletedAt: string })[];
+  folder: Folder;
 }) {
   const router = useRouter();
-  const [folder, setFolder] = useState<Folder>("inbox");
   const [filter, setFilter] = useState<Filter>("all");
-  const [deletedMap, setDeletedMap] = useState<DeletedMap>({});
-  const [activeId, setActiveId] = useState("");
+  const [activeKey, setActiveKey] = useState("");
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  useEffect(() => {
-    setDeletedMap(readDeletedMap());
-  }, []);
-
-  const inboxThreads = useMemo(
-    () => threads.filter((t) => !deletedMap[threadKey(t)]),
-    [threads, deletedMap],
-  );
-
-  const deletedThreads = useMemo(
-    () =>
-      threads
-        .filter((t) => deletedMap[threadKey(t)])
-        .map((t) => ({
-          ...t,
-          deletedAt: deletedMap[threadKey(t)]!,
-        })),
-    [threads, deletedMap],
-  );
-
-  const folderThreads = folder === "deleted" ? deletedThreads : inboxThreads;
+  const threads: Thread[] =
+    folder === "deleted" ? deletedThreads : inboxThreads;
 
   const filtered = useMemo(
     () =>
-      folderThreads.filter(
+      (threads ?? []).filter(
         (t) => filter === "all" || t.participantType === filter,
       ),
-    [folderThreads, filter],
+    [threads, filter],
   );
 
   useEffect(() => {
+    setSelectedKeys(new Set());
+    setDraft("");
+    setNotice(null);
+  }, [folder]);
+
+  useEffect(() => {
     if (filtered.length === 0) {
-      setActiveId("");
+      setActiveKey("");
       return;
     }
-    setActiveId((prev) =>
-      filtered.some((t) => t.id === prev) ? prev : filtered[0]!.id,
+    const first = filtered[0];
+    if (!first) {
+      setActiveKey("");
+      return;
+    }
+    setActiveKey((prev) =>
+      filtered.some((t) => threadKey(t) === prev) ? prev : threadKey(first),
     );
   }, [filtered]);
 
   const active =
-    filtered.find((t) => t.id === activeId) ?? filtered[0] ?? null;
+    filtered.find((t) => threadKey(t) === activeKey) ?? filtered[0] ?? null;
 
   useEffect(() => {
     if (
@@ -143,39 +114,127 @@ export function MessagesCenter({
     router,
   ]);
 
-  function switchFolder(next: Folder) {
-    setFolder(next);
+  function setFolder(next: Folder) {
     setFilter("all");
+    setSelectedKeys(new Set());
     setDraft("");
     setNotice(null);
-    setConfirmDelete(false);
+    const params = new URLSearchParams();
+    if (next === "deleted") params.set("folder", "deleted");
+    router.replace(
+      params.toString()
+        ? `/recruiter/messages?${params}`
+        : "/recruiter/messages",
+      { scroll: false },
+    );
   }
 
-  function moveToDeleted() {
+  function toggleSelected(key: string) {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    const visible = filtered.map(threadKey);
+    const allSelected =
+      visible.length > 0 && visible.every((k) => selectedKeys.has(k));
+    if (allSelected) {
+      setSelectedKeys(new Set());
+      return;
+    }
+    setSelectedKeys(new Set(visible));
+  }
+
+  function refsFromKeys(keys: Iterable<string>): ThreadRef[] {
+    return Array.from(keys).flatMap((key) => {
+      const [participantType, ...rest] = key.split(":");
+      const threadId = rest.join(":");
+      if (!isParticipantType(participantType) || !threadId) return [];
+      return [{ participantType, threadId }];
+    });
+  }
+
+  function onDeleteThread() {
     if (!active || folder !== "inbox") return;
-    const key = threadKey(active);
-    const next = { ...readDeletedMap(), [key]: new Date().toISOString() };
-    writeDeletedMap(next);
-    setDeletedMap(next);
-    setConfirmDelete(false);
-    setNotice("Conversation moved to Deleted.");
+    startTransition(async () => {
+      const result = await deleteRecruiterThread({
+        participantType: active.participantType,
+        threadId: active.id,
+      });
+      if (result.ok) {
+        setNotice(null);
+        setSelectedKeys((prev) => {
+          const next = new Set(prev);
+          next.delete(threadKey(active));
+          return next;
+        });
+        router.refresh();
+      } else {
+        setNotice(result.error ?? "Failed to delete");
+      }
+    });
   }
 
-  function restoreConversation() {
+  function onDeleteSelected() {
+    const refs = refsFromKeys(selectedKeys);
+    if (refs.length === 0) return;
+    startTransition(async () => {
+      const result = await deleteRecruiterThreads(refs);
+      if (result.ok) {
+        setNotice(null);
+        setSelectedKeys(new Set());
+        router.refresh();
+      } else {
+        setNotice(result.error ?? "Failed to delete");
+      }
+    });
+  }
+
+  function onRestoreThread() {
     if (!active || folder !== "deleted") return;
-    const key = threadKey(active);
-    const next = { ...readDeletedMap() };
-    delete next[key];
-    writeDeletedMap(next);
-    setDeletedMap(next);
-    setNotice("Conversation restored to Inbox.");
-    switchFolder("inbox");
+    startTransition(async () => {
+      const result = await restoreRecruiterThread({
+        participantType: active.participantType,
+        threadId: active.id,
+      });
+      if (result.ok) {
+        setNotice(null);
+        setSelectedKeys((prev) => {
+          const next = new Set(prev);
+          next.delete(threadKey(active));
+          return next;
+        });
+        router.replace("/recruiter/messages", { scroll: false });
+        router.refresh();
+      } else {
+        setNotice(result.error ?? "Failed to restore");
+      }
+    });
   }
 
-  function sendActiveMessage() {
-    if (!active || folder === "deleted") return;
+  function onRestoreSelected() {
+    const refs = refsFromKeys(selectedKeys);
+    if (refs.length === 0) return;
+    startTransition(async () => {
+      const result = await restoreRecruiterThreads(refs);
+      if (result.ok) {
+        setNotice(null);
+        setSelectedKeys(new Set());
+        router.replace("/recruiter/messages", { scroll: false });
+        router.refresh();
+      } else {
+        setNotice(result.error ?? "Failed to restore");
+      }
+    });
+  }
+
+  function send() {
+    if (!active || !draft.trim() || folder === "deleted") return;
     const body = draft.trim();
-    if (!body) return;
     setDraft("");
     startTransition(async () => {
       const result =
@@ -204,94 +263,149 @@ export function MessagesCenter({
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--cf-border)] bg-white shadow-sm">
       {notice ? (
-        <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-900">
+        <div
+          className={`border-b px-4 py-2 text-sm ${
+            notice.toLowerCase().includes("fail") ||
+            notice.toLowerCase().includes("required") ||
+            notice.toLowerCase().includes("unauthorized")
+              ? "border-red-200 bg-red-50 text-red-900"
+              : "border-emerald-200 bg-emerald-50 text-emerald-900"
+          }`}
+        >
           {notice}
         </div>
       ) : null}
-      <div className="grid min-h-[28rem] lg:grid-cols-[16rem_1fr]">
-        <aside className="flex flex-col border-b border-[var(--cf-border)] lg:border-r lg:border-b-0">
-          <div className="space-y-2 p-3">
-            <div className="grid grid-cols-2 gap-1.5">
+      <div className="grid min-h-[28rem] lg:grid-cols-[18rem_1fr]">
+        <aside className="border-b border-[var(--cf-border)] lg:border-r lg:border-b-0">
+          <div className="space-y-2 border-b border-[var(--cf-border)] p-3">
+            <div className="flex rounded-lg border border-[var(--cf-border)] bg-[var(--cf-surface)] p-0.5">
               <button
                 type="button"
-                onClick={() => switchFolder("inbox")}
-                className={`rounded-lg px-2.5 py-2 text-center text-xs font-semibold ${
+                onClick={() => setFolder("inbox")}
+                className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${
                   folder === "inbox"
-                    ? "bg-[var(--cf-navy)] text-white"
-                    : "border border-[var(--cf-border)] text-[var(--cf-ink)] hover:bg-[var(--cf-surface)]"
+                    ? "bg-white text-[var(--cf-ink)] shadow-sm"
+                    : "text-[var(--cf-muted)] hover:text-[var(--cf-ink)]"
                 }`}
               >
                 Inbox
               </button>
               <button
                 type="button"
-                onClick={() => switchFolder("deleted")}
-                className={`rounded-lg px-2.5 py-2 text-center text-xs font-semibold ${
+                onClick={() => setFolder("deleted")}
+                className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${
                   folder === "deleted"
-                    ? "bg-[var(--cf-navy)] text-white"
-                    : "border border-[var(--cf-border)] text-[var(--cf-ink)] hover:bg-[var(--cf-surface)]"
+                    ? "bg-white text-[var(--cf-ink)] shadow-sm"
+                    : "text-[var(--cf-muted)] hover:text-[var(--cf-ink)]"
                 }`}
               >
                 Deleted
-                {deletedThreads.length > 0
-                  ? ` (${deletedThreads.length})`
-                  : ""}
+                {deletedThreads.length > 0 ? (
+                  <span className="ml-1 text-[10px] text-[var(--cf-muted)]">
+                    ({deletedThreads.length})
+                  </span>
+                ) : null}
               </button>
             </div>
-
-            {folder === "inbox" ? (
-              <div className="flex flex-col gap-0.5 border-t border-[var(--cf-border)] pt-2">
-                {FILTERS.map((f) => (
+            <div className="flex flex-wrap gap-1">
+              {(["all", "employer", "candidate", "accounting"] as const).map(
+                (f) => (
                   <button
-                    key={f.id}
+                    key={f}
                     type="button"
-                    onClick={() => {
-                      setFilter(f.id);
-                      setConfirmDelete(false);
-                    }}
-                    className={`rounded-md px-2.5 py-1.5 text-left text-xs font-medium ${
-                      filter === f.id
-                        ? "bg-[var(--cf-accent)]/15 text-[var(--cf-navy)]"
-                        : "text-[var(--cf-ink)] hover:bg-[var(--cf-surface)]"
+                    onClick={() => setFilter(f)}
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize ${
+                      filter === f
+                        ? "bg-[var(--cf-navy)] text-white"
+                        : "text-[var(--cf-muted)] hover:bg-[var(--cf-surface)]"
                     }`}
                   >
-                    {f.label}
+                    {f}
                   </button>
-                ))}
+                ),
+              )}
+            </div>
+            {filtered.length > 0 ? (
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-[var(--cf-muted)]">
+                  <input
+                    type="checkbox"
+                    checked={
+                      filtered.length > 0 &&
+                      filtered.every((t) => selectedKeys.has(threadKey(t)))
+                    }
+                    onChange={toggleSelectAll}
+                    className="h-3.5 w-3.5 rounded border-[var(--cf-border)]"
+                  />
+                  Select all
+                </label>
+                {selectedKeys.size > 0 ? (
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={
+                      folder === "deleted" ? onRestoreSelected : onDeleteSelected
+                    }
+                    className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold transition disabled:opacity-50 ${
+                      folder === "deleted"
+                        ? "text-[var(--cf-ink)] hover:bg-[var(--cf-accent)]/10"
+                        : "text-red-700 hover:bg-red-50"
+                    }`}
+                  >
+                    {folder === "deleted" ? (
+                      <ArchiveRestore className="h-3.5 w-3.5" aria-hidden />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                    )}
+                    {folder === "deleted" ? "Restore" : "Delete"} (
+                    {selectedKeys.size})
+                  </button>
+                ) : null}
               </div>
-            ) : (
-              <p className="border-t border-[var(--cf-border)] pt-2 text-[11px] text-[var(--cf-muted)]">
-                Conversations kept for 30 days, then removed permanently.
-              </p>
-            )}
+            ) : null}
           </div>
-          <ul className="max-h-[24rem] flex-1 overflow-y-auto border-t border-[var(--cf-border)]">
-            {filtered.map((t) => (
-              <li key={`${t.participantType}-${t.id}`}>
-                <button
-                  type="button"
-                  onClick={() => setActiveId(t.id)}
-                  className={`w-full border-b border-[var(--cf-border)] px-3 py-3 text-left hover:bg-[var(--cf-surface)] ${
-                    active?.id === t.id ? "bg-[var(--cf-accent)]/10" : ""
-                  }`}
-                >
-                  <p className="text-sm font-medium text-[var(--cf-ink)]">
-                    {t.participantName}
-                  </p>
-                  <p className="truncate text-xs text-[var(--cf-muted)]">
-                    {t.preview}
-                  </p>
-                  <p className="mt-1 text-[10px] uppercase tracking-wide text-[var(--cf-muted)]">
-                    {t.participantType}
-                    {folder === "deleted" && "deletedAt" in t
-                      ? ` · ${daysLeft(String(t.deletedAt))}d left`
-                      : t.unread
-                        ? ` · ${t.unread} unread`
-                        : ""}
-                  </p>
-                </button>
-              </li>
-            ))}
+          <ul className="max-h-[24rem] overflow-y-auto">
+            {filtered.map((t) => {
+              const key = threadKey(t);
+              const isActive = active ? threadKey(active) === key : false;
+              return (
+                <li key={key}>
+                  <div
+                    className={`flex w-full items-start gap-2 border-b border-[var(--cf-border)] px-2 py-2.5 hover:bg-[var(--cf-surface)] ${
+                      isActive ? "bg-[var(--cf-accent)]/10" : ""
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedKeys.has(key)}
+                      onChange={() => toggleSelected(key)}
+                      aria-label={`Select ${t.participantName}`}
+                      className="mt-2.5 h-3.5 w-3.5 shrink-0 rounded border-[var(--cf-border)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setActiveKey(key)}
+                      className="min-w-0 flex-1 py-0.5 text-left"
+                    >
+                      <p className="text-sm font-medium text-[var(--cf-ink)]">
+                        {t.participantName}
+                      </p>
+                      <p className="truncate text-xs text-[var(--cf-muted)]">
+                        {t.preview}
+                      </p>
+                      <p className="mt-1 text-[10px] tracking-wide text-[var(--cf-muted)] uppercase">
+                        {t.participantType}
+                        {folder === "deleted" && t.deletedAt
+                          ? ` · ${daysLeft(t.deletedAt)}d left`
+                          : t.unread
+                            ? ` · ${t.unread} unread`
+                            : ""}
+                      </p>
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
             {filtered.length === 0 ? (
               <li className="px-3 py-8 text-center text-sm text-[var(--cf-muted)]">
                 {folder === "deleted"
@@ -305,39 +419,39 @@ export function MessagesCenter({
         <div className="flex flex-col">
           {active ? (
             <>
-              <div className="flex items-start justify-between gap-3 border-b border-[var(--cf-border)] px-4 py-3">
-                <div>
+              <div className="flex items-start gap-3 border-b border-[var(--cf-border)] px-4 py-3">
+                <div className="min-w-0 flex-1">
                   <p className="font-semibold text-[var(--cf-ink)]">
                     {active.participantName}
                   </p>
                   <p className="text-xs text-[var(--cf-muted)]">
-                    {folder === "deleted" && "deletedAt" in active
-                      ? `Deleted · ${daysLeft(String(active.deletedAt))} day${daysLeft(String(active.deletedAt)) === 1 ? "" : "s"} remaining`
-                      : active.participantType === "candidate"
-                        ? "Candidate · recruiter lane"
-                        : active.participantType === "accounting"
-                          ? "Accounting · staff conversation"
-                          : active.subject}
+                    {folder === "deleted" && active.deletedAt
+                      ? `Deleted · ${daysLeft(active.deletedAt)} day${daysLeft(active.deletedAt) === 1 ? "" : "s"} remaining`
+                      : active.subject}
                   </p>
                 </div>
                 {folder === "inbox" ? (
                   <button
                     type="button"
-                    title="Move conversation to Deleted"
-                    onClick={() => setConfirmDelete(true)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-[var(--cf-border)] px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                    onClick={onDeleteThread}
+                    disabled={pending}
+                    title="Move to Deleted"
+                    aria-label="Delete conversation"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--cf-border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--cf-muted)] transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden />
                     Delete
                   </button>
                 ) : (
                   <button
                     type="button"
+                    onClick={onRestoreThread}
+                    disabled={pending}
                     title="Restore to Inbox"
-                    onClick={restoreConversation}
-                    className="inline-flex items-center gap-1 rounded-lg border border-[var(--cf-border)] px-2.5 py-1.5 text-xs font-medium text-[var(--cf-navy)] hover:bg-[var(--cf-surface)]"
+                    aria-label="Restore conversation"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--cf-border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--cf-ink)] transition hover:bg-[var(--cf-accent)]/10 disabled:opacity-50"
                   >
-                    <ArchiveRestore className="h-3.5 w-3.5" />
+                    <ArchiveRestore className="h-3.5 w-3.5" aria-hidden />
                     Restore
                   </button>
                 )}
@@ -366,73 +480,35 @@ export function MessagesCenter({
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
                       rows={2}
-                      placeholder={PLACEHOLDER}
+                      placeholder={`Message ${active.participantName}…`}
                       className="min-h-[2.5rem] flex-1 rounded-lg border border-[var(--cf-border)] px-3 py-2 text-sm"
                     />
                     <button
                       type="button"
                       disabled={pending || !draft.trim()}
                       className="self-end rounded-lg bg-[var(--cf-navy)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                      onClick={sendActiveMessage}
+                      onClick={send}
                     >
                       Send
                     </button>
                   </div>
-                  {active.participantType === "accounting" ? (
-                    <p className="text-[11px] text-[var(--cf-muted)]">
-                      Synced with Accounting Portal staff conversations.
-                    </p>
-                  ) : active.participantType === "employer" ? (
-                    <p className="text-[11px] text-[var(--cf-muted)]">
-                      Synced with Client Portal employer conversations.
-                    </p>
-                  ) : null}
                 </div>
               ) : (
                 <div className="border-t border-[var(--cf-border)] px-4 py-3 text-xs text-[var(--cf-muted)]">
-                  Restore this conversation to reply again. After 30 days it is
-                  removed from Deleted permanently.
+                  Restore this conversation to reply, or it will leave Deleted
+                  after 30 days.
                 </div>
               )}
             </>
           ) : (
             <div className="flex flex-1 items-center justify-center text-sm text-[var(--cf-muted)]">
               {folder === "deleted"
-                ? "Deleted conversations appear here for 30 days."
+                ? "No deleted conversations"
                 : "Select a conversation"}
             </div>
           )}
         </div>
       </div>
-
-      {confirmDelete ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl border border-[var(--cf-border)] bg-white p-5 shadow-lg">
-            <p className="text-sm font-medium text-[var(--cf-ink)]">
-              Delete this conversation?
-            </p>
-            <p className="mt-2 text-xs text-[var(--cf-muted)]">
-              It will move to Deleted and stay available for 30 days.
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(false)}
-                className="rounded-lg border border-[var(--cf-border)] px-3 py-2 text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={moveToDeleted}
-                className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white"
-              >
-                Delete conversation
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
