@@ -17,7 +17,6 @@ export default async function CandidateDetailPage({
     <div>
       <PageHeader
         title="Candidate details"
-        description={`${candidate.name} · ${candidate.positionApplied}`}
         actions={
           <Link
             href="/recruiter/candidates"

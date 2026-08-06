@@ -18,6 +18,7 @@ import type { ApplicationStatus } from "@/lib/types/database";
 import {
   approveApplication,
   rejectApplication,
+  removeRejectedCandidate,
   scheduleInterview,
   sendRecruiterMessage,
   updateApplicationStatus,
@@ -35,6 +36,7 @@ export function CandidateDetail({
   const [showSchedule, setShowSchedule] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
   const [showMessage, setShowMessage] = useState(false);
+  const [showRemove, setShowRemove] = useState(false);
 
   const approved =
     candidate.applicationStatus === "reviewing" ||
@@ -43,6 +45,9 @@ export function CandidateDetail({
     candidate.status === "Interview Scheduled" ||
     candidate.status === "Offer Sent" ||
     candidate.status === "Hired";
+  const isRejected =
+    candidate.applicationStatus === "rejected" ||
+    candidate.status === "Rejected";
   const applicationId = candidate.applicationId ?? candidate.id;
 
   function run(
@@ -136,11 +141,19 @@ export function CandidateDetail({
             disabled={
               pending ||
               candidate.source === "job_interest" ||
-              candidate.applicationStatus === "rejected" ||
-              candidate.status === "Rejected"
+              isRejected
             }
             onClick={() => run(() => rejectApplication(applicationId))}
           />
+          {isRejected && candidate.source !== "job_interest" ? (
+            <ActionButton
+              icon={<UserX className="h-4 w-4" />}
+              label="Remove Rejected"
+              danger
+              disabled={pending}
+              onClick={() => setShowRemove(true)}
+            />
+          ) : null}
           {!approved && candidate.source !== "job_interest" ? (
             <ActionButton
               icon={<CheckCircle2 className="h-4 w-4" />}
@@ -301,6 +314,49 @@ export function CandidateDetail({
             );
           }}
         />
+      ) : null}
+
+      {showRemove ? (
+        <Modal
+          title="Permanently remove rejected candidate?"
+          onClose={() => setShowRemove(false)}
+        >
+          <p className="text-sm text-[var(--cf-muted)]">
+            {candidate.name} will be deleted from matched candidates, related
+            lists, and dashboard counts. This cannot be undone.
+          </p>
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowRemove(false)}
+              className="rounded-lg px-3 py-2 text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              onClick={() => {
+                setShowRemove(false);
+                startTransition(async () => {
+                  setError(null);
+                  setNotice(null);
+                  const result = await removeRejectedCandidate(applicationId);
+                  if (!result.ok) {
+                    setError(result.error ?? "Failed to remove");
+                    return;
+                  }
+                  setNotice(result.message ?? "Removed");
+                  router.push("/recruiter/candidates");
+                  router.refresh();
+                });
+              }}
+            >
+              Remove permanently
+            </button>
+          </div>
+        </Modal>
       ) : null}
     </div>
   );
