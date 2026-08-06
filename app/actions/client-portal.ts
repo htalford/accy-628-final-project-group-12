@@ -151,6 +151,8 @@ export async function createJobRequestAction(formData: {
   location: string;
   payRate: string;
   startDate: string;
+  industry: string;
+  yearsExperience: string;
   skills: string;
   certifications: string;
   description: string;
@@ -161,6 +163,9 @@ export async function createJobRequestAction(formData: {
 
   const title = formData.title.trim();
   if (!title) return { ok: false, message: "Position title is required." };
+
+  const industry = formData.industry.trim();
+  if (!industry) return { ok: false, message: "Industry is required." };
 
   const positions = Math.max(1, Math.floor(Number(formData.openings) || 1));
   const skills = formData.skills
@@ -185,6 +190,8 @@ export async function createJobRequestAction(formData: {
       location: formData.location.trim() || null,
       pay_rate_text: formData.payRate.trim() || null,
       start_date: formData.startDate || null,
+      industry,
+      years_experience: formData.yearsExperience.trim() || null,
       skills,
       certifications,
       description: formData.description.trim() || null,

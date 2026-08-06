@@ -41,7 +41,6 @@ export default async function ClientDashboardPage() {
   const atRiskPlacements = data.placements.filter((p) => p.status === "at_risk");
 
   const openRoles = data.metrics.openPositions;
-  const candidatesWaiting = data.metrics.pendingCandidateReviews;
   const timesheetsDue = data.metrics.timesheetsAwaitingApproval;
   const outstandingInvoices = data.metrics.outstandingInvoices;
   const atRiskCount = atRiskPlacements.length;
@@ -59,20 +58,6 @@ export default async function ClientDashboardPage() {
       href: "/client/job-requests?status=open",
       tone: openRoles === 0 ? "ok" : openRoles >= 3 ? "warn" : "info",
       icon: "roles",
-    },
-    {
-      id: "candidates",
-      label: "Candidates waiting",
-      value: candidatesWaiting,
-      detail: "",
-      href: "/client/candidates",
-      tone:
-        candidatesWaiting === 0
-          ? "ok"
-          : candidatesWaiting >= 3
-            ? "warn"
-            : "info",
-      icon: "candidates",
     },
     {
       id: "timesheets",

@@ -79,8 +79,10 @@ export async function updateApplicationStatus(
   applicationId: string,
   status: ApplicationStatus,
 ) {
-  const { error: authError } = await requireRecruiter();
-  if (authError) return { ok: false as const, error: authError };
+  const { error: authError, user } = await requireRecruiter();
+  if (authError || !user) {
+    return { ok: false as const, error: authError ?? "Unauthorized" };
+  }
 
   const supabase = await createClient();
   const { data: app } = await supabase
@@ -91,6 +93,44 @@ export async function updateApplicationStatus(
     .maybeSingle();
 
   if (app) {
+    if (status === "offered") {
+      const { createContractIfHighMatch } = await import(
+        "@/lib/recruiter/create-contract-on-accept"
+      );
+      const contract = await createContractIfHighMatch({
+        supabase,
+        user,
+        applicationId,
+      });
+
+      revalidateRecruiter();
+      revalidatePath("/client/contracts");
+      revalidatePath("/candidate/contracts");
+      revalidatePath("/accounting/contracts");
+      revalidatePath("/client/messages");
+      revalidatePath("/candidate/messages");
+      revalidatePath("/accounting/messages");
+
+      if (contract.created) {
+        return {
+          ok: true as const,
+          message: contract.alreadyExisted
+            ? `Offer sent. Existing contract reused (${Math.round(contract.matchScore)}% match).`
+            : `Offer sent and contract created (${Math.round(contract.matchScore)}% match). Employer, candidate, and accounting were notified.`,
+          contractCreated: true as const,
+          placementId: contract.placementId,
+          matchScore: contract.matchScore,
+        };
+      }
+
+      return {
+        ok: true as const,
+        message: `Status updated to offered. ${contract.reason}`,
+        contractCreated: false as const,
+        matchScore: contract.matchScore,
+      };
+    }
+
     revalidateRecruiter();
     return { ok: true as const, message: `Status updated to ${status}.` };
   }

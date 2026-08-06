@@ -14,8 +14,8 @@ export const RECRUITER_PAGE_COPY = {
     subtitle: "Open positions and hiring progress",
   },
   candidates: {
-    title: "Candidates in pipeline",
-    subtitle: "Employee applications",
+    title: "Matched candidates",
+    subtitle: "Applications with skill and cert fit scores",
   },
   interviews: {
     title: "Upcoming interviews",

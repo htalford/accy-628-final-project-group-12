@@ -42,6 +42,9 @@ function yearsFromEmployments(jobs: PreviousEmployment[]): number | null {
 
 export type EmployeeProfileFields = {
   certifications?: string | null;
+  skills?: string | null;
+  years_experience?: string | null;
+  industry?: string | null;
   employment_type?: string | null;
   education_background?: string | null;
   previous_employments?: PreviousEmployment[] | null | unknown;
@@ -64,9 +67,12 @@ export function candidateInputFromProfile(
   },
 ): MatchCandidateInput {
   const certs = splitSkills(employee?.certifications);
+  const listedSkills = splitSkills(employee?.skills);
   const employments = asEmployments(employee?.previous_employments);
   const education = (employee?.education_background ?? "").trim();
   const resumeText = (employee?.resume_text ?? "").trim();
+  const yearsLabel = (employee?.years_experience ?? "").trim();
+  const industry = (employee?.industry ?? "").trim();
 
   const employmentTitles = employments
     .map((e) => e.title)
@@ -84,6 +90,9 @@ export function candidateInputFromProfile(
     .join("\n");
 
   const profileParts = [
+    industry ? `Industry: ${industry}` : "",
+    yearsLabel ? `Years of experience: ${yearsLabel}` : "",
+    listedSkills.length ? `Skills: ${listedSkills.join(", ")}` : "",
     certs.length ? `Certifications: ${certs.join(", ")}` : "",
     education ? `Education: ${education}` : "",
     employmentBlurb ? `Experience:\n${employmentBlurb}` : "",
@@ -93,10 +102,11 @@ export function candidateInputFromProfile(
 
   const years =
     extras?.yearsExperience ??
+    yearsFromLabel(yearsLabel) ??
     yearsFromEmployments(employments);
 
   return {
-    skills: uniqStrings([...(extras?.skills ?? []), ...certs]),
+    skills: uniqStrings([...(extras?.skills ?? []), ...listedSkills, ...certs]),
     certifications: certs,
     employmentType: employee?.employment_type ?? null,
     yearsExperience: years,
@@ -108,6 +118,18 @@ export function candidateInputFromProfile(
       ...employmentCompanies,
     ]),
   };
+}
+
+function yearsFromLabel(label: string): number | null {
+  if (!label.trim()) return null;
+  const t = label.trim().toLowerCase();
+  if (t.includes("less than")) return 0;
+  if (t.startsWith("1")) return 2;
+  if (t.startsWith("3")) return 4;
+  if (t.startsWith("6")) return 8;
+  if (t.startsWith("10")) return 12;
+  const n = Number.parseInt(t, 10);
+  return Number.isFinite(n) ? n : null;
 }
 
 function uniqStrings(values: string[]): string[] {
@@ -132,6 +154,10 @@ export function profileFieldsFromSnapshot(
   return {
     certifications:
       snap.certifications == null ? null : String(snap.certifications),
+    skills: snap.skills == null ? null : String(snap.skills),
+    years_experience:
+      snap.years_experience == null ? null : String(snap.years_experience),
+    industry: snap.industry == null ? null : String(snap.industry),
     employment_type:
       snap.employment_type == null ? null : String(snap.employment_type),
     education_background:

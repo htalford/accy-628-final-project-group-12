@@ -1,6 +1,8 @@
 import "server-only";
 
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getAppUser } from "@/lib/auth/get-app-user";
 import { requireEmployerUser } from "@/lib/client-portal/require-employer";
 import type {
   ApplicationStatus,
@@ -66,6 +68,9 @@ export function mapJobRequest(row: Record<string, unknown>): PortalJobRequest {
     location: row.location == null ? null : String(row.location),
     pay_rate_text: row.pay_rate_text == null ? null : String(row.pay_rate_text),
     start_date: row.start_date == null ? null : String(row.start_date),
+    industry: row.industry == null ? null : String(row.industry),
+    years_experience:
+      row.years_experience == null ? null : String(row.years_experience),
     skills: asStringArray(row.skills),
     certifications: asStringArray(row.certifications),
     description: row.description == null ? null : String(row.description),
@@ -249,6 +254,10 @@ function mapApplicationToCandidate(
   const liveProfile = {
     certifications:
       emp?.certifications == null ? null : String(emp.certifications),
+    skills: emp?.skills == null ? null : String(emp.skills),
+    years_experience:
+      emp?.years_experience == null ? null : String(emp.years_experience),
+    industry: emp?.industry == null ? null : String(emp.industry),
     employment_type:
       emp?.employment_type == null ? null : String(emp.employment_type),
     education_background:
@@ -262,6 +271,10 @@ function mapApplicationToCandidate(
   const mergedProfile = {
     certifications:
       liveProfile.certifications || snapProfile?.certifications || null,
+    skills: liveProfile.skills || snapProfile?.skills || null,
+    years_experience:
+      liveProfile.years_experience || snapProfile?.years_experience || null,
+    industry: liveProfile.industry || snapProfile?.industry || null,
     employment_type:
       liveProfile.employment_type || snapProfile?.employment_type || null,
     education_background:
@@ -283,12 +296,18 @@ function mapApplicationToCandidate(
           .map((c) => c.trim())
           .filter(Boolean)
       : [];
+  const listedSkills =
+    mergedProfile.skills != null
+      ? String(mergedProfile.skills)
+          .split(",")
+          .map((c) => c.trim())
+          .filter(Boolean)
+      : [];
   const summaryParts: string[] = [];
   if (row.cover_letter) summaryParts.push(String(row.cover_letter));
   if (row.note) summaryParts.push(String(row.note));
 
-  // Candidate skill tags for skill scoring (cert labels also feed the profile text)
-  const skills = Array.from(new Set([...certs]));
+  const skills = Array.from(new Set([...listedSkills, ...certs]));
   const jobTitle = job?.title != null ? String(job.title) : "Open role";
   const candidateMatchInput = candidateInputFromProfile(mergedProfile, {
     skills,
@@ -363,12 +382,11 @@ function mapApplicationToCandidate(
 }
 
 const APPLICATION_SELECT =
-  "*, jobs(id, title, client_id, employer_name, description, location, employment_type), employees(id, first_name, last_name, email, phone, certifications, employment_type, education_background, previous_employments, resume_url, resume_text)";
+  "*, jobs(id, title, client_id, employer_name, description, location, employment_type), employees(id, first_name, last_name, email, phone, industry, skills, years_experience, certifications, employment_type, education_background, previous_employments, resume_url, resume_text)";
 
-/** Applications submitted via the candidate portal for this employer's jobs. */
-export async function listApplicationsForClient(): Promise<ClientCandidate[]> {
-  const user = await requireEmployerUser();
-  void user;
+async function listApplicationsMapped(
+  detailHref: (id: string) => string,
+): Promise<ClientCandidate[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("applications")
@@ -376,7 +394,7 @@ export async function listApplicationsForClient(): Promise<ClientCandidate[]> {
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("applications list for client", error.message);
+    console.error("applications list", error.message);
     return [];
   }
 
@@ -393,14 +411,33 @@ export async function listApplicationsForClient(): Promise<ClientCandidate[]> {
     const job = (r.jobs ?? r.job) as Record<string, unknown> | null | undefined;
     const jid = job?.id != null ? String(job.id) : "";
     const req = reqMap.get(jid) ?? { skills: [], certifications: [] };
-    return mapApplicationToCandidate(r, req.skills, req.certifications);
+    const mapped = mapApplicationToCandidate(r, req.skills, req.certifications);
+    return {
+      ...mapped,
+      detail_href: detailHref(mapped.id),
+    };
   });
+}
+
+/** Applications submitted via the candidate portal for this employer's jobs. */
+export async function listApplicationsForClient(): Promise<ClientCandidate[]> {
+  await requireEmployerUser();
+  return listApplicationsMapped(
+    (id) => `/client/candidates/applications/${id}`,
+  );
 }
 
 export async function getApplicationForClient(
   id: string,
 ): Promise<ClientCandidate | null> {
   await requireEmployerUser();
+  return getApplicationById(id, (appId) => `/client/candidates/applications/${appId}`);
+}
+
+async function getApplicationById(
+  id: string,
+  detailHref: (id: string) => string,
+): Promise<ClientCandidate | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("applications")
@@ -417,7 +454,37 @@ export async function getApplicationForClient(
   const jid = job?.id != null ? String(job.id) : "";
   const reqMap = await requirementsForPublicJobs(jid ? [jid] : []);
   const req = reqMap.get(jid) ?? { skills: [], certifications: [] };
-  return mapApplicationToCandidate(row, req.skills, req.certifications);
+  const mapped = mapApplicationToCandidate(row, req.skills, req.certifications);
+  return { ...mapped, detail_href: detailHref(mapped.id) };
+}
+
+/**
+ * Matched job applications for recruiters (skill/cert fit scores).
+ * Same board employers used to see under Candidates.
+ */
+export async function listMatchedApplicationsForRecruiter(): Promise<
+  ClientCandidate[]
+> {
+  const user = await getAppUser();
+  if (!user || user.role !== "recruiter") {
+    redirect("/login");
+  }
+  return listApplicationsMapped(
+    (id) => `/recruiter/candidates/applications/${id}`,
+  );
+}
+
+export async function getApplicationForRecruiter(
+  id: string,
+): Promise<ClientCandidate | null> {
+  const user = await getAppUser();
+  if (!user || user.role !== "recruiter") {
+    redirect("/login");
+  }
+  return getApplicationById(
+    id,
+    (appId) => `/recruiter/candidates/applications/${appId}`,
+  );
 }
 
 /**

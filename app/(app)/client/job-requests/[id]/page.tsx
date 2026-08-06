@@ -9,6 +9,7 @@ import {
   jobRequestStatusLabel,
   seedStatusTone,
 } from "@/lib/client-portal/labels";
+import { getIndustryProfileOptions } from "@/lib/candidate/industry-profile";
 
 export default async function JobRequestDetailPage({
   params,
@@ -43,6 +44,20 @@ export default async function JobRequestDetailPage({
         <Card>
           <CardTitle className="mb-3">Request details</CardTitle>
           <dl className="space-y-2 text-sm">
+            <div className="flex justify-between gap-4">
+              <dt className="text-[var(--cf-muted)]">Industry</dt>
+              <dd className="font-medium text-right">
+                {getIndustryProfileOptions(job.industry)?.name ??
+                  job.industry ??
+                  "—"}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-[var(--cf-muted)]">Years of experience</dt>
+              <dd className="font-medium text-right">
+                {job.years_experience ?? "—"}
+              </dd>
+            </div>
             <div className="flex justify-between gap-4">
               <dt className="text-[var(--cf-muted)]">Positions</dt>
               <dd className="font-medium">{job.positions}</dd>
