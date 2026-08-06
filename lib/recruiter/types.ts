@@ -48,7 +48,10 @@ export type JobNote = {
   createdAt: string;
 };
 
-export type CandidateSource = "application" | "employer_submittal";
+export type CandidateSource =
+  | "application"
+  | "employer_submittal"
+  | "job_interest";
 export type JobOrderSource = "public_job" | "employer_request";
 
 export type RecruiterCandidate = {
@@ -85,8 +88,11 @@ export type RecruiterCandidate = {
     type: InterviewType;
     outcome: string;
   }[];
-  /** application = Candidate Portal; employer_submittal = Client Portal submittals */
+  /** application = Candidate Portal; employer_submittal = Client Portal submittals; job_interest = interested (often low match) */
   source: CandidateSource;
+  /** 0–100 automated match vs linked job / job request (when scorable). */
+  matchPercent?: number | null;
+  matchBand?: import("@/lib/matching/score").MatchBand | null;
 };
 
 export type RecruiterJobOrder = {
@@ -193,6 +199,8 @@ export type CandidateFilters = {
   skills?: string;
   location?: string;
   recruiter?: string;
+  /** all | under60 | 60plus — recruiter review of weak automated matches */
+  match?: string;
 };
 
 export type JobOrderFilters = {
