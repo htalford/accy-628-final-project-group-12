@@ -13,10 +13,7 @@ import {
 } from "lucide-react";
 import { signOut } from "@/app/actions/demo-switch-role";
 import { getDashboardPath, ROLE_LABELS } from "@/lib/auth/roles";
-import {
-  SAMPLE_NOTIFICATIONS,
-  type AppNotification,
-} from "@/lib/accounting/notifications";
+import type { AccountingNotification } from "@/lib/accounting/notifications";
 import { DemoRoleMenu } from "@/components/demo/demo-role-menu";
 import { useShell } from "@/components/layout/shell-context";
 import type { AppUser } from "@/lib/types/database";
@@ -31,18 +28,19 @@ type SearchHit = {
   href: string;
 };
 
+type LiveNotification = CandidateNotification | AccountingNotification;
+
 type TopBarNotification = {
   id: string;
   title: string;
   body: string;
   href?: string;
   time?: string;
-  createdAt?: string;
   tone?: "warning" | "info" | "success";
 };
 
 function toTopBarNotifications(
-  live: CandidateNotification[] | undefined,
+  live: LiveNotification[] | undefined,
 ): TopBarNotification[] {
   if (Array.isArray(live)) {
     return live.map((n) => ({
@@ -54,13 +52,15 @@ function toTopBarNotifications(
       tone: n.tone,
     }));
   }
-  return SAMPLE_NOTIFICATIONS.map((n: AppNotification) => ({
-    id: n.id,
-    title: n.title,
-    body: n.body,
-    createdAt: n.createdAt,
-    tone: n.tone,
-  }));
+  return [
+    {
+      id: "all-clear",
+      title: "You're all caught up",
+      body: "No items need attention right now.",
+      time: "Just now",
+      tone: "success",
+    },
+  ];
 }
 
 export function TopBar({
@@ -68,7 +68,7 @@ export function TopBar({
   notifications: liveNotifications,
 }: {
   user: AppUser;
-  notifications?: CandidateNotification[];
+  notifications?: LiveNotification[];
 }) {
   const pathname = usePathname();
   const { toggleMobileOpen } = useShell();
@@ -245,7 +245,7 @@ export function TopBar({
             </p>
             <ul className="max-h-80 overflow-auto">
               {notifications.map((n) => {
-                const meta = n.time ?? n.createdAt ?? "";
+                const meta = n.time ?? "";
                 const content = (
                   <>
                     <p className="text-sm font-medium text-[var(--cf-ink)]">
