@@ -118,7 +118,7 @@ export function AudiencePortal() {
                     : "text-[var(--ot-muted)]"
                 }`}
               >
-                Search openings by title, location, and distance.
+                Search open roles by title or location — tap a title to get started.
               </span>
             </button>
           </div>
