@@ -23,6 +23,8 @@ const ShellContext = createContext<ShellContextValue | null>(null);
 const PINNED_KEY = "cf-sidebar-pinned";
 const LEGACY_COLLAPSED_KEY = "cf-sidebar-collapsed";
 const LEGACY_RECRUITER_SIDEBAR_PIN_KEY = "cf-recruiter-sidebar-pinned";
+/** One-time migration: candidate sidebar stays open by default (no auto-collapse off Home). */
+const CANDIDATE_OPEN_DEFAULT_KEY = "cf-candidate-sidebar-open-default-v1";
 
 export function ShellProvider({ children }: { children: React.ReactNode }) {
   const [pinned, setPinnedState] = useState(false);
@@ -87,12 +89,32 @@ export function useShell() {
   return ctx;
 }
 
-/** Sidebar is forced open on Home, or when the user has pinned it. */
-export function useSidebarLayout(homePath: string) {
+/** Sidebar open/collapsed layout. Candidate stays open on all pages unless toggled. */
+export function useSidebarLayout(
+  homePath: string,
+  options?: { stayOpenEverywhere?: boolean },
+) {
   const pathname = usePathname();
   const shell = useShell();
   const isHome = pathname === homePath;
-  const forcedOpen = isHome || shell.pinned;
+  const stayOpenEverywhere = options?.stayOpenEverywhere === true;
+
+  // Candidate: open on all pages by default (migrate once away from old auto-collapse).
+  useEffect(() => {
+    if (!stayOpenEverywhere) return;
+    try {
+      if (localStorage.getItem(CANDIDATE_OPEN_DEFAULT_KEY) !== "1") {
+        localStorage.setItem(CANDIDATE_OPEN_DEFAULT_KEY, "1");
+        shell.setPinned(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [stayOpenEverywhere, shell.setPinned]);
+
+  const forcedOpen = stayOpenEverywhere
+    ? shell.pinned
+    : isHome || shell.pinned;
   const showCollapsed = !forcedOpen;
 
   return {
@@ -100,7 +122,7 @@ export function useSidebarLayout(homePath: string) {
     isHome,
     forcedOpen,
     showCollapsed,
-    /** Pin/unpin on non-home pages; unpin also allowed on Home if globally pinned. */
-    canTogglePin: !isHome || shell.pinned,
+    /** Pin/unpin available everywhere for stay-open mode; otherwise home is locked open. */
+    canTogglePin: stayOpenEverywhere ? true : !isHome || shell.pinned,
   };
 }

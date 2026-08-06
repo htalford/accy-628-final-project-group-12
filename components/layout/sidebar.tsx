@@ -268,7 +268,9 @@ export function Sidebar({
     pinned: sidebarPinned,
     togglePinned,
     canTogglePin,
-  } = useSidebarLayout(homePath);
+  } = useSidebarLayout(homePath, {
+    stayOpenEverywhere: isCandidate,
+  });
 
   const dashboardHref = isRecruiter
     ? RECRUITER_DASHBOARD
@@ -322,6 +324,20 @@ export function Sidebar({
   // Recruiter uses per-tab pins; hide whole-sidebar pin control for that role.
   const showSidebarPinControl = !isRecruiter && canTogglePin;
   const showHomeLockedPin = !isRecruiter && !canTogglePin;
+  const pinControlLabel = isCandidate
+    ? sidebarPinned
+      ? "Hide sidebar"
+      : "Show sidebar"
+    : sidebarPinned
+      ? "Unpin sidebar"
+      : "Pin sidebar";
+  const pinControlTitle = isCandidate
+    ? sidebarPinned
+      ? "Hide sidebar"
+      : "Show sidebar"
+    : sidebarPinned
+      ? "Unpin sidebar"
+      : "Pin sidebar open on all pages";
 
   const nav = (
     <>
@@ -345,12 +361,8 @@ export function Sidebar({
                 : "text-white/50 hover:bg-white/10 hover:text-white"
             }`}
             onClick={togglePinned}
-            aria-label={sidebarPinned ? "Unpin sidebar" : "Pin sidebar"}
-            title={
-              sidebarPinned
-                ? "Unpin sidebar"
-                : "Pin sidebar open on all pages"
-            }
+            aria-label={pinControlLabel}
+            title={pinControlTitle}
           >
             <Pin
               className={`h-4 w-4 ${sidebarPinned ? "fill-current" : ""}`}
@@ -397,12 +409,8 @@ export function Sidebar({
                     : "text-white/50 hover:bg-white/10 hover:text-white"
                 }`}
                 onClick={togglePinned}
-                aria-label={sidebarPinned ? "Unpin sidebar" : "Pin sidebar"}
-                title={
-                  sidebarPinned
-                    ? "Unpin sidebar"
-                    : "Pin sidebar open on all pages"
-                }
+                aria-label={pinControlLabel}
+                title={pinControlTitle}
               >
                 <Pin
                   className={`h-4 w-4 ${sidebarPinned ? "fill-current" : ""}`}
