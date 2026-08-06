@@ -110,19 +110,16 @@ export function InvoicesClient({
         <StatCard
           label="Total Outstanding"
           value={formatMoney(outstanding)}
-          hint="Not paid"
           href="/client/invoices?status=outstanding"
         />
         <StatCard
           label="Paid"
           value={formatMoney(paid)}
-          hint="Status: paid"
           href="/client/invoices?status=paid"
         />
         <StatCard
           label="Disputed"
           value={String(disputedCount)}
-          hint="Status: disputed"
           href="/client/invoices?status=disputed"
         />
       </div>

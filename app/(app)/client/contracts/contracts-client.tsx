@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Table, THead, Th, Td } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination } from "@/components/ui/form";
-import { PinContractButton } from "@/components/portal-pins/pin-contract-button";
 import type { PlacementWithEmployee } from "@/lib/client-portal/types";
 import {
   formatMoney,
@@ -97,10 +96,7 @@ export function ContractsClient({
         p.id.toLowerCase().includes(q.toLowerCase());
 
       const matchesStatus =
-        status === "All" ||
-        p.status === status ||
-        (status === "active" &&
-          (p.status === "active" || p.status === "at_risk"));
+        status === "All" || p.status === status;
 
       const matchesPosition = position === "All" || title === position;
       const matchesType =
@@ -252,8 +248,7 @@ export function ContractsClient({
             className="sm:max-w-[12rem]"
           >
             <option value="All">All statuses</option>
-            <option value="active">Active (incl. at risk)</option>
-            <option value="at_risk">At Risk</option>
+            <option value="active">Active</option>
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
           </Select>
@@ -349,7 +344,6 @@ export function ContractsClient({
                 <Th>Pay</Th>
                 <Th>Type</Th>
                 <Th>Status</Th>
-                <Th className="w-12 text-center">Pin</Th>
               </tr>
             </THead>
             <tbody>
@@ -385,15 +379,6 @@ export function ContractsClient({
                       <Badge tone={seedStatusTone(p.status)}>
                         {placementStatusLabel(p.status)}
                       </Badge>
-                    </Td>
-                    <Td className="text-center">
-                      <PinContractButton
-                        scope="client"
-                        contractId={p.id}
-                        contractNumber={number}
-                        employeeName={name !== "—" ? name : undefined}
-                        positionTitle={title}
-                      />
                     </Td>
                   </tr>
                 );

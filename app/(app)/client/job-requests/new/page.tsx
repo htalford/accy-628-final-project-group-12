@@ -13,11 +13,63 @@ import { ConfirmActionDialog } from "@/components/client-portal/confirm-action-d
 import { useToast } from "@/components/client-portal/toast";
 import { createJobRequestAction } from "@/app/actions/client-portal";
 
+const SKILL_OPTIONS = [
+  "Accounts Payable",
+  "Accounts Receivable",
+  "Invoice processing",
+  "Excel",
+  "Vendor management",
+  "3-way match",
+  "QuickBooks",
+  "Bookkeeping",
+  "Bank reconciliation",
+  "Tax preparation",
+  "Financial modeling",
+  "External audit",
+  "ASC 606",
+  "Oracle NetSuite",
+  "Forklift",
+  "Pick/pack",
+  "Safety",
+  "RF scanner",
+  "Inventory",
+  "TMS",
+  "Routing",
+  "Freight",
+  "Carrier scheduling",
+  "Communication",
+] as const;
+
+const CERTIFICATION_OPTIONS = [
+  "QuickBooks Certified",
+  "Excel Specialist",
+  "CPA",
+  "CPA candidate",
+  "Bookkeeping Certificate",
+  "OSHA Forklift",
+  "OSHA 10",
+  "OSHA 30",
+  "Hazmat Awareness",
+  "TMS Certification",
+] as const;
+
+function toggleInList(list: string[], value: string): string[] {
+  return list.includes(value)
+    ? list.filter((v) => v !== value)
+    : [...list, value];
+}
+
+function allSelected(list: string[], options: readonly string[]): boolean {
+  return options.length > 0 && options.every((o) => list.includes(o));
+}
+
 export default function NewJobRequestPage() {
   const router = useRouter();
   const toast = useToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [selectedCerts, setSelectedCerts] = useState<string[]>([]);
   const [form, setForm] = useState({
     title: "",
     department: "Logistics",
@@ -26,8 +78,6 @@ export default function NewJobRequestPage() {
     location: "Des Moines, IA",
     payRate: "",
     startDate: "",
-    skills: "",
-    certifications: "",
     description: "",
     notes: "",
   });
@@ -47,8 +97,8 @@ export default function NewJobRequestPage() {
       location: form.location,
       payRate: form.payRate,
       startDate: form.startDate,
-      skills: form.skills,
-      certifications: form.certifications,
+      skills: selectedSkills.join(", "),
+      certifications: selectedCerts.join(", "),
       description: form.description,
       notes: form.notes,
     });
@@ -66,6 +116,9 @@ export default function NewJobRequestPage() {
       toast.push(result.message, "error");
     }
   }
+
+  const skillsAllOn = allSelected(selectedSkills, SKILL_OPTIONS);
+  const certsAllOn = allSelected(selectedCerts, CERTIFICATION_OPTIONS);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -168,34 +221,99 @@ export default function NewJobRequestPage() {
               }
             />
           </div>
+
           <div className="sm:col-span-2">
-            <Label htmlFor="skills">Required Skills</Label>
-            <FieldInput
-              id="skills"
-              value={form.skills}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, skills: e.target.value }))
-              }
-              placeholder="Comma-separated skills (e.g. Excel, Invoice processing)"
-            />
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <Label id="skills-label">Required Skills</Label>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() =>
+                  setSelectedSkills(
+                    skillsAllOn ? [] : [...SKILL_OPTIONS],
+                  )
+                }
+              >
+                {skillsAllOn ? "Clear all" : "Select all"}
+              </Button>
+            </div>
+            <div
+              role="group"
+              aria-labelledby="skills-label"
+              className="grid gap-2 rounded-lg border border-[var(--cf-border)] bg-[var(--cf-surface)]/40 p-3 sm:grid-cols-2"
+            >
+              {SKILL_OPTIONS.map((skill) => {
+                const checked = selectedSkills.includes(skill);
+                return (
+                  <label
+                    key={skill}
+                    className="flex cursor-pointer items-center gap-2 text-sm text-[var(--cf-ink)]"
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-[var(--cf-border)] text-[var(--cf-navy)]"
+                      checked={checked}
+                      onChange={() =>
+                        setSelectedSkills((prev) => toggleInList(prev, skill))
+                      }
+                    />
+                    <span>{skill}</span>
+                  </label>
+                );
+              })}
+            </div>
             <p className="mt-1 text-xs text-[var(--cf-muted)]">
               Used for automated candidate skill matching.
             </p>
           </div>
+
           <div className="sm:col-span-2">
-            <Label htmlFor="certifications">Required Certifications</Label>
-            <FieldInput
-              id="certifications"
-              value={form.certifications}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, certifications: e.target.value }))
-              }
-              placeholder="Comma-separated certs (e.g. CPA, OSHA Forklift, QuickBooks Certified)"
-            />
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <Label id="certs-label">Required Certifications</Label>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() =>
+                  setSelectedCerts(
+                    certsAllOn ? [] : [...CERTIFICATION_OPTIONS],
+                  )
+                }
+              >
+                {certsAllOn ? "Clear all" : "Select all"}
+              </Button>
+            </div>
+            <div
+              role="group"
+              aria-labelledby="certs-label"
+              className="grid gap-2 rounded-lg border border-[var(--cf-border)] bg-[var(--cf-surface)]/40 p-3 sm:grid-cols-2"
+            >
+              {CERTIFICATION_OPTIONS.map((cert) => {
+                const checked = selectedCerts.includes(cert);
+                return (
+                  <label
+                    key={cert}
+                    className="flex cursor-pointer items-center gap-2 text-sm text-[var(--cf-ink)]"
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-[var(--cf-border)] text-[var(--cf-navy)]"
+                      checked={checked}
+                      onChange={() =>
+                        setSelectedCerts((prev) => toggleInList(prev, cert))
+                      }
+                    />
+                    <span>{cert}</span>
+                  </label>
+                );
+              })}
+            </div>
             <p className="mt-1 text-xs text-[var(--cf-muted)]">
               Matched against certifications on the candidate profile.
             </p>
           </div>
+
           <div className="sm:col-span-2">
             <Label htmlFor="description">Job Description</Label>
             <FieldTextarea
