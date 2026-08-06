@@ -1,4 +1,5 @@
-import type { Employee, PreviousEmployment } from "@/lib/types/database";
+import type { Employee } from "@/lib/types/database";
+import { parseCommaList } from "@/lib/candidate/industry-profile";
 
 export type ProfileChecklistItem = {
   id: string;
@@ -11,12 +12,6 @@ export type ProfileCompletion = {
   items: ProfileChecklistItem[];
   missing: ProfileChecklistItem[];
 };
-
-function hasEmploymentEntry(jobs: PreviousEmployment[] | null | undefined) {
-  return Boolean(
-    jobs?.some((job) => job.company?.trim() && job.title?.trim()),
-  );
-}
 
 export function getProfileCompletion(
   employee: Employee | null | undefined,
@@ -35,32 +30,34 @@ export function getProfileCompletion(
       complete: Boolean(employee?.phone?.trim()),
     },
     {
+      id: "industry",
+      label: "Industry",
+      complete: Boolean(employee?.industry?.trim()),
+    },
+    {
+      id: "education",
+      label: "Education",
+      complete: Boolean(employee?.education_background?.trim()),
+    },
+    {
+      id: "experience",
+      label: "Years of experience",
+      complete: Boolean(employee?.years_experience?.trim()),
+    },
+    {
+      id: "skills",
+      label: "Skills",
+      complete: parseCommaList(employee?.skills).length > 0,
+    },
+    {
       id: "certifications",
       label: "Certifications",
       complete: Boolean(employee?.certifications?.trim()),
     },
     {
-      id: "education",
-      label: "Education background",
-      complete: Boolean(employee?.education_background?.trim()),
-    },
-    {
-      id: "employments",
-      label: "Previous employment",
-      complete: hasEmploymentEntry(employee?.previous_employments),
-    },
-    {
       id: "resume",
       label: "Resume",
       complete: Boolean(employee?.resume_url?.trim()),
-    },
-    {
-      id: "emergency",
-      label: "Emergency Contact",
-      complete: Boolean(
-        employee?.emergency_contact_name?.trim() &&
-          employee?.emergency_contact_phone?.trim(),
-      ),
     },
   ];
 

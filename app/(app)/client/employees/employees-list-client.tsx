@@ -27,18 +27,13 @@ export type EmployeeListRow = {
 };
 
 export function EmployeesListClient({
-  companyName,
   rows,
 }: {
-  companyName: string;
   rows: EmployeeListRow[];
 }) {
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Employees"
-        description={`People currently on assignment at ${companyName}. Click a name for full details.`}
-      />
+      <PageHeader title="Employees" />
 
       {rows.length === 0 ? (
         <EmptyState

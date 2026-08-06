@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Heart } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
@@ -12,28 +11,26 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination } from "@/components/ui/form";
 import { ConfirmActionDialog } from "@/components/client-portal/confirm-action-dialog";
-import { useToast } from "@/components/client-portal/toast";
-import {
-  toggleEmployerCandidateLikeAction,
-  updateApplicationStatusAction,
-} from "@/app/actions/client-portal";
+import { ToastProvider, useToast } from "@/components/client-portal/toast";
+import { updateApplicationStatus } from "@/app/actions/recruiter";
 import type { ClientCandidate, SubmittalStage } from "@/lib/types/database";
 import {
   seedStatusTone,
   submittalStageLabel,
 } from "@/lib/client-portal/labels";
 import { paginate } from "@/lib/client-portal/pagination";
-import { MatchScoreBadge, MatchedSkills } from "@/components/matching/match-score-badge";
+import {
+  MatchScoreBadge,
+  MatchedSkills,
+} from "@/components/matching/match-score-badge";
 import { MATCH_RECRUITER_THRESHOLD } from "@/lib/matching/threshold";
 
 const MAX_COMPARE = 3;
 
-export function CandidatesClient({
+function MatchedCandidatesBoard({
   initial,
-  initialLikedIds = [],
 }: {
   initial: ClientCandidate[];
-  initialLikedIds?: string[];
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -41,23 +38,15 @@ export function CandidatesClient({
   const [q, setQ] = useState("");
   const [position, setPosition] = useState("All");
   const [status, setStatus] = useState("All");
-  const [likedOnly, setLikedOnly] = useState(false);
-  /** all | high (>=60) | recruiter (<60) */
+  /** all | high (>=threshold) | recruiter (<threshold) */
   const [matchBucket, setMatchBucket] = useState("all");
   const [page, setPage] = useState(1);
-  const [likedIds, setLikedIds] = useState<Set<string>>(
-    () => new Set(initialLikedIds),
-  );
   const [selected, setSelected] = useState<string[]>([]);
   const [dialog, setDialog] = useState<{
     id: string;
     name: string;
     next: Extract<SubmittalStage, "accepted" | "rejected">;
   } | null>(null);
-
-  useEffect(() => {
-    setLikedIds(new Set(initialLikedIds));
-  }, [initialLikedIds]);
 
   const candidatesOnly = useMemo(
     () => initial.filter((c) => c.source === "application"),
@@ -81,37 +70,37 @@ export function CandidatesClient({
       const pos = c.position_title || c.job_title || "";
       const matchesQ =
         !q || c.candidate_name.toLowerCase().includes(q.toLowerCase());
-      const matchesLiked = !likedOnly || likedIds.has(c.id);
       const score = c.match_score ?? 0;
       const routed =
         c.routed_to_recruiter ?? score < MATCH_RECRUITER_THRESHOLD;
       const matchesScore =
         matchBucket === "all" ||
-        (matchBucket === "high" && !routed && score >= MATCH_RECRUITER_THRESHOLD) ||
+        (matchBucket === "high" &&
+          !routed &&
+          score >= MATCH_RECRUITER_THRESHOLD) ||
         (matchBucket === "recruiter" && routed);
       return (
         matchesQ &&
-        matchesLiked &&
         matchesScore &&
         (position === "All" || pos === position) &&
         (status === "All" || c.stage === status)
       );
     });
     return [...list].sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0));
-  }, [candidatesOnly, q, likedOnly, likedIds, matchBucket, position, status]);
+  }, [candidatesOnly, q, matchBucket, position, status]);
 
   const paged = paginate(filtered, page);
   const hasFilters =
     q.trim() !== "" ||
     position !== "All" ||
     status !== "All" ||
-    likedOnly ||
     matchBucket !== "all";
   const routedCount = candidatesOnly.filter(
     (c) =>
       c.routed_to_recruiter ??
       (c.match_score != null && c.match_score < MATCH_RECRUITER_THRESHOLD),
   ).length;
+
   function toggleSelect(id: string) {
     setSelected((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
@@ -129,62 +118,33 @@ export function CandidatesClient({
       return;
     }
     router.push(
-      `/client/candidates/compare?ids=${encodeURIComponent(selected.join(","))}`,
+      `/recruiter/candidates/compare?ids=${encodeURIComponent(selected.join(","))}`,
     );
-  }
-
-  function toggleLike(id: string, name: string) {
-    const nextLiked = !likedIds.has(id);
-    setLikedIds((prev) => {
-      const copy = new Set(prev);
-      if (nextLiked) copy.add(id);
-      else copy.delete(id);
-      return copy;
-    });
-    startTransition(async () => {
-      const result = await toggleEmployerCandidateLikeAction(id, nextLiked);
-      if (!result.ok) {
-        setLikedIds((prev) => {
-          const copy = new Set(prev);
-          if (nextLiked) copy.delete(id);
-          else copy.add(id);
-          return copy;
-        });
-        toast.push(result.message, "error");
-        return;
-      }
-      toast.push(
-        nextLiked ? `Liked ${name}.` : `Removed like for ${name}.`,
-        "success",
-      );
-      router.refresh();
-    });
   }
 
   async function confirmDecision(reason: string) {
     if (!dialog) return;
-    const result = await updateApplicationStatusAction(
-      dialog.id,
-      dialog.next,
-      reason,
-    );
+    const nextStatus = dialog.next === "accepted" ? "offered" : "rejected";
+    const result = await updateApplicationStatus(dialog.id, nextStatus);
     if (result.ok) {
       toast.push(
-        result.message,
+        dialog.next === "accepted"
+          ? result.message
+          : `${dialog.name} rejected.${reason.trim() ? ` (${reason.trim()})` : ""}`,
         dialog.next === "accepted" ? "success" : "info",
       );
       setDialog(null);
       startTransition(() => router.refresh());
     } else {
-      toast.push(result.message, "error");
+      toast.push(result.error, "error");
     }
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Candidates"
-        description={`People who applied to your open jobs. Fit scores use required skills; matches below ${MATCH_RECRUITER_THRESHOLD}% are auto-sent to a recruiter for review.`}
+        title="Matched candidates"
+        description={`People who applied to open jobs. Fit scores use required skills and certifications. Accepting a candidate at ${MATCH_RECRUITER_THRESHOLD}%+ creates a contract for the employer, candidate, and accounting so the role can be filled.`}
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -238,37 +198,10 @@ export function CandidatesClient({
             Strong / good ({MATCH_RECRUITER_THRESHOLD}%+)
           </option>
           <option value="recruiter">
-            Sent to recruiter
+            Needs recruiter review
             {routedCount > 0 ? ` (${routedCount})` : ""}
           </option>
         </Select>
-        <Button
-          type="button"
-          variant={likedOnly ? "primary" : "secondary"}
-          size="sm"
-          onClick={() => {
-            setLikedOnly((v) => !v);
-            setPage(1);
-          }}
-          aria-pressed={likedOnly}
-          title={
-            likedOnly
-              ? "Showing liked candidates only — click to show all"
-              : "Show only candidates you liked"
-          }
-        >
-          <Heart
-            className={`mr-1.5 h-3.5 w-3.5 ${likedOnly ? "fill-current" : ""}`}
-            aria-hidden
-          />
-          Liked
-          {likedIds.size > 0 ? (
-            <span className="ml-1.5 text-xs opacity-80">({likedIds.size})</span>
-          ) : null}
-        </Button>
-        <Button href="/client/candidates/interested" variant="secondary">
-          Interested candidates
-        </Button>
         {selected.length > 0 ? (
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
             <span className="text-sm text-[var(--cf-muted)]">
@@ -298,17 +231,13 @@ export function CandidatesClient({
         <EmptyState
           title={
             hasFilters
-              ? likedOnly
-                ? "No liked candidates match"
-                : "No candidates match your filters"
-              : "No candidates yet"
+              ? "No candidates match your filters"
+              : "No matched candidates yet"
           }
           description={
             hasFilters
-              ? likedOnly
-                ? "Like a candidate with the heart on their card, or clear the Liked filter."
-                : "Clear filters to see all candidates."
-              : "When candidates apply to your posted jobs, they appear here."
+              ? "Clear filters to see all applications."
+              : "When candidates apply to posted jobs, their match scores appear here."
           }
           action={
             hasFilters ? (
@@ -319,7 +248,6 @@ export function CandidatesClient({
                   setQ("");
                   setPosition("All");
                   setStatus("All");
-                  setLikedOnly(false);
                   setMatchBucket("all");
                   setPage(1);
                 }}
@@ -327,8 +255,8 @@ export function CandidatesClient({
                 Clear filters
               </Button>
             ) : (
-              <Button href="/client/job-requests" variant="secondary">
-                View job requests
+              <Button href="/recruiter/job-orders" variant="secondary">
+                View job orders
               </Button>
             )
           }
@@ -338,7 +266,6 @@ export function CandidatesClient({
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {paged.items.map((c) => {
               const isSelected = selected.includes(c.id);
-              const isLiked = likedIds.has(c.id);
               const routed =
                 c.routed_to_recruiter ??
                 (c.match_score != null &&
@@ -370,31 +297,7 @@ export function CandidatesClient({
                         </span>
                       </span>
                     </label>
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <button
-                        type="button"
-                        disabled={pending}
-                        onClick={() =>
-                          toggleLike(c.id, c.candidate_name)
-                        }
-                        aria-pressed={isLiked}
-                        aria-label={
-                          isLiked
-                            ? `Unlike ${c.candidate_name}`
-                            : `Like ${c.candidate_name}`
-                        }
-                        title={isLiked ? "Liked — click to remove" : "Like candidate"}
-                        className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition disabled:opacity-50 ${
-                          isLiked
-                            ? "border-rose-200 bg-rose-50 text-rose-600"
-                            : "border-[var(--cf-border)] text-[var(--cf-muted)] hover:border-rose-200 hover:bg-rose-50/50 hover:text-rose-600"
-                        }`}
-                      >
-                        <Heart
-                          className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`}
-                          aria-hidden
-                        />
-                      </button>
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
                       {c.match_score != null ? (
                         <MatchScoreBadge
                           score={c.match_score}
@@ -403,7 +306,7 @@ export function CandidatesClient({
                         />
                       ) : null}
                       {routed ? (
-                        <Badge tone="warning">Sent to recruiter</Badge>
+                        <Badge tone="warning">Needs review</Badge>
                       ) : null}
                       <Badge tone={seedStatusTone(c.stage)}>
                         {submittalStageLabel(c.stage)}
@@ -422,9 +325,7 @@ export function CandidatesClient({
                     skills={c.match_skills}
                     className="mb-1.5"
                     emptyLabel={
-                      c.match_score != null
-                        ? "No matching skill tags yet"
-                        : ""
+                      c.match_score != null ? "No matching skill tags yet" : ""
                     }
                   />
                   <MatchedSkills
@@ -524,5 +425,17 @@ export function CandidatesClient({
         onConfirm={(reason) => void confirmDecision(reason)}
       />
     </div>
+  );
+}
+
+export function MatchedCandidatesClient({
+  initial,
+}: {
+  initial: ClientCandidate[];
+}) {
+  return (
+    <ToastProvider>
+      <MatchedCandidatesBoard initial={initial} />
+    </ToastProvider>
   );
 }

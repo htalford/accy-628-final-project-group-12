@@ -72,7 +72,7 @@ export default async function CandidateTimesheetsPage() {
         <DataTable
           headers={[
             "Week ending",
-            "Regular",
+            "Hours",
             "Overtime",
             "Total",
             "Status",

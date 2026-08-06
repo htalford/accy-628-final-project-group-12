@@ -62,16 +62,6 @@ export function StaffingHealthStrip({
 }) {
   return (
     <section aria-label="Staffing health">
-      <div className="mb-2 flex items-end justify-between gap-2">
-        <div>
-          <h2 className="text-base font-semibold text-[var(--cf-ink)]">
-            Snapshot
-          </h2>
-          <p className="text-sm text-[var(--cf-muted)]">
-            Counts that typically need a decision soon.
-          </p>
-        </div>
-      </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {items.map((item) => {
           const styles = toneStyles[item.tone];
@@ -96,9 +86,11 @@ export function StaffingHealthStrip({
               >
                 {item.value}
               </p>
-              <p className="mt-1 text-xs leading-snug text-[var(--cf-muted)] group-hover:text-[var(--cf-ink)]">
-                {item.detail}
-              </p>
+              {item.detail ? (
+                <p className="mt-1 text-xs leading-snug text-[var(--cf-muted)] group-hover:text-[var(--cf-ink)]">
+                  {item.detail}
+                </p>
+              ) : null}
             </Link>
           );
         })}

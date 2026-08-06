@@ -57,10 +57,7 @@ export function JobRequestsClient({
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <PageHeader
-          title="Job Requests"
-          description="Staffing requests for your company (stored on job_requests — separate from the public job board)."
-        />
+        <PageHeader title="Job Requests" />
         <Button href="/client/job-requests/new">New Job Request</Button>
       </div>
 

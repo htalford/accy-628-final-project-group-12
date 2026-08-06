@@ -4,6 +4,15 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireCandidateContext } from "@/lib/candidate/data";
 import { extractResumeText } from "@/lib/matching/extract-resume-text";
+import {
+  candidateInputFromProfile,
+} from "@/lib/matching/profile-from-employee";
+import { jobInputFromPublicJob, requirementsForPublicJobs } from "@/lib/matching";
+import { scoreMatch } from "@/lib/matching/score";
+import {
+  routeToRecruiterNote,
+  shouldRouteToRecruiter,
+} from "@/lib/matching/threshold";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -72,38 +81,108 @@ export async function applyToJob(formData: FormData): Promise<ActionResult> {
   }
 
   let profileSnapshot: Record<string, unknown> | null = null;
-  if (includeProfile) {
+  let employeeRow: Record<string, unknown> | null = null;
+  {
     const { data: employee } = await supabase
       .from("employees")
       .select(
-        "first_name, last_name, email, phone, certifications, resume_url, resume_text, emergency_contact_name, emergency_contact_phone, education_background, previous_employments, employment_type, status",
+        "first_name, last_name, email, phone, industry, skills, years_experience, certifications, resume_url, resume_text, emergency_contact_name, emergency_contact_phone, education_background, previous_employments, employment_type, status",
       )
       .eq("id", employeeId)
       .maybeSingle();
-
-    profileSnapshot = {
-      displayName: user.name,
-      accountEmail: user.email,
-      ...(employee ?? {}),
-      ...(extractedResumeText ? { resume_text: extractedResumeText } : {}),
-    };
+    employeeRow = (employee as Record<string, unknown> | null) ?? null;
+    if (includeProfile) {
+      profileSnapshot = {
+        displayName: user.name,
+        accountEmail: user.email,
+        ...(employee ?? {}),
+        ...(extractedResumeText ? { resume_text: extractedResumeText } : {}),
+      };
+    }
   }
+
+  // Score against job-request required skills so low-match apps can auto-route.
+  let matchScore: number | null = null;
+  {
+    const { data: job } = await supabase
+      .from("jobs")
+      .select(
+        "id, title, description, location, employment_type, pay_rate_min, pay_rate_max",
+      )
+      .eq("id", jobId)
+      .maybeSingle();
+    if (job) {
+      const reqMap = await requirementsForPublicJobs([jobId]);
+      const req = reqMap.get(jobId) ?? { skills: [], certifications: [] };
+      const profile = candidateInputFromProfile(
+        {
+          certifications:
+            employeeRow?.certifications == null
+              ? null
+              : String(employeeRow.certifications),
+          skills:
+            employeeRow?.skills == null ? null : String(employeeRow.skills),
+          years_experience:
+            employeeRow?.years_experience == null
+              ? null
+              : String(employeeRow.years_experience),
+          industry:
+            employeeRow?.industry == null
+              ? null
+              : String(employeeRow.industry),
+          employment_type:
+            employeeRow?.employment_type == null
+              ? null
+              : String(employeeRow.employment_type),
+          education_background:
+            employeeRow?.education_background == null
+              ? null
+              : String(employeeRow.education_background),
+          previous_employments: employeeRow?.previous_employments ?? null,
+          resume_text:
+            extractedResumeText ||
+            (employeeRow?.resume_text == null
+              ? null
+              : String(employeeRow.resume_text)),
+        },
+        {
+          profileText: coverLetter || null,
+          titles: [String(job.title ?? "")],
+        },
+      );
+      const match = scoreMatch(
+        jobInputFromPublicJob(job, req.skills, req.certifications),
+        profile,
+      );
+      matchScore = match.score;
+    }
+  }
+
+  const routeNote =
+    matchScore != null && shouldRouteToRecruiter(matchScore)
+      ? routeToRecruiterNote(matchScore)
+      : null;
+  const baseNote = coverLetter
+    ? null
+    : includeProfile
+      ? "Sent profile information"
+      : resumeUrl
+        ? "Attached resume"
+        : null;
+  const applicationNote = routeNote
+    ? [baseNote, routeNote].filter(Boolean).join("\n")
+    : baseNote;
 
   const { error } = await supabase.from("applications").insert({
     job_id: jobId,
     employee_id: employeeId,
     status: "submitted",
-    note: coverLetter
-      ? null
-      : includeProfile
-        ? "Sent profile information"
-        : resumeUrl
-          ? "Attached resume"
-          : null,
+    note: applicationNote,
     cover_letter: coverLetter || null,
     resume_url: resumeUrl || null,
     include_profile: includeProfile,
     profile_snapshot: profileSnapshot,
+    interview_notes: routeNote,
   });
 
   if (error) {
@@ -124,6 +203,18 @@ export async function applyToJob(formData: FormData): Promise<ActionResult> {
     await supabase.rpc("forward_application_to_client", {
       p_application_id: appRow.id,
     });
+
+    // Message inserts as candidate may fail RLS; note + UI flag still route the app.
+    if (routeNote) {
+      await notifyRecruiterLowMatch({
+        supabase,
+        jobId,
+        employeeId,
+        applicationId: String(appRow.id),
+        matchScore: matchScore!,
+        note: routeNote,
+      });
+    }
   }
 
   revalidatePath("/candidate/jobs");
@@ -132,7 +223,84 @@ export async function applyToJob(formData: FormData): Promise<ActionResult> {
   revalidatePath("/client/candidates");
   revalidatePath("/client/dashboard");
   revalidatePath("/client/job-requests");
+  revalidatePath("/client/messages");
+  revalidatePath("/recruiter/candidates");
+  revalidatePath("/recruiter/messages");
+  revalidatePath("/recruiter/job-orders");
   return { ok: true };
+}
+
+async function notifyRecruiterLowMatch(args: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  jobId: string;
+  employeeId: string;
+  applicationId: string;
+  matchScore: number;
+  note: string;
+}) {
+  const { supabase, jobId, employeeId, matchScore, note } = args;
+  try {
+    const { data: job } = await supabase
+      .from("jobs")
+      .select("id, title, client_id, employer_name")
+      .eq("id", jobId)
+      .maybeSingle();
+    const { data: emp } = await supabase
+      .from("employees")
+      .select("first_name, last_name")
+      .eq("id", employeeId)
+      .maybeSingle();
+
+    const name = emp
+      ? `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim() || "Candidate"
+      : "Candidate";
+    const title = job?.title ? String(job.title) : "Open role";
+    const clientId =
+      job?.client_id != null ? String(job.client_id) : null;
+
+    // Prefer employer inbox conversation with the recruiter (per-person thread).
+    if (clientId) {
+      const recruiterName = "Morgan Recruiter";
+      const { data: existing } = await supabase
+        .from("client_message_threads")
+        .select("id")
+        .eq("client_id", clientId)
+        .eq("recruiter_name", recruiterName)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let threadId = existing?.id as string | undefined;
+      if (!threadId) {
+        const { data: created } = await supabase
+          .from("client_message_threads")
+          .insert({
+            client_id: clientId,
+            subject: `Messages with ${recruiterName}`,
+            recruiter_name: recruiterName,
+          })
+          .select("id")
+          .maybeSingle();
+        threadId = created?.id as string | undefined;
+      }
+      if (threadId) {
+        await supabase.from("client_messages").insert({
+          thread_id: threadId,
+          sender_role: "recruiter",
+          body: `${note}\n\n${name} applied to ${title} with a ${Math.round(matchScore)}% skill match. Please review and support screening.`,
+        });
+        await supabase
+          .from("client_message_threads")
+          .update({
+            updated_at: new Date().toISOString(),
+            deleted_at: null,
+          })
+          .eq("id", threadId);
+      }
+    }
+  } catch (err) {
+    console.error("notifyRecruiterLowMatch", err);
+  }
 }
 
 export async function toggleJobInterest(
@@ -370,61 +538,19 @@ export async function updateCandidateProfile(
   const lastName = String(formData.get("lastName") ?? "").trim();
   const displayName = String(formData.get("displayName") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
+  const industry = String(formData.get("industry") ?? "").trim();
   const certifications = String(formData.get("certifications") ?? "").trim();
+  const skills = String(formData.get("skills") ?? "").trim();
+  const yearsExperience = String(formData.get("yearsExperience") ?? "").trim();
   const educationBackground = String(
     formData.get("educationBackground") ?? "",
   ).trim();
-  const emergencyContactName = String(
-    formData.get("emergencyContactName") ?? "",
-  ).trim();
-  const emergencyContactPhone = String(
-    formData.get("emergencyContactPhone") ?? "",
-  ).trim();
+  const otherTags = String(formData.get("otherTags") ?? "").trim();
   const keepExistingResume = formData.get("keepExistingResume") === "on";
   const resumeFile = formData.get("resumeFile");
-  const previousEmploymentsRaw = String(
-    formData.get("previousEmployments") ?? "[]",
-  );
 
   if (!firstName || !lastName || !displayName) {
     return { ok: false, error: "Name fields are required." };
-  }
-
-  let previousEmployments: Array<{
-    company: string;
-    title: string;
-    startDate: string;
-    endDate: string;
-    description: string;
-  }> = [];
-  try {
-    const parsed = JSON.parse(previousEmploymentsRaw) as unknown;
-    if (!Array.isArray(parsed)) {
-      return { ok: false, error: "Previous employments format is invalid." };
-    }
-    previousEmployments = parsed
-      .slice(0, 3)
-      .map((row) => {
-        const r = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
-        return {
-          company: String(r.company ?? "").trim(),
-          title: String(r.title ?? "").trim(),
-          startDate: String(r.startDate ?? "").trim(),
-          endDate: String(r.endDate ?? "").trim(),
-          description: String(r.description ?? "").trim(),
-        };
-      });
-    while (previousEmployments.length < 3) {
-      previousEmployments.push({
-        company: "",
-        title: "",
-        startDate: "",
-        endDate: "",
-        description: "",
-      });
-    }
-  } catch {
-    return { ok: false, error: "Previous employments format is invalid." };
   }
 
   const supabase = await createClient();
@@ -465,15 +591,21 @@ export async function updateCandidateProfile(
     resumeText = null;
   }
 
+  // Fold industry “other” tags into skills so matching still sees them.
+  const skillsJoined = [skills, otherTags]
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(", ");
+
   const employeeUpdate: Record<string, unknown> = {
     first_name: firstName,
     last_name: lastName,
     phone: phone || null,
+    industry: industry || null,
+    skills: skillsJoined || null,
+    years_experience: yearsExperience || null,
     certifications: certifications || null,
     education_background: educationBackground || null,
-    previous_employments: previousEmployments,
-    emergency_contact_name: emergencyContactName || null,
-    emergency_contact_phone: emergencyContactPhone || null,
     updated_at: new Date().toISOString(),
   };
   if (resumeUrl !== undefined) {

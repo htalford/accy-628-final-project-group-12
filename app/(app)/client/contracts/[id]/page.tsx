@@ -39,10 +39,7 @@ export default async function ContractDetailPage({
         ]}
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <PageHeader
-          title={`Contract ${number}`}
-          description={`${title} · ${name} · linked to Accounting portal contract #${number}`}
-        />
+        <PageHeader title={`Contract ${number}`} />
         <div className="flex items-center gap-2">
           <Badge tone={seedStatusTone(p.status)}>
             {placementStatusLabel(p.status)}

@@ -172,12 +172,12 @@ export default async function CandidateContractDetailPage({
               },
               {
                 key: "reg",
-                header: "Regular",
+                header: "Hours",
                 render: (row) => String(row.hoursRegular),
               },
               {
                 key: "ot",
-                header: "OT",
+                header: "Overtime",
                 render: (row) => String(row.hoursOvertime),
               },
               {

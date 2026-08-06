@@ -39,6 +39,12 @@ export function filterCandidates(
       if (filters.experience === "3-5" && !(years >= 3 && years <= 5)) return false;
       if (filters.experience === "6+" && !(years >= 6)) return false;
     }
+    if (filters.match && filters.match !== "all") {
+      const pct = c.matchPercent;
+      if (pct == null) return false;
+      if (filters.match === "under60" && !(pct < 60)) return false;
+      if (filters.match === "60plus" && !(pct >= 60)) return false;
+    }
     return true;
   });
 }

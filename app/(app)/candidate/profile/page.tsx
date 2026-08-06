@@ -13,7 +13,7 @@ export default async function CandidateProfilePage() {
     <div>
       <PageHeader
         title="Profile"
-        description="View and update the contact details recruiters use for placements."
+        description="Choose your industry, check off education, experience, skills, and certifications, and upload your resume."
       />
       {!user || !employee ? (
         <EmptyState

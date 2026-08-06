@@ -13,15 +13,31 @@ import {
   sendAccountingEmployerMessage,
   sendAccountingRecruiterMessage,
 } from "@/app/actions/accounting-messages";
-import type { AccountingMessageThread } from "@/lib/accounting/messages";
+import type {
+  AccountingMessageThread,
+  AccountingParticipantType,
+} from "@/lib/accounting/messages";
 
 type Filter = "all" | "candidate" | "employer" | "recruiter";
 type Folder = "inbox" | "deleted";
 
 type Thread = AccountingMessageThread & { deletedAt?: string };
 
+type ThreadRef = {
+  participantType: AccountingParticipantType;
+  threadId: string;
+};
+
 function threadKey(t: Pick<Thread, "participantType" | "id">) {
   return `${t.participantType}:${t.id}`;
+}
+
+function isParticipantType(
+  value: string | undefined,
+): value is AccountingParticipantType {
+  return (
+    value === "candidate" || value === "employer" || value === "recruiter"
+  );
 }
 
 function daysLeft(deletedAt: string) {
@@ -142,27 +158,12 @@ export function AccountingMessagesCenter({
     setSelectedKeys(new Set(visible));
   }
 
-  function refsFromKeys(keys: Iterable<string>) {
+  function refsFromKeys(keys: Iterable<string>): ThreadRef[] {
     return Array.from(keys).flatMap((key) => {
       const [participantType, ...rest] = key.split(":");
       const threadId = rest.join(":");
-      if (
-        participantType !== "candidate" &&
-        participantType !== "employer" &&
-        participantType !== "recruiter"
-      ) {
-        return [];
-      }
-      if (!threadId) return [];
-      return [
-        {
-          participantType: participantType as
-            | "candidate"
-            | "employer"
-            | "recruiter",
-          threadId,
-        },
-      ];
+      if (!isParticipantType(participantType) || !threadId) return [];
+      return [{ participantType, threadId }];
     });
   }
 

@@ -35,31 +35,15 @@ function marginPercent(
 
 export default async function ClientDashboardPage() {
   const data = await loadClientPortalData();
-  const company = data.client?.name ?? "Your company";
   const openPlacements = data.placements.filter(
     (p) => p.status === "active" || p.status === "at_risk",
   );
   const atRiskPlacements = data.placements.filter((p) => p.status === "at_risk");
 
   const openRoles = data.metrics.openPositions;
-  const candidatesWaiting = data.metrics.pendingCandidateReviews;
   const timesheetsDue = data.metrics.timesheetsAwaitingApproval;
   const outstandingInvoices = data.metrics.outstandingInvoices;
   const atRiskCount = atRiskPlacements.length;
-
-  const atRiskDetail =
-    atRiskCount === 0
-      ? "All open placements look commercially healthy"
-      : atRiskPlacements
-          .slice(0, 2)
-          .map((p) => {
-            const title = placementPositionTitle(p.title, p.placement_type);
-            const m = marginPercent(p.bill_rate, p.pay_rate);
-            const marginNote =
-              m != null ? ` · ~${m.toFixed(0)}% margin` : " · thin margin";
-            return `${title}${marginNote}`;
-          })
-          .join("; ") + (atRiskCount > 2 ? ` · +${atRiskCount - 2} more` : "");
 
   const healthItems: Array<
     StaffingHealthItem & {
@@ -70,39 +54,16 @@ export default async function ClientDashboardPage() {
       id: "open-roles",
       label: "Open roles",
       value: openRoles,
-      detail:
-        openRoles === 0
-          ? "No open job requests"
-          : `${openRoles} seat${openRoles === 1 ? "" : "s"} to fill`,
+      detail: "",
       href: "/client/job-requests?status=open",
       tone: openRoles === 0 ? "ok" : openRoles >= 3 ? "warn" : "info",
       icon: "roles",
     },
     {
-      id: "candidates",
-      label: "Candidates waiting",
-      value: candidatesWaiting,
-      detail:
-        candidatesWaiting === 0
-          ? "No applications need review"
-          : "Submitted / under review",
-      href: "/client/candidates",
-      tone:
-        candidatesWaiting === 0
-          ? "ok"
-          : candidatesWaiting >= 3
-            ? "warn"
-            : "info",
-      icon: "candidates",
-    },
-    {
       id: "timesheets",
       label: "Timesheets due",
       value: timesheetsDue,
-      detail:
-        timesheetsDue === 0
-          ? "Nothing waiting on approval"
-          : "Submitted — approve or reject",
+      detail: "",
       href: "/client/timesheets?status=submitted",
       tone:
         timesheetsDue === 0 ? "ok" : timesheetsDue >= 3 ? "warn" : "info",
@@ -112,10 +73,7 @@ export default async function ClientDashboardPage() {
       id: "invoices",
       label: "Outstanding invoices",
       value: outstandingInvoices,
-      detail:
-        outstandingInvoices === 0
-          ? "No unpaid invoices"
-          : "Sent or disputed — not paid",
+      detail: "",
       href: "/client/invoices?status=outstanding",
       tone:
         outstandingInvoices === 0
@@ -129,7 +87,7 @@ export default async function ClientDashboardPage() {
       id: "at-risk",
       label: "At-risk contracts",
       value: atRiskCount,
-      detail: atRiskDetail,
+      detail: "",
       href: "/client/contracts?status=at_risk",
       tone: atRiskCount === 0 ? "ok" : "critical",
       icon: "atrisk",
@@ -138,10 +96,7 @@ export default async function ClientDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Dashboard"
-        description={`${company} · open work and items that need your action.`}
-      />
+      <PageHeader title="Dashboard" />
 
       <StaffingHealthStrip items={healthItems} />
 
@@ -198,8 +153,7 @@ export default async function ClientDashboardPage() {
         </Card>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
+      <Card>
           <CardTitle className="mb-4">Recent activity</CardTitle>
           {data.recentActivity.length === 0 ? (
             <p className="text-sm text-[var(--cf-muted)]">
@@ -237,37 +191,6 @@ export default async function ClientDashboardPage() {
             </ul>
           )}
         </Card>
-
-        <Card>
-          <CardTitle className="mb-4">Quick actions</CardTitle>
-          <div className="flex flex-col gap-2">
-            <Button href="/client/job-requests/new" className="w-full">
-              Submit job request
-            </Button>
-            <Button
-              href="/client/candidates"
-              variant="secondary"
-              className="w-full"
-            >
-              Review candidates
-            </Button>
-            <Button
-              href="/client/timesheets?status=submitted"
-              variant="secondary"
-              className="w-full"
-            >
-              Approve timesheets
-            </Button>
-            <Button
-              href="/client/invoices?status=outstanding"
-              variant="secondary"
-              className="w-full"
-            >
-              View invoices
-            </Button>
-          </div>
-        </Card>
-      </div>
 
       <Card>
         <div className="mb-4 flex items-center justify-between gap-2">

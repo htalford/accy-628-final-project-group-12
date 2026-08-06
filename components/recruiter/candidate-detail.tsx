@@ -99,6 +99,14 @@ export function CandidateDetail({
                   Employer submittal
                 </span>
               ) : null}
+              {candidate.source === "job_interest" ? (
+                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+                  Interested · low match
+                  {candidate.matchPercent != null
+                    ? ` · ${candidate.matchPercent}%`
+                    : ""}
+                </span>
+              ) : null}
             </p>
           </div>
         </div>
@@ -112,7 +120,7 @@ export function CandidateDetail({
           <ActionButton
             icon={<FileText className="h-4 w-4" />}
             label="Update Status"
-            disabled={pending}
+            disabled={pending || candidate.source === "job_interest"}
             onClick={() => setShowStatus(true)}
           />
           <ActionButton
@@ -127,12 +135,13 @@ export function CandidateDetail({
             danger
             disabled={
               pending ||
+              candidate.source === "job_interest" ||
               candidate.applicationStatus === "rejected" ||
               candidate.status === "Rejected"
             }
             onClick={() => run(() => rejectApplication(applicationId))}
           />
-          {!approved ? (
+          {!approved && candidate.source !== "job_interest" ? (
             <ActionButton
               icon={<CheckCircle2 className="h-4 w-4" />}
               label="Approve Application"
@@ -140,12 +149,12 @@ export function CandidateDetail({
               disabled={pending}
               onClick={() => run(() => approveApplication(applicationId))}
             />
-          ) : (
+          ) : approved ? (
             <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
               <CheckCircle2 className="h-4 w-4" />
               Approved
             </span>
-          )}
+          ) : null}
         </div>
       </div>
 

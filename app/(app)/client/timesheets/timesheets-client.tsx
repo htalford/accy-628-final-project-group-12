@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, THead, Th, Td } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Pagination } from "@/components/ui/form";
 import { ConfirmActionDialog } from "@/components/client-portal/confirm-action-dialog";
 import { useToast } from "@/components/client-portal/toast";
 import type { TimesheetWithDetails } from "@/lib/client-portal/types";
@@ -16,7 +15,6 @@ import {
   seedStatusTone,
   timesheetStatusLabel,
 } from "@/lib/client-portal/labels";
-import { paginate } from "@/lib/client-portal/pagination";
 import { updateTimesheetStatusAction } from "@/app/actions/client-portal";
 
 type PendingAction = {
@@ -27,11 +25,9 @@ type PendingAction = {
 };
 
 export function TimesheetsClient({
-  companyName,
   timesheets,
   employeeNames,
 }: {
-  companyName: string;
   timesheets: TimesheetWithDetails[];
   employeeNames: string[];
 }) {
@@ -43,7 +39,6 @@ export function TimesheetsClient({
   const [week, setWeek] = useState("All");
   const [employee, setEmployee] = useState("All");
   const [status, setStatus] = useState(initialStatus);
-  const [page, setPage] = useState(1);
   const [dialog, setDialog] = useState<PendingAction | null>(null);
 
   const weeks = useMemo(
@@ -65,13 +60,10 @@ export function TimesheetsClient({
     );
   });
 
-  const paged = paginate(filtered, page);
-
   function clearFilters() {
     setWeek("All");
     setEmployee("All");
     setStatus("All");
-    setPage(1);
   }
 
   function openAction(
@@ -107,16 +99,12 @@ export function TimesheetsClient({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Timesheets"
-        description={`Live timesheets for ${companyName} placements (statuses match seed enums).`}
-      />
+      <PageHeader title="Timesheets" />
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Select
           value={week}
           onChange={(e) => {
             setWeek(e.target.value);
-            setPage(1);
           }}
         >
           {weeks.map((w) => (
@@ -129,7 +117,6 @@ export function TimesheetsClient({
           value={employee}
           onChange={(e) => {
             setEmployee(e.target.value);
-            setPage(1);
           }}
         >
           <option value="All">All employees</option>
@@ -143,7 +130,6 @@ export function TimesheetsClient({
           value={status}
           onChange={(e) => {
             setStatus(e.target.value);
-            setPage(1);
           }}
         >
           <option value="All">All statuses</option>
@@ -182,7 +168,7 @@ export function TimesheetsClient({
                 <Th>Employee</Th>
                 <Th>Position</Th>
                 <Th>Week Ending</Th>
-                <Th>Regular</Th>
+                <Th>Hours</Th>
                 <Th>Overtime</Th>
                 <Th>Total</Th>
                 <Th>Status</Th>
@@ -190,7 +176,7 @@ export function TimesheetsClient({
               </tr>
             </THead>
             <tbody>
-              {paged.items.map((t) => (
+              {filtered.map((t) => (
                 <tr key={t.id} className="hover:bg-[var(--cf-surface)]/60">
                   <Td className="font-medium">{t.employee_name}</Td>
                   <Td>{t.position_title}</Td>
@@ -240,11 +226,6 @@ export function TimesheetsClient({
               ))}
             </tbody>
           </Table>
-          <Pagination
-            page={paged.page}
-            totalPages={paged.totalPages}
-            onPageChange={setPage}
-          />
         </>
       )}
 

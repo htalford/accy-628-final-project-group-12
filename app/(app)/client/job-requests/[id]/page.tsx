@@ -9,6 +9,7 @@ import {
   jobRequestStatusLabel,
   seedStatusTone,
 } from "@/lib/client-portal/labels";
+import { getIndustryProfileOptions } from "@/lib/candidate/industry-profile";
 
 export default async function JobRequestDetailPage({
   params,
@@ -28,10 +29,7 @@ export default async function JobRequestDetailPage({
         ]}
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <PageHeader
-          title={job.title}
-          description={`${job.department} · Requested ${job.created_at.slice(0, 10)}`}
-        />
+        <PageHeader title={job.title} />
         <div className="flex items-center gap-2">
           <Badge tone={seedStatusTone(job.status)}>
             {jobRequestStatusLabel(job.status)}
@@ -46,6 +44,20 @@ export default async function JobRequestDetailPage({
         <Card>
           <CardTitle className="mb-3">Request details</CardTitle>
           <dl className="space-y-2 text-sm">
+            <div className="flex justify-between gap-4">
+              <dt className="text-[var(--cf-muted)]">Industry</dt>
+              <dd className="font-medium text-right">
+                {getIndustryProfileOptions(job.industry)?.name ??
+                  job.industry ??
+                  "—"}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-[var(--cf-muted)]">Years of experience</dt>
+              <dd className="font-medium text-right">
+                {job.years_experience ?? "—"}
+              </dd>
+            </div>
             <div className="flex justify-between gap-4">
               <dt className="text-[var(--cf-muted)]">Positions</dt>
               <dd className="font-medium">{job.positions}</dd>
@@ -83,6 +95,20 @@ export default async function JobRequestDetailPage({
               job.skills.map((s) => (
                 <Badge key={s} tone="navy">
                   {s}
+                </Badge>
+              ))
+            )}
+          </div>
+        </Card>
+        <Card>
+          <CardTitle className="mb-3">Required certifications</CardTitle>
+          <div className="flex flex-wrap gap-2">
+            {(job.certifications ?? []).length === 0 ? (
+              <p className="text-sm text-[var(--cf-muted)]">None listed</p>
+            ) : (
+              (job.certifications ?? []).map((c) => (
+                <Badge key={c} tone="success">
+                  {c}
                 </Badge>
               ))
             )}

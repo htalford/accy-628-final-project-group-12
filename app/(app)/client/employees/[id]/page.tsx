@@ -43,7 +43,7 @@ export default async function EmployeeDetailPage({
         ]}
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <PageHeader title={name} description={title} />
+        <PageHeader title={name} />
         <div className="flex items-center gap-2">
           <Badge tone={seedStatusTone(placement.status)}>
             {placementStatusLabel(placement.status)}
@@ -97,8 +97,8 @@ export default async function EmployeeDetailPage({
             <THead>
               <tr>
                 <Th>Week Ending</Th>
-                <Th>Regular</Th>
-                <Th>OT</Th>
+                <Th>Hours</Th>
+                <Th>Overtime</Th>
                 <Th>Total</Th>
                 <Th>Status</Th>
                 <Th> </Th>

@@ -6,6 +6,7 @@ import { SearchInput } from "@/components/ui/search-input";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { MatchScoreBadge } from "@/components/matching/match-score-badge";
 import { filterCandidates } from "@/lib/recruiter/filters";
 import type { RecruiterCandidate } from "@/lib/recruiter/types";
 
@@ -28,6 +29,7 @@ export function CandidateFiltersPanel({
   const [skill, setSkill] = useState("all");
   const [location, setLocation] = useState("all");
   const [recruiter, setRecruiter] = useState("all");
+  const [match, setMatch] = useState("all");
 
   const rows = useMemo(
     () =>
@@ -38,12 +40,38 @@ export function CandidateFiltersPanel({
         skills: skill,
         location,
         recruiter,
+        match,
       }),
-    [initialRows, search, status, experience, skill, location, recruiter],
+    [
+      initialRows,
+      search,
+      status,
+      experience,
+      skill,
+      location,
+      recruiter,
+      match,
+    ],
+  );
+
+  const needsReviewCount = useMemo(
+    () =>
+      initialRows.filter(
+        (c) => c.matchPercent != null && c.matchPercent < 60,
+      ).length,
+    [initialRows],
   );
 
   return (
     <div className="space-y-4">
+      {needsReviewCount > 0 ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <span className="font-semibold">{needsReviewCount}</span> candidate
+          {needsReviewCount === 1 ? "" : "s"} under 60% match — sorted to the top
+          for recruiter review. Use the Match filter to focus on them.
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-3 rounded-xl border border-[var(--cf-border)] bg-white p-4 shadow-sm">
         <SearchInput
           value={search}
@@ -58,6 +86,16 @@ export function CandidateFiltersPanel({
             options={[
               { value: "all", label: "All statuses" },
               ...statuses.map((s) => ({ value: s, label: s })),
+            ]}
+          />
+          <FilterSelect
+            label="Match"
+            value={match}
+            onChange={setMatch}
+            options={[
+              { value: "all", label: "All match scores" },
+              { value: "under60", label: "Under 60% (needs review)" },
+              { value: "60plus", label: "60% and above" },
             ]}
           />
           <FilterSelect
@@ -112,6 +150,11 @@ export function CandidateFiltersPanel({
               <div>
                 <p className="font-medium">{row.name}</p>
                 <p className="text-xs text-[var(--cf-muted)]">{row.email}</p>
+                {row.source === "job_interest" ? (
+                  <p className="mt-0.5 text-[10px] font-medium tracking-wide text-amber-800 uppercase">
+                    Interested · low match
+                  </p>
+                ) : null}
               </div>
             ),
           },
@@ -119,6 +162,32 @@ export function CandidateFiltersPanel({
             key: "position",
             header: "Position Applied",
             render: (row) => row.positionApplied,
+          },
+          {
+            key: "match",
+            header: "Match",
+            render: (row) => {
+              if (row.matchPercent == null || !row.matchBand) {
+                return (
+                  <span className="text-xs text-[var(--cf-muted)]">—</span>
+                );
+              }
+              const needsReview = row.matchPercent < 60;
+              return (
+                <div className="space-y-1">
+                  <MatchScoreBadge
+                    score={row.matchPercent}
+                    band={row.matchBand}
+                    compact
+                  />
+                  {needsReview ? (
+                    <p className="text-[10px] font-semibold tracking-wide text-amber-800 uppercase">
+                      Needs review
+                    </p>
+                  ) : null}
+                </div>
+              );
+            },
           },
           {
             key: "exp",
@@ -141,7 +210,7 @@ export function CandidateFiltersPanel({
             interactive: true,
             render: (row) => (
               <Link
-                href={`/recruiter/candidates/${row.id}`}
+                href={`/recruiter/candidates/${encodeURIComponent(row.id)}`}
                 className="rounded-md bg-[var(--cf-navy)] px-2.5 py-1 text-xs font-medium text-white hover:bg-[var(--cf-navy-hover)]"
               >
                 View

@@ -11,6 +11,7 @@ import { Breadcrumbs } from "@/components/client-portal/breadcrumbs";
 import { ConfirmActionDialog } from "@/components/client-portal/confirm-action-dialog";
 import { useToast } from "@/components/client-portal/toast";
 import { updateApplicationStatusAction } from "@/app/actions/client-portal";
+import { updateApplicationStatus } from "@/app/actions/recruiter";
 import type { ClientCandidate, SubmittalStage } from "@/lib/types/database";
 import {
   seedStatusTone,
@@ -110,8 +111,10 @@ const ROWS: Array<{
 
 export function CandidateCompareClient({
   candidates,
+  listHref = "/client/candidates",
 }: {
   candidates: ClientCandidate[];
+  listHref?: string;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -130,6 +133,37 @@ export function CandidateCompareClient({
 
   async function confirmDecision(reason: string) {
     if (!dialog) return;
+    if (listHref.startsWith("/recruiter")) {
+      const nextStatus = dialog.next === "accepted" ? "offered" : "rejected";
+      const result = await updateApplicationStatus(dialog.id, nextStatus);
+      if (result.ok) {
+        toast.push(
+          dialog.next === "accepted"
+            ? result.message
+            : `${dialog.name} rejected.${reason.trim() ? ` (${reason.trim()})` : ""}`,
+          dialog.next === "accepted" ? "success" : "info",
+        );
+        setRows((prev) =>
+          prev.map((c) =>
+            c.id === dialog.id
+              ? {
+                  ...c,
+                  stage:
+                    dialog.next === "accepted"
+                      ? "offer"
+                      : ("rejected" as const),
+                }
+              : c,
+          ),
+        );
+        setDialog(null);
+        startTransition(() => router.refresh());
+      } else {
+        toast.push(result.error, "error");
+      }
+      return;
+    }
+
     const result = await updateApplicationStatusAction(
       dialog.id,
       dialog.next,
@@ -163,15 +197,12 @@ export function CandidateCompareClient({
       <div className="space-y-6">
         <Breadcrumbs
           items={[
-            { label: "Candidates", href: "/client/candidates" },
+            { label: "Candidates", href: listHref },
             { label: "Compare" },
           ]}
         />
-        <PageHeader
-          title="Compare candidates"
-          description="Select 2–3 candidates on the Candidates page to compare side by side."
-        />
-        <Button href="/client/candidates" variant="secondary">
+        <PageHeader title="Compare candidates" />
+        <Button href={listHref} variant="secondary">
           Back to candidates
         </Button>
       </div>
@@ -182,16 +213,13 @@ export function CandidateCompareClient({
     <div className="space-y-6">
       <Breadcrumbs
         items={[
-          { label: "Candidates", href: "/client/candidates" },
+          { label: "Candidates", href: listHref },
           { label: "Compare" },
         ]}
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <PageHeader
-          title={title}
-          description="Side-by-side review of pipeline candidates for the same or different roles."
-        />
-        <Button href="/client/candidates" variant="secondary" size="sm">
+        <PageHeader title={title} />
+        <Button href={listHref} variant="secondary" size="sm">
           Change selection
         </Button>
       </div>
@@ -294,7 +322,7 @@ export function CandidateCompareClient({
         </p>
         <p className="mt-2 text-sm">
           <Link
-            href="/client/candidates"
+            href={listHref}
             className="font-medium text-[var(--cf-navy)] hover:underline"
           >
             ← Return to all candidates

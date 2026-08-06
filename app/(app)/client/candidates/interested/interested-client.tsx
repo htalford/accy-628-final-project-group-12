@@ -16,24 +16,13 @@ export function InterestedCandidatesClient({
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <PageHeader
-          title="Interested candidates"
-        description="People who marked interest on your open jobs in the candidate portal, before or instead of applying."
-      />
-        <Button href="/client/candidates" variant="secondary">
-          Back to applications
-        </Button>
+        <PageHeader title="Interested candidates" />
       </div>
 
       {initial.length === 0 ? (
         <EmptyState
           title="No interest yet"
           description="When candidates on the talent board mark your jobs as interested, they show up here so you can follow up."
-          action={
-            <Button href="/client/candidates" variant="secondary">
-              View applications
-            </Button>
-          }
         />
       ) : (
         <div className="overflow-hidden rounded-xl border border-[var(--cf-border)] bg-white shadow-sm">

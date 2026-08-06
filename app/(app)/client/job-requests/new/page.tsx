@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,68 @@ import { Breadcrumbs } from "@/components/client-portal/breadcrumbs";
 import { ConfirmActionDialog } from "@/components/client-portal/confirm-action-dialog";
 import { useToast } from "@/components/client-portal/toast";
 import { createJobRequestAction } from "@/app/actions/client-portal";
+import {
+  INDUSTRY_PROFILE_OPTIONS,
+  YEARS_OPTIONS,
+  getIndustryProfileOptions,
+  joinCommaList,
+} from "@/lib/candidate/industry-profile";
+
+function toggleValue(list: string[], value: string): string[] {
+  return list.includes(value)
+    ? list.filter((item) => item !== value)
+    : [...list, value];
+}
+
+function CheckboxGrid({
+  legend,
+  hint,
+  options,
+  selected,
+  onToggle,
+}: {
+  legend: string;
+  hint?: string;
+  options: readonly string[];
+  selected: string[];
+  onToggle: (value: string) => void;
+}) {
+  return (
+    <fieldset className="space-y-3">
+      <div>
+        <legend className="text-base font-semibold text-[var(--cf-ink)]">
+          {legend}
+        </legend>
+        {hint ? (
+          <p className="mt-1 text-xs text-[var(--cf-muted)]">{hint}</p>
+        ) : null}
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map((option) => {
+          const checked = selected.includes(option);
+          return (
+            <label
+              key={option}
+              className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 text-sm transition ${
+                checked
+                  ? "border-[var(--cf-navy)] bg-[var(--cf-navy)]/5"
+                  : "border-[var(--cf-border)] bg-white hover:bg-[var(--cf-surface)]"
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-[var(--cf-navy)]"
+                checked={checked}
+                onChange={() => onToggle(option)}
+              />
+              <span className="leading-snug text-[var(--cf-ink)]">{option}</span>
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
 
 export default function NewJobRequestPage() {
   const router = useRouter();
@@ -26,13 +88,39 @@ export default function NewJobRequestPage() {
     location: "Des Moines, IA",
     payRate: "",
     startDate: "",
-    skills: "",
+    industry: "",
+    yearsExperience: "",
     description: "",
     notes: "",
   });
+  const [skills, setSkills] = useState<string[]>([]);
+  const [certifications, setCertifications] = useState<string[]>([]);
+
+  const industryOptions = useMemo(
+    () => getIndustryProfileOptions(form.industry),
+    [form.industry],
+  );
+
+  function onIndustryChange(nextSlug: string) {
+    setForm((f) => ({ ...f, industry: nextSlug }));
+    const opts = getIndustryProfileOptions(nextSlug);
+    if (!opts) {
+      setSkills([]);
+      setCertifications([]);
+      return;
+    }
+    setSkills((prev) => prev.filter((s) => opts.skills.includes(s)));
+    setCertifications((prev) =>
+      prev.filter((c) => opts.certifications.includes(c)),
+    );
+  }
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!form.industry) {
+      toast.push("Please choose an industry.", "error");
+      return;
+    }
     setConfirmOpen(true);
   }
 
@@ -46,7 +134,10 @@ export default function NewJobRequestPage() {
       location: form.location,
       payRate: form.payRate,
       startDate: form.startDate,
-      skills: form.skills,
+      industry: form.industry,
+      yearsExperience: form.yearsExperience,
+      skills: joinCommaList(skills),
+      certifications: joinCommaList(certifications),
       description: form.description,
       notes: form.notes,
     });
@@ -75,10 +166,32 @@ export default function NewJobRequestPage() {
       />
       <PageHeader
         title="New Job Request"
-        description="Submit a staffing need to your TalentQuest recruiters. Saves to your company’s job_requests only (not the public board)."
+        description="Choose an industry to load matching skills, certifications, and experience requirements."
       />
       <Card>
-        <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
+        <form onSubmit={onSubmit} className="grid gap-5 sm:grid-cols-2">
+          <div className="sm:col-span-2 rounded-xl border-2 border-[var(--cf-navy)]/25 bg-[var(--cf-navy)]/5 p-4">
+            <Label htmlFor="industry">Industry</Label>
+            <Select
+              id="industry"
+              required
+              className="mt-1.5 w-full bg-white text-base"
+              value={form.industry}
+              onChange={(e) => onIndustryChange(e.target.value)}
+            >
+              <option value="">Select an industry…</option>
+              {INDUSTRY_PROFILE_OPTIONS.map((item) => (
+                <option key={item.slug} value={item.slug}>
+                  {item.name}
+                </option>
+              ))}
+            </Select>
+            <p className="mt-2 text-xs text-[var(--cf-muted)]">
+              Skills and certification checkboxes update based on this
+              selection (same list candidates use on their profile).
+            </p>
+          </div>
+
           <div className="sm:col-span-2">
             <Label htmlFor="title">Position Title</Label>
             <FieldInput
@@ -166,17 +279,72 @@ export default function NewJobRequestPage() {
               }
             />
           </div>
-          <div className="sm:col-span-2">
-            <Label htmlFor="skills">Required Skills</Label>
-            <FieldInput
-              id="skills"
-              value={form.skills}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, skills: e.target.value }))
-              }
-              placeholder="Comma-separated skills"
-            />
-          </div>
+
+          {industryOptions ? (
+            <div className="sm:col-span-2 space-y-8 rounded-xl border border-[var(--cf-border)] bg-[var(--cf-surface)]/40 p-4 sm:p-5">
+              <p className="text-base font-semibold text-[var(--cf-ink)]">
+                {industryOptions.name} requirements
+              </p>
+
+              <fieldset className="space-y-3">
+                <legend className="text-base font-semibold text-[var(--cf-ink)]">
+                  Years of experience
+                </legend>
+                <p className="text-xs text-[var(--cf-muted)]">
+                  Preferred experience level for this role.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {YEARS_OPTIONS.map((option) => (
+                    <label
+                      key={option}
+                      className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 text-sm ${
+                        form.yearsExperience === option
+                          ? "border-[var(--cf-navy)] bg-[var(--cf-navy)]/5"
+                          : "border-[var(--cf-border)] bg-white hover:bg-[var(--cf-surface)]"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="yearsExperience"
+                        className="mt-0.5 h-4 w-4 accent-[var(--cf-navy)]"
+                        checked={form.yearsExperience === option}
+                        onChange={() =>
+                          setForm((f) => ({ ...f, yearsExperience: option }))
+                        }
+                      />
+                      <span>{option}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              <CheckboxGrid
+                legend="Required skills"
+                hint={`Select skills needed for ${industryOptions.name}. Used for automated matching.`}
+                options={industryOptions.skills}
+                selected={skills}
+                onToggle={(value) =>
+                  setSkills((prev) => toggleValue(prev, value))
+                }
+              />
+
+              <CheckboxGrid
+                legend="Required certifications"
+                hint={`Select certifications for ${industryOptions.name}. Matched against candidate profiles.`}
+                options={industryOptions.certifications}
+                selected={certifications}
+                onToggle={(value) =>
+                  setCertifications((prev) => toggleValue(prev, value))
+                }
+              />
+            </div>
+          ) : (
+            <div className="sm:col-span-2 rounded-xl border border-dashed border-[var(--cf-border)] bg-[var(--cf-surface)] px-4 py-6 text-center text-sm text-[var(--cf-muted)]">
+              Select an industry above to unlock years of experience, skills,
+              and certification checkboxes.
+            </div>
+          )}
+
           <div className="sm:col-span-2">
             <Label htmlFor="description">Job Description</Label>
             <FieldTextarea
