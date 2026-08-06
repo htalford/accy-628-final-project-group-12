@@ -19,7 +19,7 @@ export default async function ReportPreviewPage({
   const report = await getReportPreview(id);
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <div>
         <Link
           href="/accounting/reports"
